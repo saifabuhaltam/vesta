@@ -360,6 +360,29 @@
   .hs-status{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
   .type-badge.accepted{ background:var(--success-soft); color:var(--success); }
   .hs-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+
+  /* ---------- Lock In focus mode ---------- */
+  .lock-in-btn{
+    display:flex; align-items:center; gap:10px; border:1px solid var(--accent);
+    background:var(--accent-soft); color:var(--accent-ink); padding:9px 10px; border-radius:8px;
+    text-align:left; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .lock-in-btn:hover{ background:var(--accent); color:#fff; }
+  .focus-overlay{ position:fixed; inset:0; background:var(--bg); z-index:100; display:flex; align-items:center; justify-content:center; padding:24px; overflow:auto; }
+  .focus-panel{ position:relative; width:100%; max-width:420px; background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:36px 32px; box-shadow:var(--shadow); text-align:center; }
+  .focus-panel.focus-running{ max-width:460px; }
+  .focus-phase{ font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; margin-bottom:18px; }
+  .focus-ring-wrap{ position:relative; width:280px; height:280px; margin:0 auto 22px; }
+  .focus-ring-wrap svg{ position:absolute; top:0; left:0; }
+  .focus-time{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:52px; font-weight:600; }
+  .focus-task{ font-size:14px; color:var(--text-muted); margin-bottom:6px; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .focus-task.hint{ font-style:italic; }
+  .focus-session{ font-size:12.5px; color:var(--text-faint); font-weight:600; text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px; }
+  .focus-dots{ display:flex; justify-content:center; gap:7px; margin-bottom:22px; }
+  .focus-dot{ width:8px; height:8px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border); }
+  .focus-dot.filled{ background:var(--accent); border-color:var(--accent); }
+  .focus-controls{ display:flex; gap:10px; justify-content:center; }
+  .focus-setup-close{ position:absolute; top:16px; right:16px; }
 </style>
 </head>
 <body>
@@ -370,6 +393,7 @@
       <div class="brand-mark">Vesta</div>
       <div class="brand-sub" id="brand-sub">This term</div>
     </div>
+    <button class="lock-in-btn" data-action="open-focus"><span class="ic">⏱</span>Lock In</button>
     <nav class="tabs" id="tabs">
       <button class="tab-btn" data-action="switch-tab" data-tab="overview"><span class="ic">◐</span>Overview</button>
       <button class="tab-btn" data-action="switch-tab" data-tab="classes"><span class="ic">▤</span>Classes</button>
@@ -387,6 +411,7 @@
   </main>
 </div>
 <div id="modal-root"></div>
+<div id="focus-root"></div>
 
 <script>
 (function(){
@@ -1419,6 +1444,180 @@
     });
   }
 
+  // ---------------- Lock In focus mode ----------------
+  var FOCUS_SETTINGS_KEY = 'vesta_focus_settings';
+  var FOCUS_PHASE_LABEL = { work:'Focus', short_break:'Short break', long_break:'Long break' };
+  var FOCUS_PHASE_COLOR = { work:'var(--accent)', short_break:'var(--success)', long_break:'var(--warn)' };
+  var FOCUS_DEFAULTS = { work:45, shortBreak:5, longBreak:15, sessionsBeforeLong:4 };
+
+  function loadFocusSettings(){
+    try{
+      var raw = localStorage.getItem(FOCUS_SETTINGS_KEY);
+      if(raw) return clampFocusSettings(Object.assign({}, FOCUS_DEFAULTS, JSON.parse(raw)));
+    } catch(e){}
+    return Object.assign({}, FOCUS_DEFAULTS);
+  }
+  function saveFocusSettings(s){
+    try{ localStorage.setItem(FOCUS_SETTINGS_KEY, JSON.stringify(s)); } catch(e){}
+  }
+  function clampFocusSettings(s){
+    return {
+      work: Math.min(90, Math.max(25, Number(s.work)||FOCUS_DEFAULTS.work)),
+      shortBreak: Math.min(15, Math.max(3, Number(s.shortBreak)||FOCUS_DEFAULTS.shortBreak)),
+      longBreak: Math.min(30, Math.max(10, Number(s.longBreak)||FOCUS_DEFAULTS.longBreak)),
+      sessionsBeforeLong: Math.min(6, Math.max(2, Number(s.sessionsBeforeLong)||FOCUS_DEFAULTS.sessionsBeforeLong))
+    };
+  }
+
+  var focusSettings = loadFocusSettings();
+  var focusState = null;
+  var focusTickHandle = null;
+  var focusTaskId = '';
+
+  function openFocusOverlay(){ renderFocusOverlay(); }
+
+  function renderFocusOverlay(){
+    var root = document.getElementById('focus-root');
+    root.innerHTML = focusState ? focusRunningHtml() : focusSetupHtml();
+  }
+
+  function focusSetupHtml(){
+    var openItems = items.filter(function(it){ return it.status!=='done'; })
+      .sort(function(a,b){ return (a.dueDate||'zzzz').localeCompare(b.dueDate||'zzzz'); });
+    var taskOptions = '<option value="">No specific task</option>' + openItems.map(function(it){
+      var cls = classById(it.classId);
+      var label = (cls ? cls.code+' — ' : '') + it.title;
+      return '<option value="'+it.id+'"'+(focusTaskId===it.id?' selected':'')+'>'+escapeHtml(label)+'</option>';
+    }).join('');
+
+    return '<div class="focus-overlay" data-action="focus-backdrop">'
+      + '<div class="focus-panel" data-action="focus-stop">'
+      + '<button type="button" class="btn ghost focus-setup-close" data-action="focus-close-setup">✕</button>'
+      + '<h2 style="margin-bottom:18px;">Lock In</h2>'
+      + '<label class="field">Task<select id="focus-task">'+taskOptions+'</select></label>'
+      + '<div class="field-row" style="margin-top:14px;">'
+      + '<label class="field">Work (min)<input type="number" id="focus-work" min="25" max="90" value="'+focusSettings.work+'"></label>'
+      + '<label class="field">Short break (min)<input type="number" id="focus-short" min="3" max="15" value="'+focusSettings.shortBreak+'"></label>'
+      + '</div>'
+      + '<div class="field-row" style="margin-top:10px;">'
+      + '<label class="field">Long break (min)<input type="number" id="focus-long" min="10" max="30" value="'+focusSettings.longBreak+'"></label>'
+      + '<label class="field">Sessions before long break<input type="number" id="focus-count" min="2" max="6" value="'+focusSettings.sessionsBeforeLong+'"></label>'
+      + '</div>'
+      + '<button type="button" class="btn primary" data-action="focus-start" style="margin-top:22px;width:100%;">Start focusing</button>'
+      + '</div></div>';
+  }
+
+  function focusRunningHtml(){
+    var fs = focusState;
+    var total = fs.totalSeconds;
+    var left = fs.secondsLeft;
+    var pct = total>0 ? (left/total) : 0;
+    var circumference = 2*Math.PI*120;
+    var offset = circumference * (1-pct);
+    var mm = Math.floor(left/60), ss = left%60;
+    var timeStr = String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');
+    var it = fs.taskItemId ? items.find(function(i){ return i.id===fs.taskItemId; }) : null;
+    var cls = it ? classById(it.classId) : null;
+    var color = FOCUS_PHASE_COLOR[fs.phase];
+    var dots = '';
+    for(var i=0;i<focusSettings.sessionsBeforeLong;i++){
+      dots += '<span class="focus-dot'+(i<fs.sessionNumber?' filled':'')+'"></span>';
+    }
+
+    return '<div class="focus-overlay">'
+      + '<div class="focus-panel focus-running">'
+      + '<div class="focus-phase" style="color:'+color+';">'+FOCUS_PHASE_LABEL[fs.phase]+'</div>'
+      + '<div class="focus-ring-wrap">'
+      + '<svg width="280" height="280" viewBox="0 0 280 280">'
+      + '<circle cx="140" cy="140" r="120" fill="none" stroke="var(--surface-2)" stroke-width="14"/>'
+      + '<circle cx="140" cy="140" r="120" fill="none" stroke="'+color+'" stroke-width="14" stroke-linecap="round" stroke-dasharray="'+circumference+'" stroke-dashoffset="'+offset+'" transform="rotate(-90 140 140)"/>'
+      + '</svg>'
+      + '<div class="focus-time mono">'+timeStr+'</div>'
+      + '</div>'
+      + (it ? ('<div class="focus-task">'+(cls?'<span class="class-chip" style="--c:'+(cls.color||'var(--none)')+'">'+escapeHtml(cls.code)+'</span>':'')+escapeHtml(it.title)+'</div>') : '<div class="focus-task hint">No specific task</div>')
+      + '<div class="focus-session">Session '+fs.sessionNumber+' of '+focusSettings.sessionsBeforeLong+'</div>'
+      + '<div class="focus-dots">'+dots+'</div>'
+      + '<div class="focus-controls">'
+      + '<button type="button" class="btn primary" data-action="focus-toggle-pause">'+(fs.paused?'Resume':'Pause')+'</button>'
+      + '<button type="button" class="btn danger" data-action="focus-end">End session</button>'
+      + '</div>'
+      + '</div></div>';
+  }
+
+  function playFocusChime(){
+    try{
+      var ctx = new (window.AudioContext||window.webkitAudioContext)();
+      var o = ctx.createOscillator(); var g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880;
+      g.gain.setValueAtTime(0.15, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.6);
+      o.start(); o.stop(ctx.currentTime+0.6);
+    } catch(e){}
+  }
+
+  function advanceFocusPhase(){
+    playFocusChime();
+    var fs = focusState;
+    if(fs.phase === 'work'){
+      if(fs.sessionNumber >= focusSettings.sessionsBeforeLong){
+        fs.phase = 'long_break';
+        fs.totalSeconds = focusSettings.longBreak*60;
+      } else {
+        fs.phase = 'short_break';
+        fs.totalSeconds = focusSettings.shortBreak*60;
+      }
+    } else {
+      if(fs.phase === 'long_break'){ fs.sessionNumber = 1; } else { fs.sessionNumber += 1; }
+      fs.phase = 'work';
+      fs.totalSeconds = focusSettings.work*60;
+    }
+    fs.secondsLeft = fs.totalSeconds;
+    renderFocusOverlay();
+  }
+
+  function focusTick(){
+    if(!focusState || focusState.paused) return;
+    focusState.secondsLeft -= 1;
+    if(focusState.secondsLeft <= 0){ advanceFocusPhase(); }
+    else { renderFocusOverlay(); }
+  }
+
+  function startFocusSession(){
+    focusSettings = clampFocusSettings({
+      work: document.getElementById('focus-work').value,
+      shortBreak: document.getElementById('focus-short').value,
+      longBreak: document.getElementById('focus-long').value,
+      sessionsBeforeLong: document.getElementById('focus-count').value
+    });
+    saveFocusSettings(focusSettings);
+    focusTaskId = document.getElementById('focus-task').value || '';
+
+    focusState = {
+      phase: 'work',
+      totalSeconds: focusSettings.work*60,
+      secondsLeft: focusSettings.work*60,
+      sessionNumber: 1,
+      paused: false,
+      taskItemId: focusTaskId || null
+    };
+    renderFocusOverlay();
+    if(focusTickHandle) clearInterval(focusTickHandle);
+    focusTickHandle = setInterval(focusTick, 1000);
+  }
+
+  function toggleFocusPause(){
+    if(!focusState) return;
+    focusState.paused = !focusState.paused;
+    renderFocusOverlay();
+  }
+
+  function endFocusSession(){
+    if(focusTickHandle){ clearInterval(focusTickHandle); focusTickHandle = null; }
+    focusState = null;
+    document.getElementById('focus-root').innerHTML = '';
+  }
+
   function saveTermFromForm(){
     var data = {
       name: document.getElementById('f-term-name').value.trim(),
@@ -1598,6 +1797,16 @@
           loadState();
         }).catch(reportError);
       }
+      return;
+    }
+    if(action==='open-focus'){ openFocusOverlay(); return; }
+    if(action==='focus-backdrop'){ document.getElementById('focus-root').innerHTML=''; return; }
+    if(action==='focus-stop'){ e.stopPropagation(); return; }
+    if(action==='focus-close-setup'){ document.getElementById('focus-root').innerHTML=''; return; }
+    if(action==='focus-start'){ startFocusSession(); return; }
+    if(action==='focus-toggle-pause'){ toggleFocusPause(); return; }
+    if(action==='focus-end'){
+      if(confirmAction('End this focus session?', "You'll lose the current timer progress.")){ endFocusSession(); }
       return;
     }
   });
