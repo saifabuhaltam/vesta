@@ -319,9 +319,10 @@
   .detail-section{ margin-bottom:22px; }
   .detail-section:last-child{ margin-bottom:0; }
   .file-cat-title{ font-size:12px; font-weight:600; color:var(--text-muted); margin:0 0 6px; }
-  .material-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 11px; border:1px solid var(--border); border-radius:8px; margin-bottom:6px; font-size:13px; background:var(--surface); }
-  .material-row a{ color:var(--text); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .material-row{ display:flex; align-items:center; gap:8px; padding:8px 11px; border:1px solid var(--border); border-radius:8px; margin-bottom:6px; font-size:13px; background:var(--surface); }
+  .material-row a{ flex:1; min-width:0; color:var(--text); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .material-row a:hover{ color:var(--accent); text-decoration:underline; }
+  .mat-cat-select{ width:auto; flex:none; font-size:11px; padding:4px 6px; }
   .material-add-row{ display:flex; gap:6px; margin-top:8px; }
   .material-add-row input[type="text"]{ flex:1; }
   .dropzone{
@@ -624,6 +625,33 @@
   }
   function updateHeadstart(id, data){ return apiPut('/api/headstarts/'+id, data); }
   function deleteHeadstart(id){ return apiDelete('/api/headstarts/'+id); }
+  function updateMaterial(id, data){ return apiPut('/api/materials/'+id, data).then(loadState); }
+  function fetchRubric(materialId){ return apiGet('/api/materials/'+materialId+'/rubric'); }
+  function parseRubric(materialId){ return apiPost('/api/materials/'+materialId+'/parse-rubric', {}); }
+  function updateRubric(id, data){ return apiPut('/api/rubrics/'+id, data); }
+  function deleteRubricRecord(id){ return apiDelete('/api/rubrics/'+id); }
+  function logFocusTime(itemId, seconds){ return apiPost('/api/items/'+itemId+'/focus-time', { seconds:seconds }); }
+
+  var FILE_CATEGORY_RULES = [
+    [/rubric/, 'rubrics'],
+    [/midterm|final[\s_-]?exam|past[\s_-]?exam|exam[\s_-]?\d|old[\s_-]?exam/, 'exams'],
+    [/lecture|slides|week[\s_-]?\d+|lesson[\s_-]?\d+/, 'slides'],
+    [/reading|article|chapter|excerpt/, 'readings'],
+    [/project/, 'projects'],
+    [/notes|journal/, 'personal']
+  ];
+  function guessFileCategory(filename){
+    var name = (filename||'').toLowerCase();
+    for(var i=0;i<FILE_CATEGORY_RULES.length;i++){
+      if(FILE_CATEGORY_RULES[i][0].test(name)) return FILE_CATEGORY_RULES[i][1];
+    }
+    return 'other';
+  }
+  function formatFocusDuration(sec){
+    var h = Math.floor(sec/3600), m = Math.round((sec%3600)/60);
+    if(h>0) return h+'h '+m+'m';
+    return m+'m';
+  }
 
   // ---------------- init ----------------
   function init(){ loadState(); }
@@ -1047,7 +1075,11 @@
         + rows.map(function(m){
             var label = escapeHtml(m.title || m.filename || m.url);
             var titleAttr = m.kind==='file' ? ' title="'+humanSize(m.size)+'"' : '';
-            return '<div class="material-row"><a href="'+escapeHtml(m.url)+'" target="_blank" rel="noopener noreferrer"'+titleAttr+'>'+label+'</a><button type="button" class="btn ghost" data-action="remove-material" data-class="'+c.id+'" data-mid="'+m.id+'">✕</button></div>';
+            var rubricBtn = cat.key==='rubrics' ? '<button type="button" class="btn ghost" data-action="open-rubric" data-mid="'+m.id+'" data-class="'+c.id+'">Rubric</button>' : '';
+            var catSelect = '<select class="mat-cat-select" data-action="change-material-category" data-class="'+c.id+'" data-mid="'+m.id+'">'
+              + FILE_CATEGORIES.map(function(fc){ return '<option value="'+fc.key+'"'+((m.category||'other')===fc.key?' selected':'')+'>'+fc.label+'</option>'; }).join('')
+              + '</select>';
+            return '<div class="material-row"><a href="'+escapeHtml(m.url)+'" target="_blank" rel="noopener noreferrer"'+titleAttr+'>'+label+'</a>'+catSelect+rubricBtn+'<button type="button" class="btn ghost" data-action="remove-material" data-class="'+c.id+'" data-mid="'+m.id+'">✕</button></div>';
           }).join('')
         + '</div>';
     });
@@ -1176,6 +1208,55 @@
     document.getElementById('modal-root').innerHTML = html;
   }
 
+  var currentRubricMaterialId = null;
+  var currentRubricClassId = null;
+  var currentRubric = null;
+
+  function openRubricModal(materialId, classId){
+    currentRubricMaterialId = materialId;
+    currentRubricClassId = classId;
+    document.getElementById('modal-root').innerHTML = '<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop"><div class="modal-body"><div class="hint">Loading…</div></div></div></div>';
+    fetchRubric(materialId).then(function(rubric){
+      currentRubric = rubric;
+      renderRubricModal();
+    }).catch(function(err){ closeModal(); reportError(err); });
+  }
+
+  function renderRubricModal(){
+    var cls = classById(currentRubricClassId);
+    var mat = cls ? (cls.materials||[]).find(function(m){ return m.id===currentRubricMaterialId; }) : null;
+    var body;
+    if(!currentRubric){
+      if(mat && !mat.hasText){
+        body = '<div class="hint">No extractable text was found in this file - only PDF and DOCX get their text pulled out on upload. Try re-uploading it as one of those.</div>';
+      } else {
+        body = '<div class="hint" style="margin-bottom:14px;">Pull the grading criteria out of this file so they can feed the grade tracker and Headstart.</div>'
+          + '<button type="button" class="btn primary" data-action="rubric-parse">Parse rubric</button>';
+      }
+    } else {
+      var classItems = items.filter(function(it){ return it.classId===currentRubricClassId; });
+      var linkOptions = '<option value="">Not linked to an assignment</option>' + classItems.map(function(it){
+        return '<option value="'+it.id+'"'+(currentRubric.itemId===it.id?' selected':'')+'>'+escapeHtml(it.title)+'</option>';
+      }).join('');
+      var rows = currentRubric.criteria.length ? currentRubric.criteria.map(function(c){
+        return '<div class="grade-row"><span>'+escapeHtml(c.name||'')+(c.description?' <span class="hint">— '+escapeHtml(c.description)+'</span>':'')+'</span><span class="mono">'+(c.points!=null?c.points:'—')+'</span><span></span></div>';
+      }).join('') : '<div class="hint">No criteria found in this file.</div>';
+      body = (currentRubric.totalPoints!=null ? '<div class="hint" style="margin-bottom:10px;">Total: '+currentRubric.totalPoints+' points</div>' : '')
+        + '<div class="grade-table">'+rows+'</div>'
+        + '<label class="field" style="margin-top:16px;">Link to assignment<select id="rubric-link" data-action="rubric-link-select">'+linkOptions+'</select></label>'
+        + '<div style="display:flex;gap:8px;margin-top:14px;">'
+        + '<button type="button" class="btn ghost danger" data-action="rubric-delete">Delete</button>'
+        + '<button type="button" class="btn" data-action="rubric-parse">Re-parse</button>'
+        + '</div>';
+    }
+    var html = '<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop">'
+      + '<div class="modal-head"><h2>Rubric</h2>'+(mat?'<div class="hint" style="margin-top:6px;">'+escapeHtml(mat.title||mat.filename||'')+'</div>':'')+'</div>'
+      + '<div class="modal-body">'+body+'</div>'
+      + '<div class="modal-foot"><span></span><div class="right"><button class="btn" data-action="modal-close">Close</button></div></div>'
+      + '</div></div>';
+    document.getElementById('modal-root').innerHTML = html;
+  }
+
   var editingSubtasks = [];
 
   function openItemModal(existing, prefillDate, prefillClassId){
@@ -1260,6 +1341,19 @@
       ? '<div class="hint">Weight '+it.weight+'%'+(it.score!=null?' · Score '+it.score+'%':' · not graded yet')+'</div>'
       : '';
 
+    var focusHtml = it.focusSeconds>0
+      ? '<div class="hint">Focus time logged: '+formatFocusDuration(it.focusSeconds)+'</div>'
+      : '';
+
+    var rubricHtml = '';
+    if(it.rubric && it.rubric.criteria && it.rubric.criteria.length){
+      rubricHtml = '<div><div style="font-size:12px;font-weight:600;color:var(--text-muted);margin:14px 0 6px;">Rubric'+(it.rubric.totalPoints!=null?' · '+it.rubric.totalPoints+' pts':'')+'</div>'
+        + it.rubric.criteria.map(function(c){
+            return '<div class="hint" style="margin-bottom:4px;">• '+escapeHtml(c.name||'')+(c.points!=null?' ('+c.points+' pts)':'')+(c.description?' — '+escapeHtml(c.description):'')+'</div>';
+          }).join('')
+        + '</div>';
+    }
+
     var notesHtml = it.notes
       ? '<div style="white-space:pre-wrap;font-size:13px;color:var(--text);">'+escapeHtml(it.notes)+'</div>'
       : '<div class="hint">No description yet.</div>';
@@ -1284,7 +1378,9 @@
       + '<div class="modal-body">'
       + '<div class="mono" style="font-size:13px;font-weight:600;color:'+urgencyColor+';">'+whenLine+'</div>'
       + gradeHtml
+      + focusHtml
       + notesHtml
+      + rubricHtml
       + subsHtml
       + '</div>'
       + '<div class="modal-foot"><button class="btn danger" data-action="detail-delete-item" data-id="'+it.id+'">Delete</button>'
@@ -1560,6 +1656,7 @@
     playFocusChime();
     var fs = focusState;
     if(fs.phase === 'work'){
+      fs.workSecondsLogged = (fs.workSecondsLogged||0) + fs.totalSeconds;
       if(fs.sessionNumber >= focusSettings.sessionsBeforeLong){
         fs.phase = 'long_break';
         fs.totalSeconds = focusSettings.longBreak*60;
@@ -1599,7 +1696,8 @@
       secondsLeft: focusSettings.work*60,
       sessionNumber: 1,
       paused: false,
-      taskItemId: focusTaskId || null
+      taskItemId: focusTaskId || null,
+      workSecondsLogged: 0
     };
     renderFocusOverlay();
     if(focusTickHandle) clearInterval(focusTickHandle);
@@ -1614,6 +1712,14 @@
 
   function endFocusSession(){
     if(focusTickHandle){ clearInterval(focusTickHandle); focusTickHandle = null; }
+    var fs = focusState;
+    if(fs){
+      var totalWork = fs.workSecondsLogged || 0;
+      if(fs.phase === 'work'){ totalWork += Math.max(0, fs.totalSeconds - fs.secondsLeft); }
+      if(fs.taskItemId && totalWork > 0){
+        logFocusTime(fs.taskItemId, totalWork).then(loadState).catch(function(){});
+      }
+    }
     focusState = null;
     document.getElementById('focus-root').innerHTML = '';
   }
@@ -1738,6 +1844,27 @@
       return;
     }
     if(action==='open-headstart'){ openHeadstartModal(t.dataset.id); return; }
+    if(action==='open-rubric'){ openRubricModal(t.dataset.mid, t.dataset.class); return; }
+    if(action==='rubric-parse'){
+      var rBody = document.querySelector('.modal-body');
+      if(rBody) rBody.innerHTML = '<div class="hint">Reading the rubric… this can take up to a minute.</div>';
+      parseRubric(currentRubricMaterialId).then(function(r){
+        currentRubric = r;
+        renderRubricModal();
+        loadState();
+      }).catch(function(err){ renderRubricModal(); reportError(err); });
+      return;
+    }
+    if(action==='rubric-delete'){
+      if(confirmAction('Delete this rubric?', 'This removes the parsed criteria. The file itself stays.')){
+        deleteRubricRecord(currentRubric.id).then(function(){
+          currentRubric = null;
+          renderRubricModal();
+          loadState();
+        }).catch(reportError);
+      }
+      return;
+    }
     if(action==='hs-select-kind'){ headstartActiveKind = t.dataset.kind; headstartRevisingKind = null; renderHeadstartModal(); return; }
     if(action==='hs-generate'){ submitHeadstart(currentHeadstartItemId, t.dataset.kind, 'generate', ''); return; }
     if(action==='hs-regenerate'){
@@ -1843,6 +1970,18 @@
       toggleTopic(t.dataset.tid, t.checked).then(function(){ openClassDetailModal(tcId2); }).catch(reportError);
       return;
     }
+    if(t.matches('[data-action="change-material-category"]')){
+      var mcId = t.dataset.class;
+      updateMaterial(t.dataset.mid, { category: t.value }).then(function(){ openClassDetailModal(mcId); }).catch(reportError);
+      return;
+    }
+    if(t.matches('[data-action="rubric-link-select"]')){
+      updateRubric(currentRubric.id, { itemId: t.value || null }).then(function(r){
+        currentRubric = r;
+        loadState();
+      }).catch(reportError);
+      return;
+    }
     if(t.matches('[data-action="toggle-subtask"]')){
       var it = items.find(function(i){ return i.id===t.dataset.id; });
       if(it){
@@ -1859,8 +1998,11 @@
     if(t.matches('[data-action="material-file-input"]')){
       if(t.files && t.files.length){
         var cid = t.dataset.classid;
-        var cat = document.getElementById('mat-category') ? document.getElementById('mat-category').value : 'other';
-        uploadMaterialFile(t.files[0], cid, cat).then(function(){ openClassDetailModal(cid); }).catch(reportError);
+        var file = t.files[0];
+        var guess = guessFileCategory(file.name);
+        var catSel = document.getElementById('mat-category');
+        if(catSel) catSel.value = guess;
+        uploadMaterialFile(file, cid, guess).then(function(){ openClassDetailModal(cid); }).catch(reportError);
       }
       return;
     }
@@ -1882,8 +2024,11 @@
     var files = e.dataTransfer && e.dataTransfer.files;
     if(files && files.length){
       var cid = zone.dataset.classid;
-      var cat = document.getElementById('mat-category') ? document.getElementById('mat-category').value : 'other';
-      uploadMaterialFile(files[0], cid, cat).then(function(){ openClassDetailModal(cid); }).catch(reportError);
+      var file = files[0];
+      var guess = guessFileCategory(file.name);
+      var catSel = document.getElementById('mat-category');
+      if(catSel) catSel.value = guess;
+      uploadMaterialFile(file, cid, guess).then(function(){ openClassDetailModal(cid); }).catch(reportError);
     }
   });
 

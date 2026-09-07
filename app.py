@@ -69,7 +69,7 @@ HEADSTART_KIND_INSTRUCTIONS = {
 }
 
 
-def build_headstart_prompt(item, cls, kind, materials_text, revise_content=None, instructions=None):
+def build_headstart_prompt(item, cls, kind, materials_text, revise_content=None, instructions=None, rubric_text=None):
     context = ["Assignment: " + (item["title"] or ""), "Type: " + (item["type"] or "")]
     if cls:
         context.append("Class: " + (cls["code"] or "") + " - " + (cls["name"] or ""))
@@ -77,6 +77,8 @@ def build_headstart_prompt(item, cls, kind, materials_text, revise_content=None,
         context.append("Due: " + item["due_date"])
     if item["notes"]:
         context.append("Description/notes from the student: " + item["notes"])
+    if rubric_text:
+        context.append("Grading rubric:\n" + rubric_text)
     if kind == "synthesis" and materials_text:
         context.append("Relevant reading material:\n" + materials_text)
 
@@ -112,12 +114,33 @@ def serialize_headstart(r):
 
 # ---------------- serializers ----------------
 
+FILE_CATEGORY_RULES = [
+    (r"rubric", "rubrics"),
+    (r"midterm|final[\s_-]?exam|past[\s_-]?exam|exam[\s_-]?\d|old[\s_-]?exam", "exams"),
+    (r"lecture|slides|week[\s_-]?\d+|lesson[\s_-]?\d+", "slides"),
+    (r"reading|article|chapter|excerpt", "readings"),
+    (r"project", "projects"),
+    (r"notes|journal", "personal"),
+]
+
+
+def guess_file_category(filename):
+    import re
+
+    name = (filename or "").lower()
+    for pattern, category in FILE_CATEGORY_RULES:
+        if re.search(pattern, name):
+            return category
+    return "other"
+
+
 def serialize_material(m):
     d = {
         "id": m["id"],
         "category": m["category"],
         "title": m["title"],
         "kind": m["kind"],
+        "hasText": bool(m["extracted_text"]),
         "createdAt": m["created_at"],
     }
     if m["kind"] == "file":
@@ -174,6 +197,19 @@ def serialize_class(conn, row):
     }
 
 
+def serialize_rubric(r):
+    if not r:
+        return None
+    return {
+        "id": r["id"],
+        "materialId": r["material_id"],
+        "itemId": r["item_id"],
+        "totalPoints": r["total_points"],
+        "criteria": json.loads(r["criteria"]) if r["criteria"] else [],
+        "createdAt": r["created_at"],
+    }
+
+
 def serialize_item(conn, row):
     subtasks = conn.execute(
         "SELECT * FROM subtasks WHERE item_id=?", (row["id"],)
@@ -181,6 +217,9 @@ def serialize_item(conn, row):
     headstarts = conn.execute(
         "SELECT kind, status FROM headstarts WHERE item_id=?", (row["id"],)
     ).fetchall()
+    rubric_row = conn.execute(
+        "SELECT * FROM rubrics WHERE item_id=?", (row["id"],)
+    ).fetchone()
     return {
         "id": row["id"],
         "classId": row["class_id"],
@@ -193,11 +232,13 @@ def serialize_item(conn, row):
         "weight": row["weight"],
         "score": row["score"],
         "notes": row["notes"],
+        "focusSeconds": row["focus_seconds"] or 0,
         "createdAt": row["created_at"],
         "subtasks": [
             {"id": s["id"], "title": s["title"], "done": bool(s["done"])} for s in subtasks
         ],
         "headstarts": [{"kind": h["kind"], "status": h["status"]} for h in headstarts],
+        "rubric": serialize_rubric(rubric_row),
     }
 
 
@@ -462,6 +503,22 @@ def generate_headstart(iid):
         "SELECT * FROM headstarts WHERE item_id=? AND kind=?", (iid, kind)
     ).fetchone()
 
+    rubric_row = conn.execute("SELECT * FROM rubrics WHERE item_id=?", (iid,)).fetchone()
+    rubric_text = None
+    if rubric_row and rubric_row["criteria"]:
+        crit_list = json.loads(rubric_row["criteria"])
+        if crit_list:
+            lines = []
+            for c in crit_list:
+                pts = c.get("points")
+                line = "- " + (c.get("name") or "")
+                if pts is not None:
+                    line += f" ({pts} pts)"
+                if c.get("description"):
+                    line += ": " + c["description"]
+                lines.append(line)
+            rubric_text = "\n".join(lines)
+
     revise_content = None
     hist = []
     if mode == "revise":
@@ -481,6 +538,7 @@ def generate_headstart(iid):
         materials_text,
         revise_content,
         instructions if mode == "revise" else None,
+        rubric_text,
     )
 
     try:
@@ -589,7 +647,7 @@ def add_material(cid):
         f.save(path)
         size = os.path.getsize(path)
         mimetype = f.mimetype
-        category = request.form.get("category", "other")
+        category = request.form.get("category") or guess_file_category(original)
         title = request.form.get("title") or original
         text = extract_text(path, original)
         conn.execute(
@@ -615,6 +673,28 @@ def add_material(cid):
     return jsonify({"id": mid}), 201
 
 
+@app.route("/api/materials/<mid>", methods=["PUT"])
+def update_material(mid):
+    data = request.get_json(force=True) or {}
+    conn = get_db()
+    fields, values = [], []
+    if "category" in data:
+        fields.append("category=?")
+        values.append(data["category"])
+    if "title" in data:
+        fields.append("title=?")
+        values.append(data["title"])
+    if fields:
+        values.append(mid)
+        conn.execute(f"UPDATE materials SET {', '.join(fields)} WHERE id=?", values)
+        conn.commit()
+    row = conn.execute("SELECT * FROM materials WHERE id=?", (mid,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    return jsonify(serialize_material(row))
+
+
 @app.route("/api/materials/<mid>", methods=["DELETE"])
 def delete_material(mid):
     conn = get_db()
@@ -637,6 +717,150 @@ def download_material(mid):
     if not m or m["kind"] != "file":
         abort(404)
     return send_from_directory(UPLOAD_DIR, m["stored_name"], as_attachment=True, download_name=m["filename"])
+
+
+# ---------------- rubrics ----------------
+
+RUBRIC_PARSE_INSTRUCTION = (
+    "You are extracting a grading rubric from the raw text below. Return ONLY valid JSON, "
+    "no markdown code fences, no commentary, in exactly this shape:\n"
+    '{"criteria": [{"name": "...", "description": "...", "points": <number or null>}], '
+    '"totalPoints": <number or null>}\n'
+    "If a criterion is expressed as a percentage rather than raw points, put the percentage "
+    "number in \"points\" and say so in \"description\". If you can't find real grading "
+    "criteria in the text, return {\"criteria\": [], \"totalPoints\": null}."
+)
+
+
+@app.route("/api/materials/<mid>/rubric")
+def get_rubric(mid):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM rubrics WHERE material_id=?", (mid,)).fetchone()
+    conn.close()
+    return jsonify(serialize_rubric(row))
+
+
+@app.route("/api/materials/<mid>/parse-rubric", methods=["POST"])
+def parse_rubric(mid):
+    conn = get_db()
+    m = conn.execute("SELECT * FROM materials WHERE id=?", (mid,)).fetchone()
+    if not m:
+        conn.close()
+        abort(404)
+    if not m["extracted_text"]:
+        conn.close()
+        return jsonify({"error": "No extractable text in this file - only PDF and DOCX get parsed on upload."}), 400
+
+    prompt = RUBRIC_PARSE_INSTRUCTION + "\n\n---\n" + m["extracted_text"][:12000]
+
+    try:
+        client = anthropic.Anthropic()
+        response = client.messages.create(
+            model="claude-opus-5",
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = "\n".join(b.text for b in response.content if b.type == "text").strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text
+            if text.endswith("```"):
+                text = text.rsplit("```", 1)[0]
+        parsed = json.loads(text)
+    except anthropic.AuthenticationError:
+        conn.close()
+        return jsonify({"error": "Invalid or missing ANTHROPIC_API_KEY. Set it in Railway's Variables tab."}), 503
+    except anthropic.RateLimitError:
+        conn.close()
+        return jsonify({"error": "Rate limited by the Claude API. Wait a moment and try again."}), 429
+    except anthropic.APIStatusError as e:
+        conn.close()
+        return jsonify({"error": f"Claude API error: {e.message}"}), 502
+    except anthropic.APIConnectionError:
+        conn.close()
+        return jsonify({"error": "Could not reach the Claude API."}), 502
+    except (ValueError, json.JSONDecodeError):
+        conn.close()
+        return jsonify({"error": "Couldn't parse a rubric out of Claude's response. Try again."}), 502
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": f"ANTHROPIC_API_KEY may not be set. ({e})"}), 503
+
+    criteria = parsed.get("criteria") or []
+    total_points = parsed.get("totalPoints")
+    now = datetime.utcnow().isoformat()
+    existing = conn.execute("SELECT id FROM rubrics WHERE material_id=?", (mid,)).fetchone()
+    if existing:
+        rid = existing["id"]
+        conn.execute(
+            "UPDATE rubrics SET criteria=?, total_points=?, created_at=? WHERE id=?",
+            (json.dumps(criteria), total_points, now, rid),
+        )
+    else:
+        rid = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO rubrics (id, material_id, item_id, criteria, total_points, created_at) VALUES (?,?,?,?,?,?)",
+            (rid, mid, None, json.dumps(criteria), total_points, now),
+        )
+    conn.commit()
+    row = conn.execute("SELECT * FROM rubrics WHERE id=?", (rid,)).fetchone()
+    conn.close()
+    return jsonify(serialize_rubric(row)), 201
+
+
+@app.route("/api/rubrics/<rid>", methods=["PUT"])
+def update_rubric(rid):
+    data = request.get_json(force=True) or {}
+    conn = get_db()
+    fields, values = [], []
+    if "itemId" in data:
+        fields.append("item_id=?")
+        values.append(data["itemId"] or None)
+    if "criteria" in data:
+        fields.append("criteria=?")
+        values.append(json.dumps(data["criteria"]))
+    if "totalPoints" in data:
+        fields.append("total_points=?")
+        values.append(data["totalPoints"])
+    if fields:
+        values.append(rid)
+        conn.execute(f"UPDATE rubrics SET {', '.join(fields)} WHERE id=?", values)
+        conn.commit()
+    row = conn.execute("SELECT * FROM rubrics WHERE id=?", (rid,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    return jsonify(serialize_rubric(row))
+
+
+@app.route("/api/rubrics/<rid>", methods=["DELETE"])
+def delete_rubric(rid):
+    conn = get_db()
+    conn.execute("DELETE FROM rubrics WHERE id=?", (rid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+# ---------------- focus time (Lock In) ----------------
+
+@app.route("/api/items/<iid>/focus-time", methods=["POST"])
+def add_focus_time(iid):
+    data = request.get_json(force=True) or {}
+    seconds = int(data.get("seconds") or 0)
+    conn = get_db()
+    row = conn.execute("SELECT id FROM items WHERE id=?", (iid,)).fetchone()
+    if not row:
+        conn.close()
+        abort(404)
+    if seconds > 0:
+        conn.execute(
+            "UPDATE items SET focus_seconds = COALESCE(focus_seconds,0) + ? WHERE id=?",
+            (seconds, iid),
+        )
+        conn.commit()
+    updated = conn.execute("SELECT focus_seconds FROM items WHERE id=?", (iid,)).fetchone()
+    conn.close()
+    return jsonify({"focusSeconds": updated["focus_seconds"] or 0})
 
 
 # ---------------- notes ----------------

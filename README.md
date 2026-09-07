@@ -10,8 +10,10 @@ A real, self-hosted rebuild of the Term Board school dashboard (classes, calenda
 - Classes with schedule, professor, notes, color
 - Assignments/quizzes/exams/readings with due dates, grade weights, scores, subtasks
 - A month and list calendar view, filterable by class, with .ics export
-- Per-class tabs: **Files** (real uploads, drag-and-drop, categorized, with PDF/DOCX text extracted on upload for future use), **Assignments**, **Notes** (auto-links to an assignment when you mention its title), **Grades** (full weighted breakdown), **Syllabus** (a topic checklist)
-- **Headstart** — a dedicated tab listing everything open, plus a "Headstart" button on any assignment. Depending on the assignment's type it offers a draft, an essay outline, quiz prep, a study outline, or a synthesis of the class's readings (using their extracted text). Generated work stays attached to that assignment — accept it, edit it, ask for changes, or regenerate it from scratch. Calls the Claude API server-side; see the API key setup below.
+- Per-class tabs: **Files** (real uploads, drag-and-drop, auto-categorized by filename — "Lecture 7.pdf" guesses Lecture slides, "Essay Rubric.docx" guesses Rubrics, "Midterm 2025.pdf" guesses Past exams — override any guess with the inline dropdown), **Assignments**, **Notes** (auto-links to an assignment when you mention its title), **Grades** (full weighted breakdown), **Syllabus** (a topic checklist)
+- **Rubric parsing** — any file categorized as a rubric gets a "Parse rubric" action that extracts its grading criteria via Claude, which can then be linked to a specific assignment. Once linked, the criteria show up on that assignment's detail view and feed into Headstart's context.
+- **Headstart** — a dedicated tab listing everything open, plus a "Headstart" button on any assignment. Depending on the assignment's type it offers a draft, an essay outline, quiz prep, a study outline, or a synthesis of the class's readings (using their extracted text, plus a linked rubric's criteria if one exists). Generated work stays attached to that assignment — accept it, edit it, ask for changes, or regenerate it from scratch. Calls the Claude API server-side; see the API key setup below.
+- **Lock In** — a Pomodoro-style focus timer tied to a specific assignment. Time spent in "work" phases logs back onto that assignment (visible on its detail view), so the loop of upload materials → Headstart drafts something → Lock In session to work on it → time logged is real, not just a diagram.
 - Everything persists in a SQLite database on disk
 
 ## Local development
@@ -28,14 +30,14 @@ Visit `http://localhost:5000`. Data is stored in `data/vesta.db` and `data/uploa
 
 ### Headstart's API key
 
-Headstart calls the Claude API from the server, which needs your own Anthropic API key (get one at [console.anthropic.com](https://console.anthropic.com)) — this is billed per generation, separate from any Claude subscription. Set it as an environment variable named `ANTHROPIC_API_KEY`. Locally:
+Headstart and rubric parsing both call the Claude API from the server, which needs your own Anthropic API key (get one at [console.anthropic.com](https://console.anthropic.com)) — this is billed per generation, separate from any Claude subscription. Set it as an environment variable named `ANTHROPIC_API_KEY`. Locally:
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 .venv/bin/python app.py
 ```
 
-Every other feature works without this key — Headstart just returns a clear error until it's set.
+Every other feature works without this key — Headstart and rubric parsing just return a clear error until it's set.
 
 ## Deploying to Railway
 

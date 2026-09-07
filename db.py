@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS items (
     weight REAL,
     score REAL,
     notes TEXT,
+    focus_seconds INTEGER DEFAULT 0,
     created_at TEXT
 );
 
@@ -90,6 +91,16 @@ CREATE TABLE IF NOT EXISTS headstarts (
     created_at TEXT,
     updated_at TEXT,
     UNIQUE(item_id, kind)
+);
+
+CREATE TABLE IF NOT EXISTS rubrics (
+    id TEXT PRIMARY KEY,
+    material_id TEXT NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+    item_id TEXT REFERENCES items(id) ON DELETE SET NULL,
+    criteria TEXT,
+    total_points REAL,
+    created_at TEXT,
+    UNIQUE(material_id)
 );
 
 CREATE TABLE IF NOT EXISTS term_settings (
