@@ -458,6 +458,7 @@
   function kindsForType(type){ return HEADSTART_KIND_BY_TYPE[type] || HEADSTART_KIND_BY_TYPE.other; }
 
   var FILE_CATEGORIES = [
+    {key:'syllabus', label:'Syllabus'},
     {key:'slides', label:'Lecture slides'},
     {key:'readings', label:'Readings'},
     {key:'rubrics', label:'Rubrics'},
@@ -633,6 +634,7 @@
   function logFocusTime(itemId, seconds){ return apiPost('/api/items/'+itemId+'/focus-time', { seconds:seconds }); }
 
   var FILE_CATEGORY_RULES = [
+    [/syllabus/, 'syllabus'],
     [/rubric/, 'rubrics'],
     [/midterm|final[\s_-]?exam|past[\s_-]?exam|exam[\s_-]?\d|old[\s_-]?exam/, 'exams'],
     [/lecture|slides|week[\s_-]?\d+|lesson[\s_-]?\d+/, 'slides'],

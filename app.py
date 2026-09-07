@@ -115,6 +115,7 @@ def serialize_headstart(r):
 # ---------------- serializers ----------------
 
 FILE_CATEGORY_RULES = [
+    (r"syllabus", "syllabus"),
     (r"rubric", "rubrics"),
     (r"midterm|final[\s_-]?exam|past[\s_-]?exam|exam[\s_-]?\d|old[\s_-]?exam", "exams"),
     (r"lecture|slides|week[\s_-]?\d+|lesson[\s_-]?\d+", "slides"),
