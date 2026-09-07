@@ -477,7 +477,7 @@ def export_ics():
     def esc(s):
         return (s or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
-    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Term Board//EN", "CALSCALE:GREGORIAN"]
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Vesta//EN", "CALSCALE:GREGORIAN"]
     stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
 
     if term["start_date"] and term["end_date"]:
@@ -503,7 +503,7 @@ def export_ics():
                 dtend = first.replace(hour=eh, minute=em).strftime("%Y%m%dT%H%M%S")
                 lines += [
                     "BEGIN:VEVENT",
-                    f"UID:{c['id']}-{s['day']}-{s['start'].replace(':','')}@term-board",
+                    f"UID:{c['id']}-{s['day']}-{s['start'].replace(':','')}@vesta",
                     f"DTSTAMP:{stamp}",
                     f"DTSTART:{dtstart}",
                     f"DTEND:{dtend}",
@@ -517,7 +517,7 @@ def export_ics():
     for it in items_rows:
         cls = class_map.get(it["class_id"])
         summary = (f"{cls['code']}: " if cls else "") + (it["title"] or "")
-        lines += ["BEGIN:VEVENT", f"UID:{it['id']}@term-board", f"DTSTAMP:{stamp}"]
+        lines += ["BEGIN:VEVENT", f"UID:{it['id']}@vesta", f"DTSTAMP:{stamp}"]
         if it["due_time"]:
             h, m = map(int, it["due_time"].split(":"))
             d = datetime.strptime(it["due_date"], "%Y-%m-%d").replace(hour=h, minute=m)
@@ -539,7 +539,7 @@ def export_ics():
     return Response(
         ics_text,
         mimetype="text/calendar",
-        headers={"Content-Disposition": 'attachment; filename="term-board-calendar.ics"'},
+        headers={"Content-Disposition": 'attachment; filename="vesta-calendar.ics"'},
     )
 
 

@@ -3,7 +3,7 @@ import sqlite3
 
 DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(__file__), "data"))
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
-DB_PATH = os.path.join(DATA_DIR, "termboard.db")
+DB_PATH = os.path.join(DATA_DIR, "vesta.db")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 

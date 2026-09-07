@@ -1,8 +1,8 @@
-# Term Board (hosted version)
+# Vesta
 
 A real, self-hosted rebuild of the Term Board school dashboard (classes, calendar, grades, to-dos), built specifically to support actual file uploads, which the Claude-artifact version couldn't do.
 
-**Status:** Built and tested locally. Not deployed yet.
+**Status:** Built and tested locally. Repo: [github.com/saifabuhaltam/vesta](https://github.com/saifabuhaltam/vesta) — not deployed yet.
 **Stack:** Flask + SQLite + vanilla JS frontend (no build step, no frameworks).
 
 ## What it does
@@ -23,11 +23,11 @@ python3 -m venv .venv
 .venv/bin/python app.py
 ```
 
-Visit `http://localhost:5000`. Data is stored in `data/termboard.db` and `data/uploads/` (both gitignored). Delete the `data/` folder to start fresh.
+Visit `http://localhost:5000`. Data is stored in `data/vesta.db` and `data/uploads/` (both gitignored). Delete the `data/` folder to start fresh.
 
 ## Deploying to Railway
 
-1. Push this folder to a GitHub repo (see below).
+1. Code is already pushed to [github.com/saifabuhaltam/vesta](https://github.com/saifabuhaltam/vesta).
 2. In Railway, create a new project from that GitHub repo. Railway auto-detects it's a Python app (via `requirements.txt` and `Procfile`) and builds it with no extra config.
 3. **Add a Volume** in the Railway service settings, mounted at `/data`. This is what makes uploads and the database survive restarts and redeploys — without it, every deploy wipes your data.
 4. Add an environment variable: `DATA_DIR=/data` (this tells the app where to put its database and uploaded files — see `db.py`).
@@ -35,16 +35,15 @@ Visit `http://localhost:5000`. Data is stored in `data/termboard.db` and `data/u
 
 No other environment variables are required to run the core dashboard.
 
-## Pushing to GitHub
+## Pushing future changes to GitHub
+
+The `origin` remote is already set to the repo above, so after this initial push, future updates are just:
 
 ```bash
-cd "projects/term-board-app"
-git init
+cd "projects/vesta"
 git add .
-git commit -m "Initial Term Board hosted app"
-git branch -M main
-git remote add origin <your-empty-github-repo-url>
-git push -u origin main
+git commit -m "Describe the change"
+git push
 ```
 
 ## Known limitations / next steps
