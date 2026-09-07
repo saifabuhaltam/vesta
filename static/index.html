@@ -349,6 +349,17 @@
   .topic-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 10px; border:1px solid var(--border); border-radius:8px; margin-bottom:6px; font-size:13px; }
   .topic-row label{ display:flex; align-items:center; gap:8px; cursor:pointer; }
   .topic-row input[type="checkbox"]{ width:15px; height:15px; accent-color:var(--accent); }
+
+  /* ---------- Headstart ---------- */
+  .hs-badge{ font-size:10px; padding:2px 6px; border-radius:6px; background:var(--surface-2); color:var(--text-muted); font-weight:600; }
+  .hs-badge.accepted{ background:var(--success-soft); color:var(--success); }
+  .hs-dot{ width:6px; height:6px; border-radius:50%; background:var(--text-faint); display:inline-block; margin-right:6px; }
+  .hs-dot.accepted{ background:var(--success); }
+  .hs-content{ font-size:13.5px; line-height:1.6; }
+  .hs-content h1,.hs-content h2,.hs-content h3,.hs-content h4{ font-family:"Fraunces",serif; }
+  .hs-status{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .type-badge.accepted{ background:var(--success-soft); color:var(--success); }
+  .hs-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
 </style>
 </head>
 <body>
@@ -364,6 +375,7 @@
       <button class="tab-btn" data-action="switch-tab" data-tab="classes"><span class="ic">▤</span>Classes</button>
       <button class="tab-btn" data-action="switch-tab" data-tab="calendar"><span class="ic">▦</span>Calendar</button>
       <button class="tab-btn" data-action="switch-tab" data-tab="todo"><span class="ic">☑</span>To-Do</button>
+      <button class="tab-btn" data-action="switch-tab" data-tab="headstart"><span class="ic">⚡</span>Headstart</button>
     </nav>
     <button class="nav-extra" data-action="open-term-settings"><span class="ic">⚙</span>Term settings</button>
     <div class="side-stats" id="side-stats"></div>
@@ -393,6 +405,32 @@
   var DOW_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var DOW_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var PALETTE = ['#D2603A','#1D8A8A','#8A4FBE','#7A8A2E','#C6497A','#B98A1F','#2C7BB8','#2F8F5B'];
+  var HEADSTART_LABELS = {
+    draft: 'Generate draft',
+    essay_outline: 'Generate essay outline',
+    quiz_prep: 'Generate quiz prep',
+    study_outline: 'Generate study outline',
+    synthesis: 'Synthesize relevant readings',
+    explain: 'Explain assignment requirements'
+  };
+  var HEADSTART_BLURBS = {
+    draft: 'Get a first draft to react to and build on.',
+    essay_outline: 'Get a working thesis and section-by-section structure.',
+    quiz_prep: 'Get likely topics, key terms, and practice questions.',
+    study_outline: 'Get a study order with the major topics and sub-points.',
+    synthesis: 'Pull the key ideas and connections out of your class readings.',
+    explain: 'Get a plain-language breakdown of what this assignment actually wants.'
+  };
+  var HEADSTART_KIND_BY_TYPE = {
+    assignment: ['draft','essay_outline','explain'],
+    project: ['draft','essay_outline','explain'],
+    quiz: ['quiz_prep','explain'],
+    exam: ['study_outline','explain'],
+    reading: ['synthesis','explain'],
+    other: Object.keys(HEADSTART_LABELS)
+  };
+  function kindsForType(type){ return HEADSTART_KIND_BY_TYPE[type] || HEADSTART_KIND_BY_TYPE.other; }
+
   var FILE_CATEGORIES = [
     {key:'slides', label:'Lecture slides'},
     {key:'readings', label:'Readings'},
@@ -433,6 +471,35 @@
     return String(s==null?'':s).replace(/[&<>"']/g, function(c){
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
     });
+  }
+  function inlineMd(s){
+    return s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*(?!\*)(.+?)\*(?!\*)/g,'$1<em>$2</em>');
+  }
+  function mdLite(text){
+    var esc = escapeHtml(text||'');
+    var lines = esc.split('\n');
+    var html = '';
+    var inList = false;
+    lines.forEach(function(line){
+      var h = line.match(/^(#{1,4})\s+(.*)/);
+      var li = line.match(/^[-*]\s+(.*)/);
+      var oli = line.match(/^\d+\.\s+(.*)/);
+      if(h){
+        if(inList){ html += '</ul>'; inList = false; }
+        var lvl = Math.min(h[1].length+2, 6);
+        html += '<h'+lvl+' style="margin:14px 0 6px;">'+inlineMd(h[2])+'</h'+lvl+'>';
+      } else if(li || oli){
+        if(!inList){ html += '<ul style="margin:6px 0 6px 18px;padding:0;">'; inList = true; }
+        html += '<li style="margin-bottom:3px;">'+inlineMd((li||oli)[1])+'</li>';
+      } else if(line.trim()===''){
+        if(inList){ html += '</ul>'; inList = false; }
+      } else {
+        if(inList){ html += '</ul>'; inList = false; }
+        html += '<p style="margin:0 0 10px;">'+inlineMd(line)+'</p>';
+      }
+    });
+    if(inList) html += '</ul>';
+    return html;
   }
   function classById(id){ return classes.find(function(c){ return c.id===id; }); }
   function classColor(id){ var c=classById(id); return c ? c.color : null; }
@@ -526,6 +593,12 @@
   function toggleTopic(id, done){ return apiPut('/api/syllabus/'+id, { done:done }).then(loadState); }
   function removeTopic(id){ return apiDelete('/api/syllabus/'+id).then(loadState); }
   function saveTermSettings(data){ return apiPut('/api/term', data).then(loadState); }
+  function fetchHeadstarts(itemId){ return apiGet('/api/items/'+itemId+'/headstarts'); }
+  function generateHeadstart(itemId, kind, mode, instructions){
+    return apiPost('/api/items/'+itemId+'/headstart', { kind:kind, mode:mode, instructions:instructions||'' });
+  }
+  function updateHeadstart(id, data){ return apiPut('/api/headstarts/'+id, data); }
+  function deleteHeadstart(id){ return apiDelete('/api/headstarts/'+id); }
 
   // ---------------- init ----------------
   function init(){ loadState(); }
@@ -549,7 +622,7 @@
   }
 
   function renderHeader(){
-    var titles = { overview:['Overview','A quick look at what needs your attention'], classes:['Classes','Everything about each course in one place'], calendar:['Calendar','Lectures and deadlines, laid out by week'], todo:['To-Do','Assignments, quizzes, and everything else'] };
+    var titles = { overview:['Overview','A quick look at what needs your attention'], classes:['Classes','Everything about each course in one place'], calendar:['Calendar','Lectures and deadlines, laid out by week'], todo:['To-Do','Assignments, quizzes, and everything else'], headstart:['Headstart','Get ahead on what\'s coming up'] };
     var t = titles[activeTab];
     var action = '';
     if(activeTab==='classes') action = '<button class="btn primary" data-action="open-add-class">+ Add class</button>';
@@ -563,6 +636,7 @@
     if(activeTab==='overview') view.innerHTML = viewOverview();
     else if(activeTab==='classes') view.innerHTML = viewClasses();
     else if(activeTab==='calendar') view.innerHTML = viewCalendar();
+    else if(activeTab==='headstart') view.innerHTML = viewHeadstart();
     else view.innerHTML = viewTodo();
   }
 
@@ -844,6 +918,40 @@
       html += '</details>';
     }
     return html;
+  }
+
+  // ---------------- Headstart ----------------
+  function headstartRowHtml(it){
+    var col = classColor(it.classId) || 'var(--none)';
+    var cls = classById(it.classId);
+    var st = statusOf(it);
+    var urgencyClass = st==='overdue' ? 'overdue' : (st==='today' ? 'today' : '');
+    var badges = (it.headstarts||[]).map(function(h){
+      var label = HEADSTART_LABELS[h.kind] || h.kind;
+      return '<span class="hs-badge'+(h.status==='accepted'?' accepted':'')+'">'+label+'</span>';
+    }).join('');
+    return '<div class="todo-row">'
+      + '<span class="dot" style="--c:'+col+'"></span>'
+      + '<div class="row-main">'
+      + '<div class="row-title">'+escapeHtml(it.title)+'</div>'
+      + '<div class="row-meta">'
+      + (cls ? '<span class="class-chip" style="--c:'+col+'">'+escapeHtml(cls.code)+'</span>' : '<span class="class-chip">General</span>')
+      + '<span class="type-badge">'+(TYPE_LABELS[it.type]||'Other')+'</span>'
+      + (it.dueDate ? '<span class="due-label '+urgencyClass+'">'+urgencyLabel(it.dueDate)+'</span>' : '<span class="due-label">No due date</span>')
+      + badges
+      + '</div></div>'
+      + '<button type="button" class="btn primary" data-action="open-headstart" data-id="'+it.id+'">Headstart</button>'
+      + '</div>';
+  }
+
+  function viewHeadstart(){
+    var open = items.filter(function(it){ return it.status!=='done'; })
+      .sort(function(a,b){ return (a.dueDate||'zzzz').localeCompare(b.dueDate||'zzzz'); });
+    if(open.length===0){
+      return '<div class="empty">Nothing open right now. Add an assignment to get a head start on it.</div>';
+    }
+    return '<div class="hint" style="margin-bottom:14px;">Pick something to get ahead on: a draft, an outline, a study guide, whatever fits.</div>'
+      + open.map(headstartRowHtml).join('');
   }
 
   // ---------------- Modals ----------------
@@ -1156,6 +1264,7 @@
       + '</div>'
       + '<div class="modal-foot"><button class="btn danger" data-action="detail-delete-item" data-id="'+it.id+'">Delete</button>'
       + '<div class="right">'
+      + '<button class="btn" data-action="open-headstart" data-id="'+it.id+'">Headstart</button>'
       + '<button class="btn" data-action="toggle-item-detail" data-id="'+it.id+'">'+(it.status==='done'?'Mark not done':'Mark done')+'</button>'
       + '<button class="btn" data-action="modal-close">Close</button>'
       + '<button class="btn primary" data-action="edit-from-detail" data-id="'+it.id+'">Edit</button>'
@@ -1218,6 +1327,96 @@
     }
     Promise.all(creates.map(function(d){ return apiPost('/api/items', d); }))
       .then(loadState).then(closeModal).catch(reportError);
+  }
+
+  var currentHeadstartItemId = null;
+  var currentHeadstarts = [];
+  var headstartActiveKind = null;
+  var headstartRevisingKind = null;
+
+  function headstartByKind(kind){
+    return currentHeadstarts.find(function(h){ return h.kind===kind; });
+  }
+
+  function openHeadstartModal(itemId){
+    currentHeadstartItemId = itemId;
+    document.getElementById('modal-root').innerHTML = '<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide" data-action="modal-stop"><div class="modal-body"><div class="hint">Loading…</div></div></div></div>';
+    fetchHeadstarts(itemId).then(function(list){
+      currentHeadstarts = list;
+      var it = items.find(function(i){ return i.id===itemId; });
+      headstartActiveKind = (list[0] && list[0].kind) || kindsForType(it ? it.type : 'other')[0] || null;
+      headstartRevisingKind = null;
+      renderHeadstartModal();
+    }).catch(function(err){ closeModal(); reportError(err); });
+  }
+
+  function renderHeadstartModal(){
+    var it = items.find(function(i){ return i.id===currentHeadstartItemId; });
+    if(!it){ closeModal(); return; }
+    var cls = classById(it.classId);
+    var col = classColor(it.classId) || 'var(--none)';
+    var kinds = kindsForType(it.type);
+
+    var kindBar = '<div class="class-tabs">' + kinds.map(function(k){
+      var existing = headstartByKind(k);
+      var dot = existing ? ('<span class="hs-dot'+(existing.status==='accepted'?' accepted':'')+'"></span>') : '';
+      return '<button type="button" class="class-tab-btn'+(headstartActiveKind===k?' active':'')+'" data-action="hs-select-kind" data-kind="'+k+'">'+dot+HEADSTART_LABELS[k]+'</button>';
+    }).join('') + '</div>';
+
+    var body;
+    var hs = headstartActiveKind ? headstartByKind(headstartActiveKind) : null;
+    if(!hs){
+      body = '<div class="hint" style="margin-bottom:14px;">'+(HEADSTART_BLURBS[headstartActiveKind]||'')+'</div>'
+        + '<button type="button" class="btn primary" data-action="hs-generate" data-kind="'+headstartActiveKind+'">Generate</button>';
+    } else if(headstartRevisingKind===headstartActiveKind){
+      body = '<div class="hs-content">'+mdLite(hs.content)+'</div>'
+        + '<label class="field" style="margin-top:14px;">What should change?<textarea id="hs-instructions" placeholder="e.g. make the tone more formal, focus more on the second reading…"></textarea></label>'
+        + '<div style="display:flex;gap:8px;margin-top:8px;">'
+        + '<button type="button" class="btn" data-action="hs-cancel-revise">Cancel</button>'
+        + '<button type="button" class="btn primary" data-action="hs-submit-revise" data-kind="'+headstartActiveKind+'">Submit</button>'
+        + '</div>';
+    } else {
+      body = '<div class="hs-status"><span class="type-badge'+(hs.status==='accepted'?' accepted':'')+'">'+(hs.status==='accepted'?'Accepted':'Draft')+'</span>'
+        + '<span class="hint">'+(hs.instructions&&hs.instructions.length ? hs.instructions.length+' revision'+(hs.instructions.length>1?'s':'') : '')+'</span></div>'
+        + '<div class="hs-content">'+mdLite(hs.content)+'</div>'
+        + '<div class="hs-actions">'
+        + (hs.status!=='accepted' ? '<button type="button" class="btn primary" data-action="hs-accept" data-id="'+hs.id+'">Accept</button>' : '<span class="hint">Accepted</span>')
+        + '<button type="button" class="btn" data-action="hs-edit" data-id="'+hs.id+'">Edit</button>'
+        + '<button type="button" class="btn" data-action="hs-request-changes" data-kind="'+headstartActiveKind+'">Request changes</button>'
+        + '<button type="button" class="btn" data-action="hs-regenerate" data-kind="'+headstartActiveKind+'">Regenerate</button>'
+        + '<button type="button" class="btn ghost danger" data-action="hs-delete" data-id="'+hs.id+'">Delete</button>'
+        + '</div>';
+    }
+
+    var html = '<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide" data-action="modal-stop">'
+      + '<div class="modal-head">'
+      + '<h2>'+escapeHtml(it.title)+'</h2>'
+      + '<div class="row-meta" style="margin-top:8px;">'
+      + (cls ? '<span class="class-chip" style="--c:'+col+'">'+escapeHtml(cls.code)+'</span>' : '<span class="class-chip">General</span>')
+      + '<span class="type-badge">'+(TYPE_LABELS[it.type]||'Other')+'</span>'
+      + '</div>'
+      + kindBar
+      + '</div>'
+      + '<div class="modal-body">'+body+'</div>'
+      + '<div class="modal-foot"><span></span><div class="right"><button class="btn" data-action="modal-close">Close</button></div></div>'
+      + '</div></div>';
+    document.getElementById('modal-root').innerHTML = html;
+  }
+
+  function submitHeadstart(itemId, kind, mode, instructions){
+    var body = document.querySelector('.modal-body');
+    if(body) body.innerHTML = '<div class="hint">Thinking… this can take up to a minute.</div>';
+    return generateHeadstart(itemId, kind, mode, instructions).then(function(hs){
+      var idx = currentHeadstarts.findIndex(function(h){ return h.kind===kind; });
+      if(idx>=0) currentHeadstarts[idx] = hs; else currentHeadstarts.push(hs);
+      headstartActiveKind = kind;
+      headstartRevisingKind = null;
+      renderHeadstartModal();
+      loadState();
+    }).catch(function(err){
+      renderHeadstartModal();
+      reportError(err);
+    });
   }
 
   function saveTermFromForm(){
@@ -1337,6 +1536,68 @@
     if(action==='edit-from-detail'){ openItemModal(items.find(function(i){ return i.id===t.dataset.id; })); return; }
     if(action==='detail-delete-item'){
       if(confirmAction('Delete this item?', 'This can\'t be undone.')){ deleteItem(t.dataset.id).then(closeModal).catch(reportError); }
+      return;
+    }
+    if(action==='open-headstart'){ openHeadstartModal(t.dataset.id); return; }
+    if(action==='hs-select-kind'){ headstartActiveKind = t.dataset.kind; headstartRevisingKind = null; renderHeadstartModal(); return; }
+    if(action==='hs-generate'){ submitHeadstart(currentHeadstartItemId, t.dataset.kind, 'generate', ''); return; }
+    if(action==='hs-regenerate'){
+      if(confirmAction('Regenerate this?', "This replaces the current content and can't be undone.")){
+        submitHeadstart(currentHeadstartItemId, t.dataset.kind, 'generate', '');
+      }
+      return;
+    }
+    if(action==='hs-request-changes'){ headstartRevisingKind = t.dataset.kind; renderHeadstartModal(); return; }
+    if(action==='hs-cancel-revise'){ headstartRevisingKind = null; renderHeadstartModal(); return; }
+    if(action==='hs-submit-revise'){
+      var instrEl = document.getElementById('hs-instructions');
+      var instr = instrEl ? instrEl.value.trim() : '';
+      if(!instr) return;
+      submitHeadstart(currentHeadstartItemId, t.dataset.kind, 'revise', instr);
+      return;
+    }
+    if(action==='hs-accept'){
+      updateHeadstart(t.dataset.id, { status:'accepted' }).then(function(hs){
+        var idx = currentHeadstarts.findIndex(function(h){ return h.id===hs.id; });
+        if(idx>=0) currentHeadstarts[idx] = hs;
+        renderHeadstartModal();
+        loadState();
+      }).catch(reportError);
+      return;
+    }
+    if(action==='hs-edit'){
+      var editHs = currentHeadstarts.find(function(h){ return h.id===t.dataset.id; });
+      if(!editHs) return;
+      var editBody = document.querySelector('.modal-body');
+      editBody.innerHTML = '<textarea id="hs-edit-text" style="min-height:260px;">'+escapeHtml(editHs.content)+'</textarea>'
+        + '<div style="display:flex;gap:8px;margin-top:8px;">'
+        + '<button type="button" class="btn" data-action="hs-cancel-edit">Cancel</button>'
+        + '<button type="button" class="btn primary" data-action="hs-save-edit" data-id="'+editHs.id+'">Save</button>'
+        + '</div>';
+      return;
+    }
+    if(action==='hs-cancel-edit'){ renderHeadstartModal(); return; }
+    if(action==='hs-save-edit'){
+      var newContentEl = document.getElementById('hs-edit-text');
+      var newContent = newContentEl ? newContentEl.value : '';
+      updateHeadstart(t.dataset.id, { content:newContent }).then(function(hs){
+        var idx = currentHeadstarts.findIndex(function(h){ return h.id===hs.id; });
+        if(idx>=0) currentHeadstarts[idx] = hs;
+        renderHeadstartModal();
+      }).catch(reportError);
+      return;
+    }
+    if(action==='hs-delete'){
+      if(confirmAction('Delete this?', 'This removes the generated content for this option. You can generate it again later.')){
+        var delId = t.dataset.id;
+        deleteHeadstart(delId).then(function(){
+          currentHeadstarts = currentHeadstarts.filter(function(h){ return h.id!==delId; });
+          var curIt = items.find(function(i){ return i.id===currentHeadstartItemId; });
+          headstartActiveKind = kindsForType(curIt ? curIt.type : 'other')[0] || null;
+          renderHeadstartModal();
+          loadState();
+        }).catch(reportError);
+      }
       return;
     }
   });

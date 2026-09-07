@@ -1,7 +1,9 @@
 import os
+import json
 import uuid
 from datetime import datetime, timedelta
 
+import anthropic
 from flask import Flask, request, jsonify, send_from_directory, abort, Response
 from werkzeug.utils import secure_filename
 
@@ -11,6 +13,101 @@ app = Flask(__name__, static_folder="static", static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # 25 MB per upload
 
 init_db()
+
+# ---------------- Headstart ----------------
+
+HEADSTART_LABELS = {
+    "draft": "Generate draft",
+    "essay_outline": "Generate essay outline",
+    "quiz_prep": "Generate quiz prep",
+    "study_outline": "Generate study outline",
+    "synthesis": "Synthesize relevant readings",
+    "explain": "Explain assignment requirements",
+}
+
+HEADSTART_KIND_BY_TYPE = {
+    "assignment": ["draft", "essay_outline", "explain"],
+    "project": ["draft", "essay_outline", "explain"],
+    "quiz": ["quiz_prep", "explain"],
+    "exam": ["study_outline", "explain"],
+    "reading": ["synthesis", "explain"],
+    "other": list(HEADSTART_LABELS.keys()),
+}
+
+HEADSTART_KIND_INSTRUCTIONS = {
+    "draft": (
+        "Write a first draft for this assignment based on the description below. "
+        "This is a starting point for the student to revise and build on, not a finished "
+        "submission - write in a natural voice appropriate for a college student, and note in "
+        "a short closing line any places where the student should add their own specifics "
+        "(data, personal examples, citations) that aren't given here."
+    ),
+    "essay_outline": (
+        "Create a structured essay outline for this assignment: a working thesis, main "
+        "sections with a one-line description of what each covers, and key points or evidence "
+        "to include under each section."
+    ),
+    "quiz_prep": (
+        "Create a quiz preparation guide: the topics most likely to be tested, key terms with "
+        "brief definitions, and 5-8 practice questions with answers, based on the context below."
+    ),
+    "study_outline": (
+        "Create a study outline for this exam: the major topics to review in a logical study "
+        "order, with sub-points under each, and a short note on what's likely to be emphasized "
+        "based on the context given."
+    ),
+    "synthesis": (
+        "Synthesize the key ideas across the readings provided below as they relate to this "
+        "assignment: the main themes, where the sources agree or disagree, and how they connect "
+        "to what the assignment is asking for."
+    ),
+    "explain": (
+        "Explain in plain terms what this assignment is actually asking for: the deliverable, "
+        "the format if evident, likely grading criteria, and what a strong submission would "
+        "include."
+    ),
+}
+
+
+def build_headstart_prompt(item, cls, kind, materials_text, revise_content=None, instructions=None):
+    context = ["Assignment: " + (item["title"] or ""), "Type: " + (item["type"] or "")]
+    if cls:
+        context.append("Class: " + (cls["code"] or "") + " - " + (cls["name"] or ""))
+    if item["due_date"]:
+        context.append("Due: " + item["due_date"])
+    if item["notes"]:
+        context.append("Description/notes from the student: " + item["notes"])
+    if kind == "synthesis" and materials_text:
+        context.append("Relevant reading material:\n" + materials_text)
+
+    context_block = "\n".join(context)
+    instruction = HEADSTART_KIND_INSTRUCTIONS[kind]
+
+    if revise_content and instructions:
+        return (
+            f"{context_block}\n\nTask: {instruction}\n\n"
+            f"Here is the current version:\n---\n{revise_content}\n---\n\n"
+            f'The student asked for this revision: "{instructions}"\n\n'
+            "Produce the full revised version incorporating that feedback. "
+            "Return only the revised content, no preamble."
+        )
+    return (
+        f"{context_block}\n\nTask: {instruction}\n\n"
+        "Return only the content itself, no preamble or meta-commentary about what you're about to do."
+    )
+
+
+def serialize_headstart(r):
+    return {
+        "id": r["id"],
+        "itemId": r["item_id"],
+        "kind": r["kind"],
+        "content": r["content"],
+        "status": r["status"],
+        "instructions": json.loads(r["instructions"]) if r["instructions"] else [],
+        "createdAt": r["created_at"],
+        "updatedAt": r["updated_at"],
+    }
 
 
 # ---------------- serializers ----------------
@@ -81,6 +178,9 @@ def serialize_item(conn, row):
     subtasks = conn.execute(
         "SELECT * FROM subtasks WHERE item_id=?", (row["id"],)
     ).fetchall()
+    headstarts = conn.execute(
+        "SELECT kind, status FROM headstarts WHERE item_id=?", (row["id"],)
+    ).fetchall()
     return {
         "id": row["id"],
         "classId": row["class_id"],
@@ -97,6 +197,7 @@ def serialize_item(conn, row):
         "subtasks": [
             {"id": s["id"], "title": s["title"], "done": bool(s["done"])} for s in subtasks
         ],
+        "headstarts": [{"kind": h["kind"], "status": h["status"]} for h in headstarts],
     }
 
 
@@ -309,6 +410,160 @@ def update_item(iid):
 def delete_item(iid):
     conn = get_db()
     conn.execute("DELETE FROM items WHERE id=?", (iid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+# ---------------- headstart ----------------
+
+@app.route("/api/items/<iid>/headstarts", methods=["GET"])
+def list_headstarts(iid):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM headstarts WHERE item_id=? ORDER BY created_at", (iid,)
+    ).fetchall()
+    conn.close()
+    return jsonify([serialize_headstart(r) for r in rows])
+
+
+@app.route("/api/items/<iid>/headstart", methods=["POST"])
+def generate_headstart(iid):
+    data = request.get_json(force=True) or {}
+    kind = data.get("kind")
+    mode = data.get("mode", "generate")
+    instructions = (data.get("instructions") or "").strip()
+    if kind not in HEADSTART_LABELS:
+        return jsonify({"error": "Unknown headstart kind"}), 400
+
+    conn = get_db()
+    item = conn.execute("SELECT * FROM items WHERE id=?", (iid,)).fetchone()
+    if not item:
+        conn.close()
+        abort(404)
+    cls = (
+        conn.execute("SELECT * FROM classes WHERE id=?", (item["class_id"],)).fetchone()
+        if item["class_id"]
+        else None
+    )
+
+    materials_text = None
+    if kind == "synthesis" and cls:
+        mats = conn.execute(
+            "SELECT title, extracted_text FROM materials WHERE class_id=? AND extracted_text IS NOT NULL AND extracted_text != '' ORDER BY created_at LIMIT 4",
+            (cls["id"],),
+        ).fetchall()
+        if mats:
+            materials_text = "\n\n".join(
+                f"[{m['title']}]\n{(m['extracted_text'] or '')[:4000]}" for m in mats
+            )
+
+    existing = conn.execute(
+        "SELECT * FROM headstarts WHERE item_id=? AND kind=?", (iid, kind)
+    ).fetchone()
+
+    revise_content = None
+    hist = []
+    if mode == "revise":
+        if not existing:
+            conn.close()
+            return jsonify({"error": "Nothing to revise yet - generate first."}), 400
+        if not instructions:
+            conn.close()
+            return jsonify({"error": "Revision instructions required"}), 400
+        revise_content = existing["content"]
+        hist = json.loads(existing["instructions"]) if existing["instructions"] else []
+
+    prompt = build_headstart_prompt(
+        item,
+        cls,
+        kind,
+        materials_text,
+        revise_content,
+        instructions if mode == "revise" else None,
+    )
+
+    try:
+        client = anthropic.Anthropic()
+        response = client.messages.create(
+            model="claude-opus-5",
+            max_tokens=8000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        content = "\n".join(b.text for b in response.content if b.type == "text").strip()
+        if not content:
+            conn.close()
+            return jsonify({"error": "Claude didn't return any text. Try again or adjust the assignment notes."}), 502
+    except anthropic.AuthenticationError:
+        conn.close()
+        return jsonify({"error": "Invalid or missing ANTHROPIC_API_KEY. Set it in Railway's Variables tab."}), 503
+    except anthropic.RateLimitError:
+        conn.close()
+        return jsonify({"error": "Rate limited by the Claude API. Wait a moment and try again."}), 429
+    except anthropic.APIStatusError as e:
+        conn.close()
+        return jsonify({"error": f"Claude API error: {e.message}"}), 502
+    except anthropic.APIConnectionError:
+        conn.close()
+        return jsonify({"error": "Could not reach the Claude API. Check the server's network connection."}), 502
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": f"ANTHROPIC_API_KEY may not be set. ({e})"}), 503
+
+    now = datetime.utcnow().isoformat()
+    if mode == "revise":
+        hist.append({"instruction": instructions, "at": now})
+        hid = existing["id"]
+        conn.execute(
+            "UPDATE headstarts SET content=?, status='draft', instructions=?, updated_at=? WHERE id=?",
+            (content, json.dumps(hist), now, hid),
+        )
+    elif existing:
+        hid = existing["id"]
+        conn.execute(
+            "UPDATE headstarts SET content=?, status='draft', instructions='[]', updated_at=? WHERE id=?",
+            (content, now, hid),
+        )
+    else:
+        hid = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO headstarts (id, item_id, kind, content, status, instructions, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+            (hid, iid, kind, content, "draft", "[]", now, now),
+        )
+    conn.commit()
+    row = conn.execute("SELECT * FROM headstarts WHERE id=?", (hid,)).fetchone()
+    conn.close()
+    return jsonify(serialize_headstart(row)), 201
+
+
+@app.route("/api/headstarts/<hid>", methods=["PUT"])
+def update_headstart(hid):
+    data = request.get_json(force=True) or {}
+    conn = get_db()
+    fields, values = [], []
+    if "content" in data:
+        fields.append("content=?")
+        values.append(data["content"])
+    if "status" in data:
+        fields.append("status=?")
+        values.append(data["status"])
+    if fields:
+        fields.append("updated_at=?")
+        values.append(datetime.utcnow().isoformat())
+        values.append(hid)
+        conn.execute(f"UPDATE headstarts SET {', '.join(fields)} WHERE id=?", values)
+        conn.commit()
+    row = conn.execute("SELECT * FROM headstarts WHERE id=?", (hid,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    return jsonify(serialize_headstart(row))
+
+
+@app.route("/api/headstarts/<hid>", methods=["DELETE"])
+def delete_headstart(hid):
+    conn = get_db()
+    conn.execute("DELETE FROM headstarts WHERE id=?", (hid,))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})

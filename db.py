@@ -80,6 +80,18 @@ CREATE TABLE IF NOT EXISTS syllabus_topics (
     sort_order INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS headstarts (
+    id TEXT PRIMARY KEY,
+    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    content TEXT,
+    status TEXT DEFAULT 'draft',
+    instructions TEXT,
+    created_at TEXT,
+    updated_at TEXT,
+    UNIQUE(item_id, kind)
+);
+
 CREATE TABLE IF NOT EXISTS term_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     name TEXT,
