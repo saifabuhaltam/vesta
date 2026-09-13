@@ -55,8 +55,15 @@ create index if not exists quizzes_by_semester         on quizzes(semester_id);
 -- Lift FORCE so the owner can see every user's rows for the backfill. Restored at the
 -- end of this same block, and the runner wraps the block in a transaction, so a
 -- failure anywhere puts it back.
+--
+-- `semesters` belongs in this list even though the block just created it. On a
+-- database built before this migration the new table has no policies yet, so the
+-- inserts below would go through either way; but on one built from the current
+-- pg_schema.sql the table arrives with forced RLS already on it, and the first
+-- insert is then refused outright. Lifting it here covers both.
 do $$ declare t text; begin
-  foreach t in array array['term_settings','classes','items','events','notes',
+  foreach t in array array['semesters',
+                           'term_settings','classes','items','events','notes',
                            'materials','flashcard_decks','quizzes'] loop
     execute format('alter table %I no force row level security', t);
   end loop;
@@ -101,8 +108,10 @@ do $$ declare t text; begin
 end $$;
 
 do $$ declare t text; begin
-  foreach t in array array['term_settings','classes','items','events','notes',
+  foreach t in array array['semesters',
+                           'term_settings','classes','items','events','notes',
                            'materials','flashcard_decks','quizzes'] loop
+    execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
   end loop;
 end $$;
