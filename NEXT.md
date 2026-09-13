@@ -50,6 +50,13 @@ Confirmed working: `database: postgres`, `accounts: true`, `tables: 28`,
 
 ## Blocked on Saif
 
+- [ ] **Rotate the Google OAuth client secret.** One was pasted into a chat transcript
+      on 2026-09-13 and must be considered compromised. Google Cloud Console →
+      Credentials → that OAuth client → add a new secret and delete the exposed one, or
+      delete the client and make a fresh one. Nothing had been wired to it yet, so
+      there is nothing to redo. Neither the client ID nor the secret ever needs to pass
+      through a conversation: both go from the Google console straight into the
+      Supabase provider page and Railway's variables.
 - [ ] **Google Calendar credentials.** `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
       from a Google Cloud project with the consent screen published to **Production**
       (in Testing, refresh tokens expire every 7 days). The redirect URI must now be
