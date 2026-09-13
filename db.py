@@ -293,11 +293,48 @@ def get_db(user_id=None):
     return conn
 
 
+PG_SCHEMA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "cloud", "migrate", "pg_schema.sql")
+# Arbitrary, and only has to agree between workers of the same app.
+SCHEMA_LOCK_ID = 827419901
+
+
+def ensure_pg_schema():
+    """Create the tables the first time the deployed app boots.
+
+    This exists so that deploying is a matter of setting variables and nothing else:
+    no pasting 570 lines of SQL into a web console, and no psql on the machine doing
+    the deploying.
+
+    Guarded by a Postgres advisory lock, because gunicorn starts several workers at
+    once and they would otherwise race to create the same tables. Every statement in
+    the file is `create ... if not exists`, so running it twice is harmless; the lock
+    is about not running it twice at the same instant.
+    """
+    import psycopg
+    if not os.path.exists(PG_SCHEMA_FILE):
+        raise RuntimeError(
+            f"DATABASE_URL is set but {PG_SCHEMA_FILE} is missing, so the tables "
+            "cannot be created. Run cloud/migrate/gen_pg_schema.py and commit it.")
+    sql = open(PG_SCHEMA_FILE, encoding="utf-8").read().split("-- Every row below")[0]
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute("select pg_advisory_lock(%s)", (SCHEMA_LOCK_ID,))
+            try:
+                cur.execute("select to_regclass('public.classes')")
+                if cur.fetchone()[0] is not None:
+                    return                 # already built by an earlier boot
+                cur.execute(sql)
+            finally:
+                cur.execute("select pg_advisory_unlock(%s)", (SCHEMA_LOCK_ID,))
+
+
 def init_db():
-    # On Postgres the schema is applied out of band, by the file that
-    # cloud/migrate/gen_pg_schema.py produces. The ALTER-by-ALTER migration below is a
-    # SQLite story: it exists because a local database predates most of these columns.
+    # On Postgres the tables build themselves on first boot. The ALTER-by-ALTER
+    # migration below is a SQLite story: it exists because a local database predates
+    # most of these columns.
     if DATABASE_URL:
+        ensure_pg_schema()
         return
     conn = get_db()
     conn.executescript(SCHEMA)

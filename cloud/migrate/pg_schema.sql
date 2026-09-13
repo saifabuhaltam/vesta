@@ -37,6 +37,16 @@ do $$ begin
     then create role anon; end if;
 end $$;
 
+-- The app connects as the database owner and drops to `authenticated` for the duration
+-- of each request. `set role` only works if the connecting role is a member of the
+-- target one (or is a superuser), so grant it explicitly rather than relying on the
+-- host handing out superuser. Without this every request fails at `set role`.
+do $$ begin
+  execute format('grant authenticated to %I', current_user);
+exception when others then
+  null;   -- already a member, or a host that does not allow it; RLS still applies
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- The policy helper. Owner-only, forced, with WITH CHECK on updates so a row can
 -- never be handed to another account.
