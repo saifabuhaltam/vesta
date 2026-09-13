@@ -29,6 +29,15 @@ onto the Railway volume.
 
 ## Deployment gotchas worth writing into the checklist
 
+- **Railway runs Python 3.13; local development runs 3.9.** Nothing here tests against
+  3.13, so a version-specific problem reaches production unseen. Worth either pinning
+  the runtime or testing against 3.13 before trusting a release. `datetime.utcnow()`,
+  used throughout, is deprecated from 3.12 and will eventually be removed.
+- **A stale deploy and a fixed bug look identical from outside.** Confirming the fix was
+  live took several rounds of guessing until `/health` started reporting the running
+  commit. Check `version` there before debugging anything that "should already be
+  fixed".
+
 - **Supabase needs both Site URL and Redirect URLs set**, not just one. Site URL is the
   fallback destination after an OAuth sign-in and ships as `http://localhost:3000`;
   Redirect URLs is the allowlist that `redirect_to` is checked against. Setting only
