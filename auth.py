@@ -33,6 +33,13 @@ SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or ""
 SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET") or ""
 
+# How long a sign-in lasts. Supabase's own access token expires in about an hour, but
+# it is used once, at sign-in, and never again: from then on identity is carried by
+# Flask's signed cookie, so this is the number that actually governs. Long enough not
+# to interrupt someone between classes, short enough that a removed account does not
+# keep working forever.
+SESSION_SECONDS = 60 * 60 * 24 * 30
+
 # Paths that must work before anyone is signed in.
 OPEN_PATHS = {"/api/auth/login", "/api/auth/signup", "/api/auth/reset",
               "/api/auth/logout", "/api/auth/me", "/health"}
@@ -41,8 +48,11 @@ bp = Blueprint("auth", __name__)
 
 
 def enabled():
-    """True only where accounts are configured, which is the deployed app."""
-    return bool(SUPABASE_URL and SUPABASE_ANON_KEY and SUPABASE_JWT_SECRET)
+    """True only where accounts are configured, which is the deployed app.
+
+    The JWT secret is deliberately not required. See `identify`.
+    """
+    return bool(SUPABASE_URL and SUPABASE_ANON_KEY)
 
 
 class AuthError(Exception):
@@ -140,14 +150,50 @@ def ensure_account_row(user_id, email):
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+def identify(access_token):
+    """Who a Supabase access token belongs to, as (user_id, email).
+
+    Asked of Supabase rather than worked out from the signature, because Supabase has
+    been moving projects off a single shared HS256 secret onto asymmetric ES256 signing
+    keys. Verifying ES256 here would mean an elliptic-curve dependency and fetching a
+    JWKS, all to avoid one HTTP call that happens once per sign-in and never again:
+    after this, identity is carried by Flask's own signed session cookie.
+
+    Where a shared secret *is* configured, the signature is checked locally first. That
+    is free, needs no network, and rejects a forged token outright.
+    """
+    if SUPABASE_JWT_SECRET:
+        try:
+            claims = verify_jwt(access_token)
+            return claims["sub"], claims.get("email") or ""
+        except AuthError:
+            # A legacy secret that no longer matches how this project signs tokens is a
+            # reason to ask, not a reason to refuse a genuine sign-in.
+            pass
+
+    import httpx
+    try:
+        r = httpx.get(f"{SUPABASE_URL}/auth/v1/user",
+                      headers={"Authorization": f"Bearer {access_token}",
+                               "apikey": SUPABASE_ANON_KEY},
+                      timeout=20)
+    except Exception as e:
+        raise AuthError(f"Could not reach the sign-in service: {e}", 502)
+    if r.status_code >= 400:
+        raise AuthError("That sign-in could not be confirmed.")
+    user = r.json() or {}
+    if not user.get("id"):
+        raise AuthError("That sign-in carried no account.")
+    return user["id"], user.get("email") or ""
+
+
 def _session_from_token(access_token):
-    claims = verify_jwt(access_token)
-    user_id, email = claims["sub"], claims.get("email") or ""
+    user_id, email = identify(access_token)
     ensure_account_row(user_id, email)
     session.permanent = True
     session["user_id"] = user_id
     session["email"] = email
-    session["exp"] = claims.get("exp")
+    session["exp"] = time.time() + SESSION_SECONDS
     return {"id": user_id, "email": email}
 
 
@@ -239,7 +285,7 @@ def install(app):
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=bool(os.environ.get("HTTPS_ONLY", "1") == "1" and enabled()),
-        PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 30,
+        PERMANENT_SESSION_LIFETIME=SESSION_SECONDS,
     )
 
     @app.before_request
