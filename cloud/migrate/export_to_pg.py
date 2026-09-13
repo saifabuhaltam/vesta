@@ -60,6 +60,23 @@ def main():
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
     tables = [t for t in tables if t not in SKIP_TABLES]
 
+    # A materials row whose bytes are gone would import happily and then 404 on every
+    # download, which is worse than not being there: it looks like a working file until
+    # someone needs it. Vesta's syllabus import points the materials row at the *same*
+    # stored file as the syllabus_imports row rather than copying it, so either side
+    # removing the file breaks the other, and that is how these came to be orphaned.
+    uploads = os.path.join(os.path.dirname(path), "uploads")
+    orphaned = set()
+    for r in conn.execute("SELECT id, title, stored_name FROM materials"):
+        name = r["stored_name"] or ""
+        if name and not os.path.exists(os.path.join(uploads, name)):
+            orphaned.add(r["id"])
+            print(f"-- skipping material {r['id']}: its file is missing "
+                  f"({(r['title'] or 'untitled')})", file=sys.stderr)
+    if orphaned:
+        print(f"-- {len(orphaned)} material row(s) skipped; re-upload those files in the "
+              f"app once you are signed in.", file=sys.stderr)
+
     # parents before children, same walk as the schema generator
     deps = {t: {f["table"] for f in conn.execute(f"PRAGMA foreign_key_list({t})")
                 if f["table"] != t and f["table"] in tables} for t in tables}
@@ -98,12 +115,19 @@ def main():
             continue
         cols = [c for c in rows[0].keys()]
         quoted = ", ".join(f'"{c}"' for c in cols) + ", user_id"
-        w(f"-- {t}: {len(rows)} row(s)")
-        for r in rows:
+        # Anything pointing at a skipped material goes too, or the insert fails on a
+        # foreign key. Ids are uuids, so matching any column against the set is safe.
+        keep = [r for r in rows
+                if not (orphaned and any(r[c] in orphaned for c in cols))]
+        dropped = len(rows) - len(keep)
+        if not keep:
+            continue
+        w(f"-- {t}: {len(keep)} row(s)" + (f"  ({dropped} skipped: missing file)" if dropped else ""))
+        for r in keep:
             values = ", ".join(lit(r[c]) for c in cols) + f", {OWNER}"
             w(f'insert into {t} ({quoted}) values ({values});')
         w("")
-        total += len(rows)
+        total += len(keep)
 
     # term_settings exists already, so carry the values across instead of inserting
     term = conn.execute("SELECT * FROM term_settings WHERE id=1").fetchone()

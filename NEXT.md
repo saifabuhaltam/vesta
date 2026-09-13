@@ -1,39 +1,64 @@
 # Vesta: what's left
 
-A running list so nothing gets lost between sessions. Anything marked **needs Saif**
-cannot be done from a terminal: it needs a dashboard login, an email click, or a
-decision only he can make.
+A running list so nothing is lost between sessions. **needs Saif** means it cannot be
+done from a terminal: a dashboard login, an email click, or a decision that is his.
 
-_Last updated: 2026-09-13_
+_Last updated: 2026-09-13, after the Railway deployment came up._
 
 ---
 
-## Deploying (in progress)
+## Deploying
 
-- [ ] **needs Saif** — Set the Railway variables (see "Setting the variables" below).
-- [ ] Apply `cloud/migrate/pg_schema.sql` to the Railway Postgres. 570 lines, 29 tables,
-      forced row level security on every one.
-- [ ] Import the existing data: `cloud/migrate/export_to_pg.py --email <you>` produces
-      the SQL. Requires signing in to the deployed app once first, so the account exists.
-      Verified locally: 105 inserts, every row count matching.
-- [ ] Copy `data/uploads/` onto the Railway volume. Not covered by the SQL import, so
-      until it is done the rows exist but a download 404s.
-- [ ] Smoke-test the deployment: sign in, check the 4 classes and 44 items are there,
-      upload a file, run a Headstart.
+Live at `vesta-production-8a53.up.railway.app`. `/health` reports the truth about any
+instance: which database, whether accounts are on, the table count, and whether Railway
+actually mounted the volume.
+
+Confirmed working: `database: postgres`, `accounts: true`, `tables: 28`,
+`volumeMountedAt: /data`.
+
+- [ ] **needs Saif** — Sign in once, so the account row exists for the import to hang
+      off. `saifabuhaltam@gmail.com`, already on the Supabase invite list.
+- [ ] Run `cloud/migrate/import.sql` against the Railway Postgres. 103 inserts:
+      4 classes, 44 items, 6 notes, 27 syllabus topics, 3 grade categories, 4 meeting
+      times. Verified end to end against a local Postgres.
+- [ ] Get four files into the app. Two screenshots live only on this Mac; the two
+      syllabus PDFs are in `test-syllabi/`. Either re-upload all four through the UI
+      (two minutes, no tooling) or install the Railway CLI and copy them onto the
+      volume.
+- [ ] Smoke-test the live site: sign in, confirm the classes and assignments, upload a
+      file, run a Headstart, export the calendar.
+
+## Bugs found and not yet fixed
+
+- [ ] **Syllabus import shares one file between two tables.** `do_import` points the
+      new `materials` row at the *same* stored file as the `syllabus_imports` row
+      rather than copying it. One file, two owners, so whichever side is deleted first
+      silently breaks the other. This is what orphaned the PHIL 110 and REM 388
+      syllabus rows, whose `syllabus_imports` status still reads `imported` while the
+      bytes are gone. **It will happen again** to the next syllabus imported and later
+      tidied up. Fix: copy the file at import time, or reference-count it.
+- [ ] **`extracted_text` is empty for every material.** All four rows have length 0, so
+      uploaded files are not searchable and Headstart cannot read them. The extraction
+      runs on upload and there is a startup backfill, so something is not firing. Worth
+      investigating before relying on file search.
+- [ ] **Commit `7b5d88f` has a Python script as its commit message.** My heredoc
+      nesting error: the message and the script were swapped. The code in it is correct.
+      Fixing means `git commit --amend` plus a force-push, which rewrites pushed
+      history, so **needs Saif** to say go.
+- [ ] **The sync indicator reads "Connecting…" on the sign-in screen**, before anyone
+      has signed in. Cosmetic, but it is the first thing a new user sees.
 
 ## Blocked on Saif
 
 - [ ] **Google Calendar credentials.** `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
-      from a Google Cloud project, consent screen published to **Production** (in
-      Testing, refresh tokens expire every 7 days). Register the callback URL for
-      whatever host the app ends up on. Placeholders are already in `.env`.
-      The Calendar API itself is free.
+      from a Google Cloud project with the consent screen published to **Production**
+      (in Testing, refresh tokens expire every 7 days). The redirect URI must now be
+      the Railway domain, not localhost. Placeholders are in `.env`. The API is free.
 - [ ] **Prove two accounts are isolated on the live deployment.** The same checks pass
-      20/20 against a local Postgres, but confirming the deployed database matches needs
-      the dashboard and clicking confirmation emails. Do this before any friend gets a
-      login.
-- [ ] **Invite friends** once the above is done: add their email to the Supabase
-      allowlist (one line of SQL in the Supabase SQL editor).
+      against a local Postgres, but confirming the deployed database matches needs the
+      dashboard and clicking confirmation emails. **Do this before any friend gets a
+      login.**
+- [ ] **Invite friends**: add each email to the Supabase allowlist, one line of SQL.
 
 ## Decisions waiting on Saif
 
@@ -41,40 +66,44 @@ _Last updated: 2026-09-13_
       unused by the Railway architecture. Committed in `fd2db5a`, so deleting is safe
       and reversible. The row level security work already lives in
       `cloud/migrate/gen_pg_schema.py`.
-- [ ] **What to do about the Google Calendar work** once deployed. It is written and
-      tested but its transport has never executed against Google.
+- [ ] **Google Calendar sync**: written and tested, but its transport has never
+      executed against Google. Decide whether to finish it or park it.
+- [ ] **Amend the bad commit message** on `7b5d88f`, which needs a force-push.
 
 ## Documentation (deferred by Saif, 2026-09-13)
 
-- [ ] `README.md` still documents SQLite-only and single-user. Needs the Postgres
-      backend, accounts, and the real deployment steps.
-- [ ] `DESIGN.md` still describes the Supabase-plus-Cloudflare architecture. Needs
-      rewriting for Railway plus Supabase-for-auth-only.
+- [ ] `README.md` still documents SQLite-only, single-user, and `localhost:5000`.
+      Needs Postgres, accounts, Railway, and the real deployment steps.
+- [ ] `DESIGN.md` still describes Supabase-plus-Cloudflare. Needs rewriting for
+      Railway, with Supabase used only to issue tokens.
 - [ ] A deployment checklist matching what was actually built.
 
 ## Known gaps and rough edges
 
-- [ ] **Uploads on the volume.** `DATA_DIR=/data` covers it, but nothing yet verifies
-      the volume is actually mounted. Without it every deploy wipes uploads silently.
 - [ ] **The SFU exam fallback in `syllabus.py` has never fired.** Across 16 real
       sections, finals always lived in `examSchedule`. Kept as a documented guard, not
-      a fix.
-- [ ] **Multi-section SFU courses** need the section picker; single-lecture courses skip
-      it. Working, but only exercised against four real courses.
-- [ ] **`.docx` syllabus import** depends on `python-docx` and so on `lxml`. Fine on
-      Railway. Worth remembering if the runtime ever changes.
-- [ ] **The sync indicator says "Connecting…"** on the sign-in screen, which is noise
-      before anyone has signed in.
-- [ ] **`gunicorn` worker count.** Postgres is fine with several; if the SQLite fallback
-      is ever used in production, more than one worker risks write locking.
+      a fix for an observed bug.
+- [ ] **Multi-section SFU courses** were only exercised against four real courses.
+- [ ] **`.docx` syllabus import** needs `python-docx` and therefore `lxml`. Fine on
+      Railway; worth remembering if the runtime ever changes.
+- [ ] **`gunicorn` worker count.** Postgres handles several fine. If the SQLite
+      fallback is ever used in production, more than one worker risks write locking.
+- [ ] **Session length is 30 days** (`SESSION_SECONDS` in `auth.py`). A removed Supabase
+      account keeps working locally until its cookie expires.
 
-## Done, for reference
+## Done
 
-- Postgres schema generator, row level security proven with two accounts (17/17)
-- `pgshim`: `?` placeholders, dict rows, real `PRAGMA table_info`, per-user provisioning
-- Accounts: Supabase-issued, verified server side, session cookie, gate on every `/api`
-- Sign-in screen, styled and theme-correct, browser-tested end to end (13/13)
-- Data migration verified: every table's row count matches
-- Three real bugs fixed in the calendar export: floating times drifting across DST,
-  zero-length all-day events, unpadded times breaking matching
-- Everything committed and pushed: `fd2db5a`, `c6d64f2`
+- Postgres schema that builds itself on first boot, 28 tables, forced row level
+  security on every one, dependency-ordered
+- `pgshim`: `?` placeholders, dict rows, a real `PRAGMA table_info`, per-user
+  provisioning, so none of the app's 262 queries needed a user filter
+- Two-student isolation proven with the app's own SQL (17/17)
+- Accounts: Supabase issues the token, Flask verifies and holds the session, every
+  `/api` route gated, local single-user mode untouched
+- Sign-in screen, theme-correct, browser-tested end to end (13/13)
+- `/health`, so "is it really on Postgres" is a fact rather than a hope
+- Three real bugs fixed in the calendar export: floating times drifting an hour across
+  DST, zero-length all-day events, unpadded times breaking matching
+- `psycopg` and `httpx` added to requirements; without them the deploy built fine and
+  then crashed on first use
+- Commits: `fd2db5a`, `c6d64f2`, `dcdc8ba`, `ccdb050`, `7b5d88f`
