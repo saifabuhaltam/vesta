@@ -27,6 +27,20 @@ and are kept in case that changes, but nothing depends on them. This also makes 
 earlier problems moot: the two orphaned syllabus files, and getting `data/uploads/`
 onto the Railway volume.
 
+## Deployment gotchas worth writing into the checklist
+
+- **Supabase needs both Site URL and Redirect URLs set**, not just one. Site URL is the
+  fallback destination after an OAuth sign-in and ships as `http://localhost:3000`;
+  Redirect URLs is the allowlist that `redirect_to` is checked against. Setting only
+  the allowlist still dumps the user on localhost:3000, which looks exactly like a
+  broken app. Both live under Authentication → URL Configuration.
+  Values: `https://vesta-production-8a53.up.railway.app` and
+  `https://vesta-production-8a53.up.railway.app/**`.
+- **Railway volumes are created from the project canvas** (⌘K, or right-click), not
+  from a Settings sub-menu inside the service.
+- **`DATA_DIR=/data` and the volume mount path must agree.** Either one alone looks
+  like it works and silently loses uploads on the next deploy.
+
 ## Bugs found and not yet fixed
 
 - [ ] **Syllabus import shares one file between two tables.** `do_import` points the
