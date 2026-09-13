@@ -79,6 +79,15 @@ onto the Railway volume.
       there is nothing to redo. Neither the client ID nor the secret ever needs to pass
       through a conversation: both go from the Google console straight into the
       Supabase provider page and Railway's variables.
+- [ ] **Decide whether to publish the Google app, or stay in Testing.** Testing mode
+      works and allows up to 100 test users, which covers Saif plus friends: each person
+      is added under Google Auth Platform → Audience → Test users. The cost is that
+      refresh tokens expire every 7 days, so Google Calendar needs reconnecting about
+      weekly. Publishing removes that, but requires homepage, privacy policy and terms
+      of service URLs plus registered authorized domains, and Google may refuse
+      `up.railway.app` since it is not a domain Saif owns. Doing it properly probably
+      means a custom domain, which also means re-registering the OAuth callback URL.
+      If we go that way: add `/privacy` and `/terms` pages to Vesta first, they are easy.
 - [ ] **Google Calendar credentials.** `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
       from a Google Cloud project with the consent screen published to **Production**
       (in Testing, refresh tokens expire every 7 days). The redirect URI must now be
