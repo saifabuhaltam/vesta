@@ -210,12 +210,14 @@ def note_suggestions(nid):
         "SELECT file_id FROM note_links WHERE note_id=? AND file_id IS NOT NULL", (nid,))}
     out = []
     for it in conn.execute(
-            "SELECT id, title, class_id FROM items ORDER BY (class_id IS ?) DESC, due_date", (n["class_id"],)):
+            "SELECT id, title, class_id FROM items"
+            " ORDER BY CASE WHEN class_id = ? THEN 0 ELSE 1 END, due_date", (n["class_id"],)):
         if it["id"] not in have_items and mentions(text, it["title"]):
             out.append({"kind": "item", "id": it["id"], "title": it["title"],
                         "reason": f'mentions "{it["title"]}"'})
     for m in conn.execute(
-            "SELECT id, title, filename, class_id FROM materials ORDER BY (class_id IS ?) DESC, created_at DESC",
+            "SELECT id, title, filename, class_id FROM materials"
+            " ORDER BY CASE WHEN class_id = ? THEN 0 ELSE 1 END, created_at DESC",
             (n["class_id"],)):
         if m["id"] in have_files:
             continue
@@ -239,7 +241,8 @@ def file_suggestions(mid):
     attached = set(item_ids_for_file(conn, mid))
     out = []
     for it in conn.execute(
-            "SELECT id, title, class_id FROM items ORDER BY (class_id IS ?) DESC, due_date", (m["class_id"],)):
+            "SELECT id, title, class_id FROM items"
+            " ORDER BY CASE WHEN class_id = ? THEN 0 ELSE 1 END, due_date", (m["class_id"],)):
         if it["id"] not in attached and mentions(text, it["title"]):
             out.append({"kind": "item", "id": it["id"], "title": it["title"],
                         "reason": f'mentions "{it["title"]}"'})

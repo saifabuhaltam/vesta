@@ -16,17 +16,16 @@ actually mounted the volume.
 Confirmed working: `database: postgres`, `accounts: true`, `tables: 28`,
 `volumeMountedAt: /data`.
 
-- [ ] **needs Saif** — Sign in once, so the account row exists for the import to hang
-      off. `saifabuhaltam@gmail.com`, already on the Supabase invite list.
-- [ ] Run `cloud/migrate/import.sql` against the Railway Postgres. 103 inserts:
-      4 classes, 44 items, 6 notes, 27 syllabus topics, 3 grade categories, 4 meeting
-      times. Verified end to end against a local Postgres.
-- [ ] Get four files into the app. Two screenshots live only on this Mac; the two
-      syllabus PDFs are in `test-syllabi/`. Either re-upload all four through the UI
-      (two minutes, no tooling) or install the Railway CLI and copy them onto the
-      volume.
-- [ ] Smoke-test the live site: sign in, confirm the classes and assignments, upload a
-      file, run a Headstart, export the calendar.
+- [ ] **needs Saif** — Sign in once and start fresh.
+- [ ] Smoke-test the live site: sign in, add a class, import a syllabus, connect the
+      calendar, upload a file, run a Headstart, export the calendar.
+
+**No data migration.** Saif decided on 2026-09-13 to start from scratch rather than
+carry the local database across: he will re-upload the syllabi and let the app rebuild
+from those. `cloud/migrate/export_to_pg.py` and the generated `import.sql` still work
+and are kept in case that changes, but nothing depends on them. This also makes two
+earlier problems moot: the two orphaned syllabus files, and getting `data/uploads/`
+onto the Railway volume.
 
 ## Bugs found and not yet fixed
 

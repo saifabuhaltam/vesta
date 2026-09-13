@@ -241,9 +241,10 @@ def put_state(conn, value):
     There is no secret_key and no cookies, so there is nowhere in a request to keep a
     CSRF token between the redirect out and the callback back.
     """
-    conn.execute("INSERT INTO app_settings (key, value) VALUES (?,?) "
-                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                 (STATE_KEY, json.dumps({"state": value, "at": now()})))
+    blob = json.dumps({"state": value, "at": now()})
+    if not conn.execute("UPDATE app_settings SET value=? WHERE key=?",
+                        (blob, STATE_KEY)).rowcount:
+        conn.execute("INSERT INTO app_settings (key, value) VALUES (?,?)", (STATE_KEY, blob))
     conn.commit()
 
 

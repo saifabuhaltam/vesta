@@ -64,11 +64,12 @@ def settings(conn):
 def save_settings(conn, patch):
     current = settings(conn)
     current.update({k: v for k, v in patch.items() if k in DEFAULT_SETTINGS})
-    conn.execute(
-        "INSERT INTO app_settings (key, value) VALUES ('ai', ?) "
-        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-        (json.dumps(current),),
-    )
+    # Not ON CONFLICT: app_settings is keyed (user_id, key) on Postgres, so a
+    # conflict target of `key` alone matches no constraint. Row level security scopes
+    # the UPDATE to this account, so the insert only fires for a genuinely new one.
+    blob = json.dumps(current)
+    if not conn.execute("UPDATE app_settings SET value=? WHERE key='ai'", (blob,)).rowcount:
+        conn.execute("INSERT INTO app_settings (key, value) VALUES ('ai', ?)", (blob,))
     conn.commit()
     return current
 
