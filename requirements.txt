@@ -3,3 +3,9 @@ gunicorn==22.0.0
 pypdf==4.3.1
 python-docx==1.1.2
 anthropic
+# Postgres, for the deployed app. db.py falls back to SQLite without DATABASE_URL,
+# so this is unused locally but the deploy crashes on import without it.
+psycopg[binary]==3.2.13
+# Used directly by gcal.py and auth.py. It currently arrives as a dependency of
+# anthropic, but sign-in should not rest on another package's dependency tree.
+httpx>=0.27,<1
