@@ -1720,6 +1720,121 @@ def export_ics():
     )
 
 
+# ---------------------------------------------------------------------------
+# Privacy and terms
+#
+# Google requires a homepage, a privacy policy and a terms link before an app using a
+# sensitive scope can be published, and for the privacy policy to say plainly what
+# happens to Google user data. These are served by the app itself so they live at a
+# real address on the same domain, and they are deliberately outside /api so the gate
+# lets a reviewer read them without an account.
+# ---------------------------------------------------------------------------
+
+LEGAL_CSS = """
+  :root{color-scheme:light dark}
+  body{margin:0;font:16px/1.65 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+       background:#f4f5f7;color:#1c1d21}
+  main{max-width:720px;margin:0 auto;padding:56px 22px 96px}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:-.02em}
+  h2{font-size:18px;margin:34px 0 8px}
+  p,li{color:#3d3f47}
+  .sub{color:#75777f;margin:0 0 28px}
+  a{color:#3576d9}
+  code{background:#e8e9ed;padding:1px 5px;border-radius:5px;font-size:14px}
+  @media (prefers-color-scheme:dark){
+    body{background:#17171d;color:#e9e9ee}
+    p,li{color:#b9bac2} .sub{color:#8a8c96}
+    code{background:#262730}
+  }
+"""
+
+
+def legal_page(title, body_html):
+    return Response(
+        f"<!doctype html><html lang=en><head><meta charset=utf-8>"
+        f"<meta name=viewport content='width=device-width,initial-scale=1'>"
+        f"<title>{title} — Vesta</title><style>{LEGAL_CSS}</style></head>"
+        f"<body><main>{body_html}"
+        f"<p style='margin-top:44px'><a href='/'>Back to Vesta</a></p>"
+        f"</main></body></html>",
+        mimetype="text/html")
+
+
+@app.route("/privacy")
+def privacy():
+    return legal_page("Privacy", """
+<h1>Privacy</h1>
+<p class=sub>Vesta is a personal study planner, run by one student for himself and a
+small number of friends. It is not a company and not a commercial service.</p>
+
+<h2>What Vesta stores</h2>
+<p>Only what you put into it: your classes and their schedules, assignments and due
+dates, grades you record, notes you write, and files you upload. This is held in a
+private database that only this application can reach, and every row is tied to your
+account. Other people using this same installation cannot read your data; the database
+enforces that, not just the application.</p>
+
+<h2>Google Calendar</h2>
+<p>If, and only if, you choose to connect Google Calendar, Vesta asks Google for
+permission to read and write your calendar. It uses that access for one purpose: to
+keep a calendar named <code>Vesta</code> in step with your assignment and exam due
+dates, and to read events back so the two do not contradict each other.</p>
+<p>Vesta's use of information received from Google APIs follows the
+<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API
+Services User Data Policy</a>, including its Limited Use requirements. Calendar data is
+never sold, never used for advertising, never used to train any model, and never shared
+with anyone else. It is not read by a human. You can disconnect at any time from
+Settings, or revoke access from your Google account, and Vesta stops immediately.</p>
+
+<h2>Artificial intelligence features</h2>
+<p>Some features (drafting, study outlines, quizzes, and reading a syllabus) send the
+relevant assignment text or uploaded document to Anthropic's API to generate a response.
+Those features only run when you press the button that starts them. Nothing is sent
+anywhere for the app's ordinary use.</p>
+
+<h2>What Vesta does not do</h2>
+<p>No advertising, no analytics, no tracking, no selling or sharing of data with anyone.
+Your email address is used to identify your account and nothing else.</p>
+
+<h2>Deleting your data</h2>
+<p>Delete individual items in the app at any time. To remove your account and everything
+attached to it, ask the developer and it will be deleted from the database outright.</p>
+
+<h2>Contact</h2>
+<p>Saif Abuhaltam, the developer, at the support email listed on the Google consent
+screen for this app.</p>
+""")
+
+
+@app.route("/terms")
+def terms():
+    return legal_page("Terms", """
+<h1>Terms of use</h1>
+<p class=sub>Short, because this is a study planner run by a student for a handful of
+people.</p>
+
+<h2>What this is</h2>
+<p>A private tool for organising coursework. Access is by invitation: an account can
+only be created with an email the developer has added.</p>
+
+<h2>What you can expect</h2>
+<p>Vesta is provided as is, with no guarantee of availability and no warranty. It runs
+on modest hosting and can be down, lose a deployment, or change without notice. Keep
+your own copies of anything you cannot afford to lose. The developer is not liable for
+lost work or missed deadlines.</p>
+
+<h2>What is expected of you</h2>
+<p>Use it for your own coursework. Do not upload anything you do not have the right to
+store. The AI features produce drafts and study material to work from, not work to hand
+in as your own; what you submit to your institution, and whether it complies with that
+institution's academic integrity rules, is your responsibility.</p>
+
+<h2>Ending it</h2>
+<p>Stop using it whenever you like and ask for your data to be deleted. The developer
+may withdraw access, particularly if costs or misuse make that necessary.</p>
+""")
+
+
 @app.route("/health")
 def health():
     """What this instance actually is, without revealing anything private.
