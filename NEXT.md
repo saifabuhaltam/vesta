@@ -95,7 +95,32 @@ idempotence; then the full lifecycle over HTTP (start a term, clean workspace, s
 back, archive, `423` on write, unlock, write, switch away, locked again, refuse to
 delete a term with work in it).
 
-### The one real risk: the Postgres migration has never run
+### Tested 2026-09-13 (was: "the migration has never run")
+
+It has now, against a real Postgres via `pgserver`, in the two shapes it will meet:
+the pre-semester schema with two accounts' worth of coursework in it, and a database
+built from the current `pg_schema.sql`. 57 checks pass, plus 33 more driving the API
+through a term's whole life, plus a browser pass over the switcher, the archived
+banner and unlock.
+
+One real bug came out of it and is fixed in `1dc1e5b`: the migration lifted forced
+RLS on the eight tables it backfills but not on `semesters`, which it also inserts
+into, so a **brand-new** deployment would fail to boot with *new row violates
+row-level security policy*. It stayed invisible because superusers bypass RLS
+entirely — the test only found it once the migration was run as a non-superuser.
+
+- [ ] **The test scripts live in the scratchpad, which is session-local and will be
+      gone.** This repo has never committed tests. Worth deciding whether
+      `test_semester_migration.py` and `test_semester_api.py` should become the first
+      ones, because the migration test carries a negative control that is the only
+      thing standing between a silent no-op backfill and the live database.
+- [ ] **Confirm what role Railway's `DATABASE_URL` connects as.** If it is not a
+      superuser, the fix above is load-bearing. Either way the migration is now
+      correct; this is worth knowing before the next migration is written.
+
+### Deploying it
+
+
 
 `ensure_pg_schema()` builds the tables once and then returns early forever, so a
 deployed database could never gain a column. There is now a migration runner
@@ -103,11 +128,9 @@ deployed database could never gain a column. There is now a migration runner
 advisory lock, each block in its own transaction, recorded in `schema_migrations` so a
 redeploy is a no-op.
 
-None of it has been executed against a real Postgres. There is no Postgres and no
-Docker on this machine, so `001_semesters` will run for the first time on Railway.
-Read it before deploying: it lifts `force row level security` on eight tables to do
-its backfill as the owner and puts it back in the same transaction, which is the part
-worth a second pair of eyes.
+It lifts `force row level security` on the tables it backfills and puts it back in the
+same transaction, which is still the part worth a second pair of eyes on any future
+migration.
 
 - [ ] **After deploying, check `/health` first.** It now reports `migrations`. If that
       list does not contain `001_semesters`, the app is running against a database
@@ -127,6 +150,13 @@ worth a second pair of eyes.
 - [ ] **Moving a class between terms is not in the interface.** The schema supports it
       and `semester_for` keeps child rows honest, but there is no button. A class
       created in the wrong term has to be deleted and remade.
+- [ ] **An archived term still offers "Start Focus Session" and "What to work on".**
+      Seen in the browser: the dashboard of a locked term invites you into actions the
+      server then refuses with a 423. Reading old coursework should not look like
+      working on it.
+- [ ] **The term list grows down the sidebar.** Two terms look right; eight terms over
+      four years will push the navigation off the screen. Needs a scroll or a "show
+      older" once there are more than about four, without hiding the current one.
 
 ## Missing from the original data plan
 
