@@ -23,10 +23,12 @@ Requires Python 3.9+.
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/python app.py
+PORT=5055 .venv/bin/python app.py
 ```
 
-Visit `http://localhost:5000`. Data is stored in `data/vesta.db` and `data/uploads/` (both gitignored). Delete the `data/` folder to start fresh.
+Visit `http://localhost:5055`. Data is stored in `data/vesta.db` and `data/uploads/` (both gitignored). Delete the `data/` folder to start fresh.
+
+`PORT` defaults to 5000, but **on macOS the AirPlay Receiver in Control Center permanently occupies port 5000**, so Vesta either fails to bind or you reach the wrong service. Pass `PORT` as above, or turn AirPlay Receiver off under System Settings → General → AirDrop & Handoff. Whichever port you settle on, register its callback URL in Google Cloud if you want calendar sync — see the notes in `.env`.
 
 ### Headstart's API key
 
@@ -34,8 +36,10 @@ Headstart and rubric parsing both call the Claude API from the server, which nee
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
-.venv/bin/python app.py
+PORT=5055 .venv/bin/python app.py
 ```
+
+Easier: put it in a `.env` file next to `app.py` as `ANTHROPIC_API_KEY=sk-ant-...`. Vesta reads that at startup, and the file is gitignored. The Google Calendar credentials live there too.
 
 Every other feature works without this key — Headstart and rubric parsing just return a clear error until it's set.
 

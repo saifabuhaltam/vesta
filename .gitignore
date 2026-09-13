@@ -3,3 +3,22 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# per-deployment cloud config, not secret but not shared
+cloud/app/config.js
+cloud/migrate/import.sql
+cloud/migrate/upload_manifest.json
+cloud/dist/
+cloud/setup/secrets.local.txt
+
+# local secrets and private test material
+.env
+test-syllabi/
+
+# Design material and working files. Useful locally, never needed to run the app,
+# and 25 MB that would otherwise sit in git history forever and be re-downloaded on
+# every deploy.
+vesta mockups/
+reference/
+assets/
+.DS_Store

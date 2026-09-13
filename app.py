@@ -1,4 +1,6 @@
 import os
+import re
+import mimetypes
 import json
 import uuid
 from datetime import datetime, timedelta
@@ -7,9 +9,58 @@ import anthropic
 from flask import Flask, request, jsonify, send_from_directory, abort, Response
 from werkzeug.utils import secure_filename
 
+# .env is read before anything else is imported: db.py decides where the database
+# and uploads live (DATA_DIR) the moment it is imported.
+def load_env_file(path):
+    """Read KEY=value lines from a local .env, so the API key never has to live in code.
+
+    No dependency, no logging: values go straight into the environment and are
+    never printed. Anything already set in the real environment wins.
+    """
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            if key.startswith("export "):
+                key = key[len("export "):].strip()
+            value = value.strip().strip('"').strip("'")
+            # a blank placeholder line should not count as a key
+            if key and value and key not in os.environ:
+                os.environ[key] = value
+
+
+load_env_file(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+
+
 from db import get_db, init_db, UPLOAD_DIR
 
+
+
 app = Flask(__name__, static_folder="static", static_url_path="")
+
+# The AI layer lives in its own module: Headstart tools, Quiz Me, flashcards and
+# practice tests, plus the cost guardrails they all share.
+from ai import bp as ai_bp  # noqa: E402
+app.register_blueprint(ai_bp)
+from links import bp as links_bp  # noqa: E402
+app.register_blueprint(links_bp)
+# syllabus import reads uploads with the same extractor the rest of the app uses
+# looked up at call time: extract_text is defined further down this file
+app.config["EXTRACT_TEXT"] = lambda path, name: extract_text(path, name)
+from syllabus_import import bp as syllabus_bp  # noqa: E402
+app.register_blueprint(syllabus_bp)
+# calendar: SFU's published timetable now, connected calendars next
+from calendar_api import bp as calendar_bp  # noqa: E402
+app.register_blueprint(calendar_bp)
+# Accounts, and the gate in front of every /api route. Entirely a no-op locally,
+# where no Supabase is configured: Vesta stays the single-user tool it started as.
+import auth as vesta_auth  # noqa: E402
+vesta_auth.install(app)
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # 25 MB per upload
 
 init_db()
@@ -31,6 +82,8 @@ HEADSTART_KIND_BY_TYPE = {
     "quiz": ["quiz_prep", "explain"],
     "exam": ["study_outline", "explain"],
     "reading": ["synthesis", "explain"],
+    "homework": ["draft", "explain"],
+    "discussion": ["draft", "explain"],
     "other": list(HEADSTART_LABELS.keys()),
 }
 
@@ -135,9 +188,18 @@ def guess_file_category(filename):
     return "other"
 
 
-def serialize_material(m):
+def item_ids_for_material(conn, mid):
+    """Every assignment a file is attached to. A file is stored once and can serve many."""
+    return [r["item_id"] for r in conn.execute(
+        "SELECT item_id FROM item_files WHERE material_id=? ORDER BY created_at", (mid,))]
+
+
+def serialize_material(m, item_ids=None):
+    item_ids = item_ids or []
     d = {
         "id": m["id"],
+        "itemIds": item_ids,
+        "itemId": item_ids[0] if item_ids else None,   # older callers read a single id
         "category": m["category"],
         "title": m["title"],
         "kind": m["kind"],
@@ -149,33 +211,78 @@ def serialize_material(m):
         d["size"] = m["size"]
         d["mimetype"] = m["mimetype"]
         d["url"] = f"/api/materials/{m['id']}/download"
+        # the row can outlive the upload (a deleted class removes the file), and
+        # a preview that says so beats an empty frame
+        d["missing"] = not (m["stored_name"] and os.path.exists(os.path.join(UPLOAD_DIR, m["stored_name"])))
     else:
         d["url"] = m["url"]
     return d
 
 
 def serialize_note(n):
+    keys = n.keys()
     return {
         "id": n["id"],
+        "title": n["title"] or "",
+        "folderId": n["folder_id"],
         "text": n["text"],
         "linkedItemId": n["linked_item_id"],
+        "pinned": bool(n["pinned"]) if "pinned" in keys else False,
+        "starred": bool(n["starred"]) if "starred" in keys else False,
+        "sortOrder": (n["sort_order"] or 0) if "sort_order" in keys else 0,
+        "deletedAt": n["deleted_at"] if "deleted_at" in keys else None,
+        "updatedAt": n["updated_at"] or n["created_at"],
         "createdAt": n["created_at"],
+    }
+
+
+def folder_would_cycle(conn, fid, parent_id):
+    """Walk up from the proposed parent; if we meet ourselves it is a loop."""
+    cursor, hops = parent_id, 0
+    while cursor:
+        if cursor == fid:
+            return True
+        hops += 1
+        if hops > 50:
+            return True
+        row = conn.execute("SELECT parent_id FROM note_folders WHERE id=?", (cursor,)).fetchone()
+        cursor = row["parent_id"] if row else None
+    return False
+
+
+def serialize_event(e):
+    return {
+        "id": e["id"],
+        "classId": e["class_id"],
+        "title": e["title"],
+        "kind": e["kind"] or "other",
+        "date": e["date"],
+        "start": e["start"],
+        "end": e["end"],
+        "allDay": bool(e["all_day"]),
+        "location": e["location"] or "",
+        "notes": e["notes"] or "",
+        "createdAt": e["created_at"],
     }
 
 
 def serialize_class(conn, row):
     schedule = conn.execute(
-        "SELECT day, start, end, location FROM schedule_entries WHERE class_id=?",
+        "SELECT id, day, start, \"end\", location FROM schedule_entries WHERE class_id=?",
         (row["id"],),
     ).fetchall()
     materials = conn.execute(
         "SELECT * FROM materials WHERE class_id=? ORDER BY created_at", (row["id"],)
     ).fetchall()
     notes = conn.execute(
-        "SELECT * FROM notes WHERE class_id=? ORDER BY created_at", (row["id"],)
+        "SELECT * FROM notes WHERE class_id=? AND (deleted_at IS NULL OR deleted_at='') "
+        "ORDER BY pinned DESC, sort_order, created_at",
+        (row["id"],),
     ).fetchall()
     topics = conn.execute(
-        "SELECT * FROM syllabus_topics WHERE class_id=? ORDER BY sort_order, rowid",
+        # rowid is SQLite-only; sort_order already carries the intended order and title
+        # is a deterministic tiebreak in either database.
+        "SELECT * FROM syllabus_topics WHERE class_id=? ORDER BY sort_order, title",
         (row["id"],),
     ).fetchall()
     return {
@@ -185,13 +292,42 @@ def serialize_class(conn, row):
         "professor": row["professor"],
         "color": row["color"],
         "notes": row["notes"],
+        "gradeScale": json.loads(row["grade_scale"]) if row["grade_scale"] else None,
+        # "Quizzes 20%, best 8 of 10": a share of the grade that its items split
+        "gradeCategories": [
+            {"id": g["id"], "name": g["name"] or "", "weight": g["weight"],
+             "dropLowest": g["drop_lowest"] or 0, "sortOrder": g["sort_order"] or 0}
+            for g in conn.execute(
+                "SELECT * FROM grade_categories WHERE class_id=? ORDER BY sort_order, name",
+                (row["id"],)).fetchall()
+        ],
+        "website": row["website"] or "",
         "createdAt": row["created_at"],
         "schedule": [
-            {"day": s["day"], "start": s["start"], "end": s["end"], "location": s["location"]}
+            {"id": s["id"], "day": s["day"], "start": s["start"], "end": s["end"],
+             "location": s["location"],
+             # lecture, lab, tutorial or seminar, and the dates it actually runs
+             "kind": (s["kind"] if "kind" in s.keys() else None) or "lecture",
+             "section": (s["section"] if "section" in s.keys() else None) or "",
+             "startDate": s["start_date"] if "start_date" in s.keys() else None,
+             "endDate": s["end_date"] if "end_date" in s.keys() else None}
             for s in schedule
         ],
-        "materials": [serialize_material(m) for m in materials],
+        "materials": [serialize_material(m, item_ids_for_material(conn, m["id"])) for m in materials],
         "notesList": [serialize_note(n) for n in notes],
+        "noteFolders": [
+            {
+                "id": f["id"],
+                "name": f["name"],
+                "parentId": f["parent_id"] if "parent_id" in f.keys() else None,
+                "kind": (f["kind"] or "custom") if "kind" in f.keys() else "custom",
+                "sortOrder": (f["sort_order"] or 0) if "sort_order" in f.keys() else 0,
+            }
+            for f in conn.execute(
+                "SELECT * FROM note_folders WHERE class_id=? ORDER BY sort_order, created_at",
+                (row["id"],),
+            ).fetchall()
+        ],
         "syllabus": [
             {"id": t["id"], "title": t["title"], "done": bool(t["done"])} for t in topics
         ],
@@ -232,6 +368,10 @@ def serialize_item(conn, row):
         "completedAt": row["completed_at"],
         "weight": row["weight"],
         "score": row["score"],
+        # a share of a grade category ("Quizzes 20%") instead of its own weight
+        "categoryId": row["category_id"] if "category_id" in row.keys() else None,
+        "location": (row["location"] if "location" in row.keys() else None) or "",
+        "importKey": row["import_key"] if "import_key" in row.keys() else None,
         "notes": row["notes"],
         "focusSeconds": row["focus_seconds"] or 0,
         "createdAt": row["created_at"],
@@ -254,13 +394,68 @@ def extract_text(filepath, filename):
             return text[:200000]
         if ext == "docx":
             import docx
+            from docx.table import Table
+            from docx.text.paragraph import Paragraph
 
+            # Paragraphs and tables in the order they appear. Course maps and schedules
+            # usually live in tables, and reading paragraphs alone loses all of it.
             d = docx.Document(filepath)
-            text = "\n".join(p.text for p in d.paragraphs)
+            lines = []
+            for child in d.element.body.iterchildren():
+                tag = child.tag.rsplit("}", 1)[-1]
+                if tag == "p":
+                    t = Paragraph(child, d).text.strip()
+                    if t:
+                        lines.append(t)
+                elif tag == "tbl":
+                    for row in Table(child, d).rows:
+                        cells = []
+                        for cell in row.cells:
+                            c = " ".join(cell.text.split())
+                            if c and (not cells or cells[-1] != c):   # merged cells repeat their text
+                                cells.append(c)
+                        if cells:
+                            lines.append(" | ".join(cells))
+                    lines.append("")
+            return "\n".join(lines)[:200000]
+        if ext in PLAIN_TEXT_EXTS:
+            with open(filepath, "r", encoding="utf-8", errors="replace") as fh:
+                text = fh.read(400000)
+            if ext in ("html", "htm"):
+                text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", text, flags=re.S | re.I)
+                text = re.sub(r"<[^>]+>", " ", text)
             return text[:200000]
     except Exception:
         return None
     return None
+
+
+# Files whose words can be read straight off the disk. Without their text, search,
+# link suggestions and Headstart cannot see inside them.
+PLAIN_TEXT_EXTS = ("txt", "md", "markdown", "csv", "tsv", "html", "htm")
+
+
+def backfill_extracted_text():
+    """Read files uploaded before their type was readable, once, at startup."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, filename, stored_name FROM materials "
+        "WHERE kind='file' AND (extracted_text IS NULL OR extracted_text='') AND stored_name IS NOT NULL"
+    ).fetchall()
+    for r in rows:
+        ext = (r["filename"] or "").rsplit(".", 1)[-1].lower() if "." in (r["filename"] or "") else ""
+        if ext not in PLAIN_TEXT_EXTS:
+            continue
+        path = os.path.join(UPLOAD_DIR, r["stored_name"])
+        if os.path.exists(path):
+            text = extract_text(path, r["filename"])
+            if text:
+                conn.execute("UPDATE materials SET extracted_text=? WHERE id=?", (text, r["id"]))
+    conn.commit()
+    conn.close()
+
+
+backfill_extracted_text()
 
 
 # ---------------- frontend ----------------
@@ -277,14 +472,42 @@ def get_state():
     conn = get_db()
     classes = conn.execute("SELECT * FROM classes ORDER BY created_at").fetchall()
     items = conn.execute("SELECT * FROM items ORDER BY created_at").fetchall()
+    events = conn.execute("SELECT * FROM events ORDER BY date, start").fetchall()
     term = conn.execute("SELECT * FROM term_settings WHERE id=1").fetchone()
     result = {
         "classes": [serialize_class(conn, c) for c in classes],
         "items": [serialize_item(conn, i) for i in items],
+        "events": [serialize_event(e) for e in events],
         "term": {
             "name": term["name"] or "",
             "startDate": term["start_date"] or "",
             "endDate": term["end_date"] or "",
+        },
+        # syllabi that were read (and paid for) but not reviewed yet
+        "pendingImports": [
+            {"id": r["id"], "filename": r["filename"], "classId": r["class_id"], "createdAt": r["created_at"]}
+            for r in conn.execute(
+                "SELECT id, filename, class_id, created_at FROM syllabus_imports WHERE status='review' "
+                "ORDER BY created_at DESC").fetchall()
+        ],
+        # a timetable pulled from SFU but not applied yet, so closing the tab does not
+        # lose the review the way it would if the draft only lived in the page
+        "pendingCalendarImports": [
+            {"id": r["id"], "label": r["label"], "source": r["source"],
+             "classId": r["class_id"], "createdAt": r["created_at"]}
+            for r in conn.execute(
+                "SELECT id, label, source, class_id, created_at FROM calendar_imports "
+                "WHERE status='review' ORDER BY created_at DESC").fetchall()
+        ],
+        # Notes and files jotted down or dropped in before there was anywhere to put
+        # them. They live outside every class until they are filed.
+        "unfiled": {
+            "notesList": [serialize_note(n) for n in conn.execute(
+                "SELECT * FROM notes WHERE class_id IS NULL "
+                "ORDER BY pinned DESC, updated_at DESC").fetchall()],
+            "materials": [serialize_material(m, item_ids_for_material(conn, m["id"])) for m in conn.execute(
+                "SELECT * FROM materials WHERE class_id IS NULL "
+                "ORDER BY created_at DESC").fetchall()],
         },
     }
     conn.close()
@@ -313,7 +536,7 @@ def create_class():
     cid = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     conn.execute(
-        "INSERT INTO classes (id, code, name, professor, color, notes, created_at) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO classes (id, code, name, professor, color, notes, grade_scale, website, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
         (
             cid,
             data.get("code", ""),
@@ -321,38 +544,74 @@ def create_class():
             data.get("professor", ""),
             data.get("color", ""),
             data.get("notes", ""),
+            json.dumps(data["gradeScale"]) if data.get("gradeScale") else None,
+            data.get("website", ""),
             now,
         ),
     )
     for s in data.get("schedule", []) or []:
         conn.execute(
-            "INSERT INTO schedule_entries (id, class_id, day, start, end, location) VALUES (?,?,?,?,?,?)",
-            (str(uuid.uuid4()), cid, s.get("day"), s.get("start"), s.get("end"), s.get("location", "")),
+            "INSERT INTO schedule_entries (id, class_id, day, start, \"end\", location, kind, section, start_date, end_date)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (str(uuid.uuid4()), cid, s.get("day"), s.get("start"), s.get("end"), s.get("location", ""),
+             s.get("kind") or "lecture", s.get("section") or "", s.get("startDate"), s.get("endDate")),
         )
     conn.commit()
     conn.close()
     return jsonify({"id": cid}), 201
 
 
+def save_grade_categories(conn, cid, cats):
+    """Replace a class's grade categories, keeping ids so items stay in their category.
+
+    A category that is removed releases its items rather than deleting them.
+    """
+    keep = []
+    for i, g in enumerate(cats):
+        gid = g.get("id") or str(uuid.uuid4())
+        keep.append(gid)
+        exists = conn.execute("SELECT 1 FROM grade_categories WHERE id=? AND class_id=?", (gid, cid)).fetchone()
+        values = (g.get("name") or "", g.get("weight"), int(g.get("dropLowest") or 0), i)
+        if exists:
+            conn.execute("UPDATE grade_categories SET name=?, weight=?, drop_lowest=?, sort_order=? WHERE id=?",
+                         values + (gid,))
+        else:
+            conn.execute("INSERT INTO grade_categories (id, class_id, name, weight, drop_lowest, sort_order, created_at)"
+                         " VALUES (?,?,?,?,?,?,?)", (gid, cid) + values + (datetime.utcnow().isoformat(),))
+    gone = [r["id"] for r in conn.execute("SELECT id FROM grade_categories WHERE class_id=?", (cid,)).fetchall()
+            if r["id"] not in keep]
+    for gid in gone:
+        conn.execute("UPDATE items SET category_id=NULL WHERE category_id=?", (gid,))
+        conn.execute("DELETE FROM grade_categories WHERE id=?", (gid,))
+    return keep
+
+
 @app.route("/api/classes/<cid>", methods=["PUT"])
 def update_class(cid):
     data = request.get_json(force=True) or {}
     conn = get_db()
-    colmap = {"code": "code", "name": "name", "professor": "professor", "color": "color", "notes": "notes"}
+    colmap = {"code": "code", "name": "name", "professor": "professor", "color": "color", "notes": "notes", "website": "website"}
     fields, values = [], []
     for key, col in colmap.items():
         if key in data:
             fields.append(f"{col}=?")
             values.append(data[key])
+    if "gradeScale" in data:
+        fields.append("grade_scale=?")
+        values.append(json.dumps(data["gradeScale"]) if data["gradeScale"] else None)
     if fields:
         values.append(cid)
         conn.execute(f"UPDATE classes SET {', '.join(fields)} WHERE id=?", values)
+    if "gradeCategories" in data:
+        save_grade_categories(conn, cid, data["gradeCategories"] or [])
     if "schedule" in data:
         conn.execute("DELETE FROM schedule_entries WHERE class_id=?", (cid,))
         for s in data["schedule"] or []:
             conn.execute(
-                "INSERT INTO schedule_entries (id, class_id, day, start, end, location) VALUES (?,?,?,?,?,?)",
-                (str(uuid.uuid4()), cid, s.get("day"), s.get("start"), s.get("end"), s.get("location", "")),
+                "INSERT INTO schedule_entries (id, class_id, day, start, \"end\", location, kind, section, start_date, end_date)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (str(uuid.uuid4()), cid, s.get("day"), s.get("start"), s.get("end"), s.get("location", ""),
+                 s.get("kind") or "lecture", s.get("section") or "", s.get("startDate"), s.get("endDate")),
             )
     conn.commit()
     conn.close()
@@ -385,8 +644,9 @@ def create_item():
     iid = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     conn.execute(
-        """INSERT INTO items (id, class_id, title, type, due_date, due_time, status, completed_at, weight, score, notes, created_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+        """INSERT INTO items (id, class_id, title, type, due_date, due_time, status, completed_at, weight, score, notes, created_at,
+                              category_id, location, import_key)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             iid,
             data.get("classId"),
@@ -400,6 +660,9 @@ def create_item():
             data.get("score"),
             data.get("notes", ""),
             now,
+            data.get("categoryId"),
+            data.get("location") or "",
+            data.get("importKey"),
         ),
     )
     for s in data.get("subtasks", []) or []:
@@ -427,6 +690,8 @@ def update_item(iid):
         "weight": "weight",
         "score": "score",
         "notes": "notes",
+        "categoryId": "category_id",
+        "location": "location",
     }
     fields, values = [], []
     for key, col in colmap.items():
@@ -630,15 +895,24 @@ def delete_headstart(hid):
 
 # ---------------- materials (files & links) ----------------
 
+@app.route("/api/materials", methods=["POST"])
+def add_unfiled_material():
+    """A file dropped in before it has been filed under a class."""
+    return add_material(None)
+
+
 @app.route("/api/classes/<cid>/materials", methods=["POST"])
 def add_material(cid):
     conn = get_db()
-    cls = conn.execute("SELECT id FROM classes WHERE id=?", (cid,)).fetchone()
-    if not cls:
-        conn.close()
-        abort(404)
+    if cid is not None:
+        cls = conn.execute("SELECT id FROM classes WHERE id=?", (cid,)).fetchone()
+        if not cls:
+            conn.close()
+            abort(404)
     now = datetime.utcnow().isoformat()
     mid = str(uuid.uuid4())
+    # a file can belong to one assignment as well as the class
+    item_id = request.form.get("itemId") or (request.get_json(silent=True) or {}).get("itemId") or None
 
     if "file" in request.files and request.files["file"].filename:
         f = request.files["file"]
@@ -652,9 +926,9 @@ def add_material(cid):
         title = request.form.get("title") or original
         text = extract_text(path, original)
         conn.execute(
-            """INSERT INTO materials (id, class_id, category, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (mid, cid, category, title, "file", None, original, stored, mimetype, size, text, now),
+            """INSERT INTO materials (id, class_id, item_id, category, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (mid, cid, None, category, title, "file", None, original, stored, mimetype, size, text, now),
         )
     else:
         data = request.get_json(silent=True) or request.form
@@ -665,13 +939,28 @@ def add_material(cid):
         title = data.get("title") or url
         category = data.get("category", "other")
         conn.execute(
-            """INSERT INTO materials (id, class_id, category, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (mid, cid, category, title, "link", url, None, None, None, None, None, now),
+            """INSERT INTO materials (id, class_id, item_id, category, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (mid, cid, None, category, title, "link", url, None, None, None, None, None, now),
         )
+    if item_id and conn.execute("SELECT 1 FROM items WHERE id=?", (item_id,)).fetchone():
+        conn.execute(
+            "INSERT INTO item_files (id, item_id, material_id, created_at) VALUES (?,?,?,?)"
+            " ON CONFLICT DO NOTHING",
+            (str(uuid.uuid4()), item_id, mid, now))
     conn.commit()
     conn.close()
     return jsonify({"id": mid}), 201
+
+
+@app.route("/api/items/<iid>/description", methods=["PUT"])
+def update_item_description(iid):
+    data = request.get_json(force=True) or {}
+    conn = get_db()
+    conn.execute("UPDATE items SET notes=? WHERE id=?", (data.get("notes") or "", iid))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/materials/<mid>", methods=["PUT"])
@@ -685,10 +974,24 @@ def update_material(mid):
     if "title" in data:
         fields.append("title=?")
         values.append(data["title"])
+    # attaching a file to an assignment (adds a link), or detaching it from all of them
+    if "itemId" in data:
+        if data["itemId"]:
+            conn.execute(
+                "INSERT INTO item_files (id, item_id, material_id, created_at) VALUES (?,?,?,?)"
+            " ON CONFLICT DO NOTHING",
+                (str(uuid.uuid4()), data["itemId"], mid, datetime.utcnow().isoformat()))
+        else:
+            conn.execute("DELETE FROM item_files WHERE material_id=?", (mid,))
+    # filing it under a class, or back into the Inbox. Its assignment links survive
+    # the move: a file's home and what it is used for are separate questions.
+    if "classId" in data:
+        fields.append("class_id=?")
+        values.append(data["classId"] or None)
     if fields:
         values.append(mid)
         conn.execute(f"UPDATE materials SET {', '.join(fields)} WHERE id=?", values)
-        conn.commit()
+    conn.commit()
     row = conn.execute("SELECT * FROM materials WHERE id=?", (mid,)).fetchone()
     conn.close()
     if not row:
@@ -710,6 +1013,31 @@ def delete_material(mid):
     return jsonify({"ok": True})
 
 
+# Browsers only render a file inline (PDF viewer, image, plain text) when the
+# response is not marked as an attachment, so previewing is the default and an
+# actual download is opt-in with ?download=1.
+INLINE_MIMETYPES = {
+    "application/pdf",
+    "text/plain",
+    "text/markdown",
+    "text/csv",
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+}
+
+
+def material_mimetype(m):
+    """Best guess at the stored file's content type."""
+    mt = (m["mimetype"] or "").split(";")[0].strip().lower()
+    if not mt or mt == "application/octet-stream":
+        guessed, _ = mimetypes.guess_type(m["filename"] or m["stored_name"] or "")
+        mt = (guessed or mt or "application/octet-stream").lower()
+    return mt
+
+
 @app.route("/api/materials/<mid>/download")
 def download_material(mid):
     conn = get_db()
@@ -717,7 +1045,16 @@ def download_material(mid):
     conn.close()
     if not m or m["kind"] != "file":
         abort(404)
-    return send_from_directory(UPLOAD_DIR, m["stored_name"], as_attachment=True, download_name=m["filename"])
+    mt = material_mimetype(m)
+    forced = request.args.get("download") in ("1", "true", "yes")
+    inline = not forced and mt in INLINE_MIMETYPES
+    return send_from_directory(
+        UPLOAD_DIR,
+        m["stored_name"],
+        mimetype=mt,
+        as_attachment=not inline,
+        download_name=m["filename"],
+    )
 
 
 # ---------------- rubrics ----------------
@@ -866,36 +1203,312 @@ def add_focus_time(iid):
 
 # ---------------- notes ----------------
 
+
+
+@app.route("/api/notes", methods=["POST"])
+def add_unfiled_note():
+    """A note with nowhere to live yet. File it under a class whenever you like."""
+    return add_note(None)
+
+
 @app.route("/api/classes/<cid>/notes", methods=["POST"])
 def add_note(cid):
     data = request.get_json(force=True) or {}
-    text = (data.get("text") or "").strip()
-    if not text:
-        return jsonify({"error": "text required"}), 400
+    text = data.get("text") or ""
+    title = (data.get("title") or "").strip()
+    # A brand new note legitimately has neither yet; the interface shows a
+    # placeholder until the person types something.
     conn = get_db()
-    rows = conn.execute("SELECT id, title FROM items WHERE class_id=?", (cid,)).fetchall()
-    lower = text.lower()
-    matched = None
-    for it in rows:
-        title = it["title"] or ""
-        if title and title.lower() in lower:
-            if not matched or len(title) > len(matched["title"]):
-                matched = it
     nid = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     conn.execute(
-        "INSERT INTO notes (id, class_id, text, linked_item_id, created_at) VALUES (?,?,?,?,?)",
-        (nid, cid, text, matched["id"] if matched else None, now),
+        "INSERT INTO notes (id, class_id, title, folder_id, text, linked_item_id, updated_at, created_at)"
+        " VALUES (?,?,?,?,?,?,?,?)",
+        (nid, cid, title, data.get("folderId"), text,
+         # Only an explicit link. Creating a note from inside an assignment says what
+         # it belongs to; anything else is offered as a suggestion, never assumed.
+         data.get("linkedItemId") or None, now, now),
     )
     conn.commit()
     conn.close()
     return jsonify({"id": nid}), 201
 
 
+@app.route("/api/notes/<nid>", methods=["PUT"])
+def update_note(nid):
+    data = request.get_json(force=True) or {}
+    conn = get_db()
+    row = conn.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()
+    if not row:
+        conn.close()
+        abort(404)
+    fields, values = [], []
+    for key, col in (("title", "title"), ("text", "text"), ("folderId", "folder_id")):
+        if key in data:
+            fields.append(f"{col}=?")
+            values.append(data[key])
+    # filing an unfiled note under a class, or taking it back out
+    if "classId" in data:
+        fields.append("class_id=?")
+        values.append(data["classId"] or None)
+        if not data["classId"]:
+            fields.append("folder_id=?")     # a folder belongs to a class
+            values.append(None)
+    # attaching the note to an assignment, or taking it off one
+    if "linkedItemId" in data:
+        fields.append("linked_item_id=?")
+        values.append(data["linkedItemId"] or None)
+    for key, col in (("pinned", "pinned"), ("starred", "starred")):
+        if key in data:
+            fields.append(f"{col}=?")
+            values.append(1 if data[key] else 0)
+    if "sortOrder" in data:
+        fields.append("sort_order=?")
+        values.append(int(data.get("sortOrder") or 0))
+    if "deletedAt" in data:
+        fields.append("deleted_at=?")
+        values.append(data["deletedAt"])
+    # Snapshot the previous text, at most once every five minutes, so autosave
+    # does not fill the table with near-identical rows.
+    if "text" in data and (row["text"] or "") != (data.get("text") or ""):
+        last = conn.execute(
+            "SELECT created_at FROM note_versions WHERE note_id=? ORDER BY created_at DESC LIMIT 1",
+            (nid,),
+        ).fetchone()
+        fresh = False
+        if last and last["created_at"]:
+            try:
+                fresh = (datetime.utcnow() - datetime.fromisoformat(last["created_at"])).total_seconds() < 300
+            except Exception:
+                fresh = False
+        if not fresh:
+            conn.execute(
+                "INSERT INTO note_versions (id, note_id, title, text, created_at) VALUES (?,?,?,?,?)",
+                (str(uuid.uuid4()), nid, row["title"], row["text"], datetime.utcnow().isoformat()),
+            )
+            conn.execute(
+                "DELETE FROM note_versions WHERE note_id=? AND id NOT IN "
+                "(SELECT id FROM note_versions WHERE note_id=? ORDER BY created_at DESC LIMIT 50)",
+                (nid, nid),
+            )
+    fields.append("updated_at=?")
+    values.append(datetime.utcnow().isoformat())
+    values.append(nid)
+    conn.execute(f"UPDATE notes SET {', '.join(fields)} WHERE id=?", values)
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/classes/<cid>/note-folders", methods=["POST"])
+def add_note_folder(cid):
+    data = request.get_json(force=True) or {}
+    name = (data.get("name") or "").strip() or "New folder"
+    kind = data.get("kind") or "custom"
+    if kind not in ("lecture", "reading", "exam", "assignment", "custom"):
+        kind = "custom"
+    parent_id = data.get("parentId") or None
+    fid = str(uuid.uuid4())
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO note_folders (id, class_id, parent_id, name, kind, created_at) "
+        "VALUES (?,?,?,?,?,?)",
+        (fid, cid, parent_id, name, kind, datetime.utcnow().isoformat()),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"id": fid}), 201
+
+
+@app.route("/api/note-folders/<fid>", methods=["PUT"])
+def rename_note_folder(fid):
+    data = request.get_json(force=True) or {}
+    conn = get_db()
+    fields, values = [], []
+    if "name" in data:
+        fields.append("name=?")
+        values.append((data.get("name") or "").strip() or "Untitled")
+    if "kind" in data:
+        kind = data.get("kind") or "custom"
+        if kind not in ("lecture", "reading", "exam", "assignment", "custom"):
+            kind = "custom"
+        fields.append("kind=?")
+        values.append(kind)
+    if "sortOrder" in data:
+        fields.append("sort_order=?")
+        values.append(int(data.get("sortOrder") or 0))
+    if "parentId" in data:
+        parent_id = data.get("parentId") or None
+        if parent_id == fid or folder_would_cycle(conn, fid, parent_id):
+            conn.close()
+            return jsonify({"error": "That would put a folder inside one of its own subfolders."}), 400
+        fields.append("parent_id=?")
+        values.append(parent_id)
+    if not fields:
+        conn.close()
+        return jsonify({"ok": True})
+    values.append(fid)
+    conn.execute(f"UPDATE note_folders SET {', '.join(fields)} WHERE id=?", values)
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/note-folders/<fid>", methods=["DELETE"])
+def delete_note_folder(fid):
+    conn = get_db()
+    # notes in the folder survive; they just move back to the top level
+    conn.execute("UPDATE notes SET folder_id=NULL WHERE folder_id=?", (fid,))
+    conn.execute("DELETE FROM note_folders WHERE id=?", (fid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/notes/<nid>", methods=["DELETE"])
 def delete_note(nid):
+    """Move to the Trash by default. ?permanent=1 actually destroys it."""
     conn = get_db()
-    conn.execute("DELETE FROM notes WHERE id=?", (nid,))
+    if request.args.get("permanent") == "1":
+        conn.execute("DELETE FROM notes WHERE id=?", (nid,))
+    else:
+        conn.execute("UPDATE notes SET deleted_at=? WHERE id=?",
+                     (datetime.utcnow().isoformat(), nid))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/notes/trash")
+def list_trashed_notes():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT n.*, c.code AS class_code FROM notes n LEFT JOIN classes c ON c.id=n.class_id "
+        "WHERE n.deleted_at IS NOT NULL AND n.deleted_at<>'' ORDER BY n.deleted_at DESC"
+    ).fetchall()
+    out = []
+    for r in rows:
+        d = serialize_note(r)
+        d["classId"] = r["class_id"]
+        d["classCode"] = r["class_code"] or ""
+        out.append(d)
+    conn.close()
+    return jsonify(out)
+
+
+@app.route("/api/notes/<nid>/restore", methods=["POST"])
+def restore_note(nid):
+    conn = get_db()
+    conn.execute("UPDATE notes SET deleted_at=NULL WHERE id=?", (nid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/notes/<nid>/duplicate", methods=["POST"])
+def duplicate_note(nid):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()
+    if not row:
+        conn.close()
+        abort(404)
+    new_id = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+    conn.execute(
+        "INSERT INTO notes (id, class_id, title, folder_id, text, linked_item_id, created_at, updated_at) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (new_id, row["class_id"], ((row["title"] or "Untitled note") + " copy"),
+         row["folder_id"], row["text"], row["linked_item_id"], now, now),
+    )
+    # carry the connections across too, or the copy is only half a copy
+    for link in conn.execute("SELECT * FROM note_links WHERE note_id=?", (nid,)).fetchall():
+        conn.execute(
+            "INSERT INTO note_links (id, note_id, item_id, file_id, event_id, schedule_entry_id, "
+            "headstart_id, target_note_id, label, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (str(uuid.uuid4()), new_id, link["item_id"], link["file_id"], link["event_id"],
+             link["schedule_entry_id"],
+             link["headstart_id"] if "headstart_id" in link.keys() else None,
+             link["target_note_id"], link["label"], now),
+        )
+    conn.commit()
+    conn.close()
+    return jsonify({"id": new_id}), 201
+
+
+@app.route("/api/notes/<nid>/versions")
+def list_note_versions(nid):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, title, text, created_at FROM note_versions WHERE note_id=? "
+        "ORDER BY created_at DESC LIMIT 50",
+        (nid,),
+    ).fetchall()
+    out = [{"id": r["id"], "title": r["title"] or "", "text": r["text"] or "",
+            "createdAt": r["created_at"]} for r in rows]
+    conn.close()
+    return jsonify(out)
+
+
+@app.route("/api/notes/<nid>/versions/<vid>/restore", methods=["POST"])
+def restore_note_version(nid, vid):
+    conn = get_db()
+    v = conn.execute("SELECT * FROM note_versions WHERE id=? AND note_id=?", (vid, nid)).fetchone()
+    cur = conn.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()
+    if not v or not cur:
+        conn.close()
+        abort(404)
+    now = datetime.utcnow().isoformat()
+    # the version being replaced becomes a version itself, so this is undoable
+    conn.execute(
+        "INSERT INTO note_versions (id, note_id, title, text, created_at) VALUES (?,?,?,?,?)",
+        (str(uuid.uuid4()), nid, cur["title"], cur["text"], now),
+    )
+    conn.execute("UPDATE notes SET title=?, text=?, updated_at=? WHERE id=?",
+                 (v["title"], v["text"], now, nid))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/notes/<nid>/links", methods=["GET", "POST"])
+def note_links(nid):
+    conn = get_db()
+    if request.method == "POST":
+        data = request.get_json(force=True) or {}
+        kind = data.get("type")
+        col = {"item": "item_id", "file": "file_id", "event": "event_id",
+               "lecture": "schedule_entry_id", "headstart": "headstart_id",
+               "note": "target_note_id"}.get(kind)
+        if not col or not data.get("id"):
+            conn.close()
+            return jsonify({"error": "A link needs a type and an id."}), 400
+        existing = conn.execute(
+            f"SELECT id FROM note_links WHERE note_id=? AND {col}=?", (nid, data["id"])
+        ).fetchone()
+        if existing:
+            conn.close()
+            return jsonify({"id": existing["id"]}), 200
+        lid = str(uuid.uuid4())
+        conn.execute(
+            f"INSERT INTO note_links (id, note_id, {col}, label, created_at) VALUES (?,?,?,?,?)",
+            (lid, nid, data["id"], data.get("label") or "", datetime.utcnow().isoformat()),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"id": lid}), 201
+    rows = conn.execute("SELECT * FROM note_links WHERE note_id=? ORDER BY created_at", (nid,)).fetchall()
+    out = [{"id": r["id"], "itemId": r["item_id"], "fileId": r["file_id"],
+            "eventId": r["event_id"], "lectureId": r["schedule_entry_id"],
+            "headstartId": r["headstart_id"] if "headstart_id" in r.keys() else None,
+            "noteId": r["target_note_id"], "label": r["label"] or ""} for r in rows]
+    conn.close()
+    return jsonify(out)
+
+
+@app.route("/api/note-links/<lid>", methods=["DELETE"])
+def delete_note_link(lid):
+    conn = get_db()
+    conn.execute("DELETE FROM note_links WHERE id=?", (lid,))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -944,6 +1557,87 @@ def delete_topic(tid):
 
 # ---------------- calendar export ----------------
 
+@app.route("/api/events", methods=["POST"])
+def create_event():
+    data = request.get_json(force=True) or {}
+    conn = get_db()
+    eid = str(uuid.uuid4())
+    conn.execute(
+        "INSERT INTO events (id, class_id, title, kind, date, start, \"end\", all_day, location, notes, created_at)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            eid,
+            data.get("classId") or None,
+            data.get("title", ""),
+            data.get("kind", "other"),
+            data.get("date"),
+            data.get("start"),
+            data.get("end"),
+            1 if data.get("allDay") else 0,
+            data.get("location", ""),
+            data.get("notes", ""),
+            datetime.utcnow().isoformat(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"id": eid}), 201
+
+
+@app.route("/api/events/<eid>", methods=["PUT"])
+def update_event(eid):
+    data = request.get_json(force=True) or {}
+    colmap = {
+        "classId": "class_id", "title": "title", "kind": "kind", "date": "date",
+        # the SQL name is quoted because `end` is reserved in Postgres
+        "start": "start", "end": '"end"', "location": "location", "notes": "notes",
+    }
+    fields, values = [], []
+    for key, col in colmap.items():
+        if key in data:
+            fields.append(f"{col}=?")
+            values.append(data[key] or None if key == "classId" else data[key])
+    if "allDay" in data:
+        fields.append("all_day=?")
+        values.append(1 if data["allDay"] else 0)
+    conn = get_db()
+    if fields:
+        values.append(eid)
+        conn.execute(f"UPDATE events SET {', '.join(fields)} WHERE id=?", values)
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/events/<eid>", methods=["DELETE"])
+def delete_event(eid):
+    conn = get_db()
+    conn.execute("DELETE FROM events WHERE id=?", (eid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+# Times in the feed are Vancouver wall-clock, not floating. Emitted bare, "14:30" is
+# whatever the reading calendar decides it is, and a weekly class meeting slips by an
+# hour the moment daylight time ends in November. TZID pins it; the VTIMEZONE block is
+# carried because strict readers will not resolve a bare IANA name.
+CAL_TZ = "America/Vancouver"
+VTIMEZONE = [
+    "BEGIN:VTIMEZONE",
+    f"TZID:{CAL_TZ}",
+    "BEGIN:DAYLIGHT",
+    "TZOFFSETFROM:-0800", "TZOFFSETTO:-0700", "TZNAME:PDT",
+    "DTSTART:19700308T020000", "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU",
+    "END:DAYLIGHT",
+    "BEGIN:STANDARD",
+    "TZOFFSETFROM:-0700", "TZOFFSETTO:-0800", "TZNAME:PST",
+    "DTSTART:19701101T020000", "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU",
+    "END:STANDARD",
+    "END:VTIMEZONE",
+]
+
+
 @app.route("/api/export.ics")
 def export_ics():
     conn = get_db()
@@ -957,7 +1651,7 @@ def export_ics():
     def esc(s):
         return (s or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
-    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Vesta//EN", "CALSCALE:GREGORIAN"]
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Vesta//EN", "CALSCALE:GREGORIAN"] + VTIMEZONE
     stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
 
     if term["start_date"] and term["end_date"]:
@@ -985,8 +1679,8 @@ def export_ics():
                     "BEGIN:VEVENT",
                     f"UID:{c['id']}-{s['day']}-{s['start'].replace(':','')}@vesta",
                     f"DTSTAMP:{stamp}",
-                    f"DTSTART:{dtstart}",
-                    f"DTEND:{dtend}",
+                    f"DTSTART;TZID={CAL_TZ}:{dtstart}",
+                    f"DTEND;TZID={CAL_TZ}:{dtend}",
                     f"RRULE:FREQ=WEEKLY;UNTIL={until_str}",
                     f"SUMMARY:{esc((c['code'] or '') + ' — ' + (c['name'] or ''))}",
                 ]
@@ -1002,12 +1696,15 @@ def export_ics():
             h, m = map(int, it["due_time"].split(":"))
             d = datetime.strptime(it["due_date"], "%Y-%m-%d").replace(hour=h, minute=m)
             dend = d + timedelta(minutes=30)
-            lines.append(f"DTSTART:{d.strftime('%Y%m%dT%H%M%S')}")
-            lines.append(f"DTEND:{dend.strftime('%Y%m%dT%H%M%S')}")
+            lines.append(f"DTSTART;TZID={CAL_TZ}:{d.strftime('%Y%m%dT%H%M%S')}")
+            lines.append(f"DTEND;TZID={CAL_TZ}:{dend.strftime('%Y%m%dT%H%M%S')}")
         else:
-            compact = it["due_date"].replace("-", "")
-            lines.append(f"DTSTART;VALUE=DATE:{compact}")
-            lines.append(f"DTEND;VALUE=DATE:{compact}")
+            # An all-day DTEND is exclusive: a one-day event ends on the following day.
+            # Equal DTSTART and DTEND is a zero-length event, which readers either drop
+            # or render on the wrong day.
+            start_d = datetime.strptime(it["due_date"], "%Y-%m-%d")
+            lines.append(f"DTSTART;VALUE=DATE:{start_d.strftime('%Y%m%d')}")
+            lines.append(f"DTEND;VALUE=DATE:{(start_d + timedelta(days=1)).strftime('%Y%m%d')}")
         lines.append(f"SUMMARY:{esc(summary)}")
         if it["notes"]:
             lines.append(f"DESCRIPTION:{esc(it['notes'])}")
