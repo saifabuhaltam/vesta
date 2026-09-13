@@ -199,6 +199,16 @@
   /* thin rules between groups of pages, and above the settings footer */
   .side-divider{ height:1px; background:var(--sidebar-border); margin:7px 10px; flex:none; }
   #app.side-collapsed .side-divider{ margin:7px 8px; }
+  /* At 64px there is no room for a list, but which term you are in is exactly the
+     thing you must not lose sight of. So: the active term only, shortened. */
+  #app.side-collapsed .term-switch{ padding:0 4px 10px; }
+  #app.side-collapsed .term-switch-head,
+  #app.side-collapsed .term-more,
+  #app.side-collapsed .term-pill:not(.active),
+  #app.side-collapsed .term-pill .tp-name,
+  #app.side-collapsed .term-pill .tp-tag{ display:none; }
+  #app.side-collapsed .term-pill{ justify-content:center; padding:8px 4px; }
+  #app.side-collapsed .term-pill .tp-short{ display:block; }
   .side-foot{ display:flex; flex-direction:column; gap:10px; padding-top:14px;
     border-top:1px solid var(--sidebar-border); margin:0 -14px; padding-left:14px; padding-right:14px; }
   #app.side-collapsed .side-foot{ margin:0 -10px; padding-left:10px; padding-right:10px; }
@@ -1843,6 +1853,62 @@
   .lib-topic-row .lt-mark{ width:14px; flex:none; text-align:center; color:var(--success); }
   .lib-topic-row.undone .lt-mark{ color:var(--text-faint); }
   .lib-topic-row.undone .lt-text{ color:var(--text-muted); }
+
+  /* ---------------- semesters ---------------- */
+  /* The term you are in sits at the top of the sidebar, above everything it scopes.
+     Terms are listed as rows rather than folded into a select: which term you are in
+     changes what every screen means, so it should never take a click to find out. */
+  .term-switch{ padding:0 12px 10px; }
+  .term-switch-head{ display:flex; align-items:center; justify-content:space-between;
+    font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--text-faint); padding:0 4px 6px; }
+  .term-manage{ border:0; background:none; cursor:pointer; color:var(--accent);
+    font:inherit; font-size:11px; font-weight:700; letter-spacing:.04em; padding:2px 4px;
+    border-radius:6px; }
+  .term-manage:hover{ background:var(--accent-soft); }
+  .term-pill{ display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+    border:1px solid transparent; background:var(--surface-2); color:var(--text);
+    border-radius:12px; padding:8px 10px; margin-bottom:6px; cursor:pointer;
+    font:inherit; font-size:13px; font-weight:600; transition:background .12s, border-color .12s; }
+  .term-pill:hover{ background:var(--surface-3); }
+  .term-pill.active{ background:var(--accent-soft); border-color:var(--accent);
+    color:var(--accent-strong, var(--accent)); }
+  .term-pill .tp-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tp-short{ display:none; font-size:12px; font-weight:800; letter-spacing:.02em; }
+  .term-pill .tp-tag{ font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    padding:2px 6px; border-radius:999px; background:var(--surface-3); color:var(--text-muted); }
+  .term-pill.archived .tp-name{ color:var(--text-muted); }
+  .term-pill.archived.active .tp-name{ color:inherit; }
+  .term-more{ width:100%; border:1px dashed var(--border); background:none; color:var(--text-muted);
+    border-radius:12px; padding:7px 10px; cursor:pointer; font:inherit; font-size:12px; font-weight:600; }
+  .term-more:hover{ color:var(--text); border-color:var(--text-faint); }
+
+  /* Reading an archived term should feel different from working in a live one. */
+  .term-banner{ display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    background:var(--warn-soft); border:1px solid var(--warn); color:var(--warn);
+    border-radius:14px; padding:10px 14px; margin:0 0 14px; font-size:13px; font-weight:600; }
+  .term-banner .tb-text{ flex:1; min-width:200px; }
+  .term-banner .tb-text b{ font-weight:800; }
+  .term-banner.unlocked{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+
+  .term-row{ display:flex; align-items:center; gap:10px; padding:10px 0;
+    border-bottom:1px solid var(--border); flex-wrap:wrap; }
+  .term-row:last-child{ border-bottom:0; }
+  .term-row .tr-main{ flex:1; min-width:160px; }
+  .term-row .tr-name{ font-weight:700; }
+  .term-row .tr-meta{ font-size:12px; color:var(--text-muted); margin-top:2px; }
+  .term-row .tr-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+
+  .gpa-term{ display:flex; align-items:center; gap:10px; padding:7px 0; }
+  .gpa-term .gt-name{ width:104px; font-size:12px; font-weight:700; flex:none;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .gpa-term .gt-val{ width:46px; text-align:right; font-variant-numeric:tabular-nums;
+    font-size:13px; font-weight:700; }
+  .gpa-term.is-now .gt-name{ color:var(--accent); }
+  .gpa-cume{ display:flex; align-items:baseline; justify-content:space-between;
+    padding:10px 0 4px; border-bottom:1px solid var(--border); margin-bottom:6px; }
+  .gpa-cume .gc-val{ font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .gpa-cume .gc-lbl{ font-size:12px; color:var(--text-muted); font-weight:600; }
 </style>
 </head>
 <body>
@@ -1854,6 +1920,7 @@
     <div class="brand">
       <div class="brand-mark"><img src="/vesta-mark.png" alt="" class="brand-logo"><span>Vesta</span></div>
     </div>
+    <div class="term-switch" id="term-switch"></div>
     <button type="button" class="side-search" data-action="open-search"><span class="ic" data-icon="search"></span><span>Search…</span><span class="kbd">⌘K</span></button>
     <nav class="tabs" id="tabs">
       <!-- grouped by purpose: where you are, your coursework, your material, study tools -->
@@ -1877,6 +1944,7 @@
     </div>
   </aside>
   <main id="main">
+    <div id="term-banner"></div>
     <div id="view-header"></div>
     <div id="view-actions"></div>
     <div id="view"></div>
@@ -1895,6 +1963,13 @@
   var events = [];
   var items = [];
   var termSettings = { name:'', startDate:'', endDate:'' };
+  // Which term the app is showing, and every term there is. The server owns the
+  // choice, so a second tab or a second device is never looking somewhere else.
+  var semesters = [];
+  var semester = null;
+  var termLocked = false;
+  var TERMS_SHOWN = 4;          // the rest live one click away, in Manage
+  var showAllTerms = false;
   var expandedItems = new Set();
   var activeTab = 'dashboard';
   var activeClassId = null;
@@ -2293,11 +2368,22 @@
    * them), and it counts as graded in proportion to how much of it has been marked.
    */
   function classGradeStats(classId){
-    var cls = classById(classId);
+    return gradeStatsFrom(classById(classId), items);
+  }
+
+  /**
+   * A class's standing, worked out from a given set of items.
+   *
+   * Split out from classGradeStats so the GPA history can run the identical maths
+   * over a past term's rows. An archived GPA and a live one must never be arrived at
+   * two different ways.
+   */
+  function gradeStatsFrom(cls, itemList){
+    var classId = cls && cls.id;
     var cats = (cls && cls.gradeCategories) || [];
     var inCat = {};
     cats.forEach(function(g){ inCat[g.id] = g; });
-    var mine = items.filter(function(it){ return it.classId===classId; });
+    var mine = (itemList || []).filter(function(it){ return it.classId===classId; });
     var totalWeight = 0, gradedWeight = 0, earned = 0;
 
     mine.forEach(function(it){
@@ -2402,6 +2488,10 @@
   function loadState(){
     return (BE ? BE.loadState() : apiGet('/api/state')).then(function(data){
       classes = data.classes; items = data.items; events = data.events || []; termSettings = data.term;
+      semesters = data.semesters || [];
+      semester = data.semester || null;
+      termLocked = !!data.locked;
+      gpaHistory = null;            // a switch or an archive can change every term's numbers
       inbox = data.unfiled || { notesList:[], materials:[] };
       pendingImports = data.pendingImports || [];
       pendingCalImports = data.pendingCalendarImports || [];
@@ -2790,6 +2880,8 @@
   function render(){
     var navTab = (activeTab==='class') ? 'classes' : activeTab;
     document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.tab===navTab); });
+    renderTermSwitcher();
+    renderTermBanner();
     renderSideStats();
     renderHeader();
     renderView();
@@ -2867,7 +2959,9 @@
     header.innerHTML = '<div><h1>'+escapeHtml(t[0])+'</h1><div class="sub">'+escapeHtml(t[1])+'</div></div>' + headerRight;
 
     var action = '';
-    if(activeTab==='classes') action = '<span style="display:flex;gap:8px;">'
+    // Nothing that starts a write is offered while an archived term is locked. The
+    // server refuses those calls anyway; this stops the page from inviting them.
+    if(activeTab==='classes' && !termLocked) action = '<span style="display:flex;gap:8px;">'
       + '<button class="btn" data-action="cal-sfu-open">Get schedule from SFU</button>'
       + '<button class="btn" data-action="si-open">Import syllabus</button>'
       + '<button class="btn primary" data-action="open-add-class">+ Add class</button></span>';
@@ -4288,8 +4382,75 @@
         }).join('') + '</div></div>';
   }
 
+  // GPA across terms. Loaded once per state load, because it is the only view that
+  // needs more than the term you are in.
+  var gpaHistory = null;
+  var gpaHistoryLoading = false;
+
+  function loadGpaHistory(){
+    if(gpaHistoryLoading) return;
+    gpaHistoryLoading = true;
+    apiGet('/api/history').then(function(terms){
+      gpaHistory = terms.map(function(t){
+        var gps = (t.classes || []).map(function(c){
+          var st = gradeStatsFrom(c, t.items || []);
+          if(st.currentGrade == null) return null;
+          return { code: c.code || c.name || '', color: c.color,
+                   gp: gradePoints(letterForGrade(c, st.currentGrade)) };
+        }).filter(function(x){ return x && x.gp != null; });
+        return {
+          id: t.id, name: t.name, status: t.status,
+          classes: gps,
+          gpa: gps.length ? gps.reduce(function(a, b){ return a + b.gp; }, 0) / gps.length : null
+        };
+      });
+      gpaHistoryLoading = false;
+      renderView();
+    }).catch(function(){
+      gpaHistoryLoading = false;      // a failed load simply shows this term only
+    });
+  }
+
+  /**
+   * Grade points, this term and every term before it.
+   *
+   * The cumulative number is the average across every graded course in every term,
+   * not an average of term averages: a term with five courses should weigh more than
+   * a term with one. Courses with nothing marked yet are left out entirely rather
+   * than counted as a zero.
+   */
   function gpaHistoryHtml(gpa){
-    // No term history is stored yet, so this shows the current standing only.
+    if(gpaHistory === null){
+      loadGpaHistory();
+      return gpaThisTermHtml(gpa, 'Working out your other terms…');
+    }
+    var withGpa = gpaHistory.filter(function(t){ return t.gpa != null; });
+    if(withGpa.length <= 1) return gpaThisTermHtml(gpa, '');
+
+    var all = [];
+    gpaHistory.forEach(function(t){ t.classes.forEach(function(c){ all.push(c.gp); }); });
+    var cume = all.length ? all.reduce(function(a, b){ return a + b; }, 0) / all.length : null;
+
+    return '<div class="card"><div class="card-head"><h2>GPA by Term</h2>'
+      + '<span class="hint">out of '+GPA_MAX.toFixed(2)+'</span></div>'
+      + (cume != null
+          ? '<div class="gpa-cume"><span class="gc-lbl">Cumulative · '+all.length
+            + ' graded course'+(all.length===1?'':'s')+'</span>'
+            + '<span class="gc-val">'+cume.toFixed(2)+'</span></div>'
+          : '')
+      + withGpa.map(function(t){
+          var now = semester && t.id === semester.id;
+          return '<div class="gpa-term'+(now?' is-now':'')+'">'
+            + '<span class="gt-name" title="'+escapeHtml(t.name||'')+'">'+escapeHtml(t.name||'Term')+'</span>'
+            + '<div class="cp-progress-bar" style="flex:1;"><span style="width:'
+              + Math.min(100, t.gpa/GPA_MAX*100)+'%;background:'+(now?'var(--accent)':'var(--text-faint)')+';"></span></div>'
+            + '<span class="gt-val">'+t.gpa.toFixed(2)+'</span></div>';
+        }).join('')
+      + '</div>';
+  }
+
+  /** The per-course breakdown for the term on screen. */
+  function gpaThisTermHtml(gpa, note){
     var pts = classes.map(function(c){
       var st = classGradeStats(c.id);
       if(st.currentGrade==null) return null;
@@ -4308,6 +4469,7 @@
               + Math.min(100, p.gp/GPA_MAX*100)+'%;background:var(--accent);"></span></div>'
             + '<span class="gp-val">'+p.gp.toFixed(2)+'</span></div>';
         }).join('')
+      + (note ? '<div class="hint" style="margin-top:8px;">'+escapeHtml(note)+'</div>' : '')
       + '</div>';
   }
 
@@ -9056,6 +9218,210 @@
     saveTermSettings(data).then(closeModal).catch(reportError);
   }
 
+  // ---------------- semesters ----------------
+
+  function termLabel(t){ return t && t.name ? t.name : 'Untitled term'; }
+
+  /** "Fall 2026" -> "F26", for the collapsed sidebar. Spring and Summer both start
+      with S, so they get two letters or they would be the same badge. */
+  var SEASON_SHORT = { spring:'Sp', summer:'Su', fall:'F', winter:'W' };
+  function termShort(t){
+    var name = (t && t.name || '').trim();
+    var m = /^(Spring|Summer|Fall|Winter)\s+(\d{4})$/i.exec(name);
+    if(m) return SEASON_SHORT[m[1].toLowerCase()] + m[2].slice(2);
+    return name.replace(/\s+/g, '').slice(0, 3).toUpperCase() || '—';
+  }
+
+  function termDates(t){
+    if(!t) return '';
+    if(t.startDate && t.endDate) return fmtDateShort(t.startDate)+' – '+fmtDateShort(t.endDate);
+    if(t.startDate) return 'From '+fmtDateShort(t.startDate);
+    if(t.endDate) return 'Until '+fmtDateShort(t.endDate);
+    return 'No dates set';
+  }
+
+  /**
+   * The term list in the sidebar.
+   *
+   * Every term is a row you can read at a glance rather than an option hidden inside
+   * a select: switching term changes what the whole app means, so the current one has
+   * to be obvious and the others one click away. Past a handful the list would take
+   * over the sidebar, so the oldest fold into a single button that shows the rest.
+   */
+  function renderTermSwitcher(){
+    var host = document.getElementById('term-switch');
+    if(!host) return;
+    if(!semesters.length){ host.innerHTML = ''; return; }
+    var shown = showAllTerms ? semesters : semesters.slice(0, TERMS_SHOWN);
+    var hidden = semesters.length - shown.length;
+    var html = '<div class="term-switch-head"><span>Term</span>'
+      + '<button type="button" class="term-manage" data-action="open-terms">Manage</button></div>';
+    html += shown.map(function(t){
+      var active = semester && t.id === semester.id;
+      return '<button type="button" class="term-pill'+(active?' active':'')
+        + (t.status==='archived'?' archived':'')+'" data-action="switch-term" data-id="'+t.id+'">'
+        + '<span class="tp-short">'+escapeHtml(termShort(t))+'</span>'
+        + '<span class="tp-name">'+escapeHtml(termLabel(t))+'</span>'
+        + (t.status==='archived' ? '<span class="tp-tag">Archived</span>' : '')
+        + '</button>';
+    }).join('');
+    if(hidden > 0){
+      html += '<button type="button" class="term-more" data-action="show-all-terms">'
+        + hidden + ' earlier term' + (hidden===1?'':'s') + '</button>';
+    } else if(showAllTerms && semesters.length > TERMS_SHOWN){
+      html += '<button type="button" class="term-more" data-action="show-all-terms">Show fewer</button>';
+    }
+    host.innerHTML = html;
+  }
+
+  /**
+   * The banner above every screen when you are reading a finished term.
+   *
+   * An archived term is read-only, enforced by the server, so this says plainly what
+   * is going on and offers the way out. The unlock lasts for this browser session and
+   * drops the moment you switch away, which is why it says so.
+   */
+  function renderTermBanner(){
+    var host = document.getElementById('term-banner');
+    if(!host) return;
+    if(!semester || semester.status !== 'archived'){ host.innerHTML = ''; return; }
+    if(termLocked){
+      host.innerHTML = '<div class="term-banner">'
+        + '<span class="tb-text"><b>'+escapeHtml(termLabel(semester))+'</b> is archived. '
+        + 'You can read everything here; editing is off so an old record cannot be changed by accident.</span>'
+        + '<button type="button" class="btn" data-action="unlock-term">Unlock to edit</button>'
+        + '</div>';
+    } else {
+      host.innerHTML = '<div class="term-banner unlocked">'
+        + '<span class="tb-text"><b>'+escapeHtml(termLabel(semester))+'</b> is unlocked. '
+        + 'Changes are being saved. It locks again when you switch terms or close the tab.</span>'
+        + '<button type="button" class="btn" data-action="lock-term">Lock it</button>'
+        + '</div>';
+    }
+  }
+
+  function switchTerm(id){
+    if(semester && id === semester.id) return Promise.resolve();
+    return apiPut('/api/semesters/active', { id:id }).then(function(){
+      // A term switch changes every screen, so go back to the top rather than leaving
+      // a class from last year open in front of the new one.
+      activeClassId = null;
+      if(activeTab === 'class') activeTab = 'classes';
+      return loadState();
+    });
+  }
+
+  function unlockTerm(lock){
+    if(!semester) return Promise.resolve();
+    return apiPost('/api/semesters/'+semester.id+'/unlock', { lock: !!lock })
+      .then(function(){ return loadState(); });
+  }
+
+  function openTermsModal(){
+    apiGet('/api/semesters').then(function(list){
+      semesters = list;
+      renderTermsModal(list);
+    }).catch(reportError);
+  }
+
+  function renderTermsModal(list){
+    var rows = list.map(function(t){
+      var c = t.counts || {};
+      var bits = [];
+      if(c.classes) bits.push(c.classes + (c.classes===1?' class':' classes'));
+      if(c.items) bits.push(c.items + (c.items===1?' assignment':' assignments'));
+      if(c.notes) bits.push(c.notes + (c.notes===1?' note':' notes'));
+      if(c.materials) bits.push(c.materials + (c.materials===1?' file':' files'));
+      var empty = !bits.length;
+      var meta = termDates(t) + (bits.length ? ' · ' + bits.join(' · ') : ' · Empty');
+      return '<div class="term-row">'
+        + '<div class="tr-main"><div class="tr-name">'+escapeHtml(termLabel(t))
+          + (t.active ? ' <span class="tp-tag" style="background:var(--accent-soft);color:var(--accent);">Current</span>' : '')
+          + (t.status==='archived' ? ' <span class="tp-tag">Archived</span>' : '')
+          + '</div><div class="tr-meta">'+escapeHtml(meta)+'</div></div>'
+        + '<div class="tr-actions">'
+        + (t.active ? '' : '<button type="button" class="btn" data-action="switch-term" data-id="'+t.id+'">Open</button>')
+        + (t.status==='archived'
+            ? '<button type="button" class="btn" data-action="unarchive-term" data-id="'+t.id+'">Unarchive</button>'
+            : '<button type="button" class="btn" data-action="archive-term" data-id="'+t.id+'">Archive</button>')
+        + (empty && list.length > 1
+            ? '<button type="button" class="btn danger" data-action="delete-term" data-id="'+t.id+'">Delete</button>' : '')
+        + '</div></div>';
+    }).join('');
+
+    var html = '<div class="overlay" data-action="modal-backdrop">'
+      + '<div class="modal" data-action="modal-stop">'
+      + '<div class="modal-head"><h2>Terms</h2></div>'
+      + '<div class="modal-body">'
+      + '<div class="detail-section">'
+      + '<div class="file-cat-title">Start a new term</div>'
+      + '<label class="field">Name<input type="text" id="f-newterm-name" placeholder="'+escapeHtml(nextTermGuess())+'" value=""></label>'
+      + '<div class="field-row" style="margin-top:10px;">'
+      + '<label class="field">Start date<input type="date" id="f-newterm-start"></label>'
+      + '<label class="field">End date<input type="date" id="f-newterm-end"></label>'
+      + '</div>'
+      + '<div class="hint" style="margin-top:8px;">Starting a term gives you an empty workspace and switches you into it. '
+      + 'Nothing from your other terms is touched: classes, files, notes and grades stay where they are, one click away.</div>'
+      + '<div style="margin-top:10px;"><button type="button" class="btn primary" data-action="create-term">Start term</button></div>'
+      + '</div>'
+      + '<div class="detail-section">'
+      + '<div class="file-cat-title">Your terms</div>'
+      + rows
+      + '<div class="hint" style="margin-top:10px;">Archiving keeps a term readable and searchable while locking it against edits. '
+      + 'A term can only be deleted once it is empty.</div>'
+      + '</div>'
+      + '</div>'
+      + '<div class="modal-foot"><span></span><div class="right">'
+      + '<button class="btn" data-action="modal-close">Close</button></div></div>'
+      + '</div></div>';
+    document.getElementById('modal-root').innerHTML = html;
+    paintIcons();
+  }
+
+  /** "Fall 2026" -> "Spring 2027": the term most likely to be started next. */
+  function nextTermGuess(){
+    var order = ['Spring', 'Summer', 'Fall'];
+    var latest = semesters[0];
+    var m = latest && /^(Spring|Summer|Fall)\s+(\d{4})$/.exec((latest.name||'').trim());
+    if(!m){
+      var d = new Date();
+      var season = d.getMonth() < 4 ? 'Spring' : (d.getMonth() < 8 ? 'Summer' : 'Fall');
+      return season + ' ' + d.getFullYear();
+    }
+    var i = order.indexOf(m[1]);
+    var year = Number(m[2]);
+    if(i === order.length - 1) return order[0] + ' ' + (year + 1);
+    return order[i + 1] + ' ' + year;
+  }
+
+  function createTermFromForm(){
+    var name = document.getElementById('f-newterm-name');
+    var data = {
+      name: (name && name.value.trim()) || nextTermGuess(),
+      startDate: document.getElementById('f-newterm-start').value || '',
+      endDate: document.getElementById('f-newterm-end').value || ''
+    };
+    apiPost('/api/semesters', data)
+      .then(function(){ closeModal(); return loadState(); })
+      .catch(reportError);
+  }
+
+  function setTermStatus(id, status){
+    return apiPut('/api/semesters/'+id, { status:status })
+      .then(function(){ return loadState(); })
+      .then(function(){ openTermsModal(); })
+      .catch(reportError);
+  }
+
+  function deleteTerm(id){
+    var t = semesters.filter(function(x){ return x.id===id; })[0];
+    if(!confirmAction('Delete '+termLabel(t)+'?', 'It has nothing in it, so nothing is lost.')) return;
+    apiDelete('/api/semesters/'+id)
+      .then(function(){ return loadState(); })
+      .then(function(){ openTermsModal(); })
+      .catch(reportError);
+  }
+
   // ---------------- events ----------------
   // ---------------- Search ----------------
   function searchIndex(){
@@ -10152,6 +10518,15 @@
       return;
     }
     if(action==='save-term'){ saveTermFromForm(); return; }
+    if(action==='switch-term'){ closeModal(); switchTerm(t.dataset.id).catch(reportError); return; }
+    if(action==='show-all-terms'){ showAllTerms = !showAllTerms; renderTermSwitcher(); return; }
+    if(action==='open-terms'){ openTermsModal(); return; }
+    if(action==='create-term'){ createTermFromForm(); return; }
+    if(action==='archive-term'){ setTermStatus(t.dataset.id, 'archived'); return; }
+    if(action==='unarchive-term'){ setTermStatus(t.dataset.id, 'active'); return; }
+    if(action==='delete-term'){ deleteTerm(t.dataset.id); return; }
+    if(action==='unlock-term'){ unlockTerm(false).catch(reportError); return; }
+    if(action==='lock-term'){ unlockTerm(true).catch(reportError); return; }
     if(action==='cal-view'){ calView = t.dataset.view; renderView(); return; }
     if(action==='toggle-filter'){
       var key = t.dataset.key;

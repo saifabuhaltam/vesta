@@ -13,7 +13,7 @@ from datetime import datetime
 from flask import Blueprint, abort, jsonify, request
 
 from ai import strip_html
-from db import get_db
+from db import get_db, active_semester_id
 
 bp = Blueprint("links", __name__)
 
@@ -132,17 +132,29 @@ def search():
     ql = q.lower()
     conn = get_db()
     codes = {r["id"]: (r["code"] or r["name"] or "") for r in conn.execute("SELECT id, code, name FROM classes")}
+    # Search deliberately spans every term, archived ones included: a finished course
+    # is still the place last year's essay lives. Each result carries the term it came
+    # from so a hit from two years ago is never mistaken for this week's work.
+    here = active_semester_id(conn)
+    terms = {r["id"]: (r["name"] or "") for r in conn.execute("SELECT id, name FROM semesters")}
+
+    def term_of(row):
+        sid = row["semester_id"] if "semester_id" in row.keys() else None
+        return {"semesterId": sid or "",
+                "semesterName": terms.get(sid, "") if sid and sid != here else "",
+                "pastTerm": bool(sid and sid != here)}
+
     results = []
 
     for m in conn.execute(
-            "SELECT id, class_id, title, filename, extracted_text FROM materials "
+            "SELECT id, semester_id, class_id, title, filename, extracted_text FROM materials "
             "WHERE title LIKE ? OR filename LIKE ? OR extracted_text LIKE ? ORDER BY created_at DESC LIMIT 25",
             (like, like, like)):
         name = m["title"] or m["filename"] or "File"
         in_name = ql in (name + " " + (m["filename"] or "")).lower()
         results.append({
             "type": "file", "id": m["id"], "title": name, "classId": m["class_id"],
-            "classCode": codes.get(m["class_id"], "Inbox"),
+            "classCode": codes.get(m["class_id"], "Inbox"), **term_of(m),
             "matchedIn": "name" if in_name else "contents",
             "snippet": "" if in_name else snippet(m["extracted_text"], q),
             "related": related_for_file(conn, m["id"]),
@@ -157,7 +169,7 @@ def search():
             continue                      # the match was inside the markup, not the words
         results.append({
             "type": "note", "id": n["id"], "title": n["title"] or plain[:60] or "Untitled note",
-            "classId": n["class_id"], "classCode": codes.get(n["class_id"], "Inbox"),
+            "classId": n["class_id"], "classCode": codes.get(n["class_id"], "Inbox"), **term_of(n),
             "matchedIn": "title" if in_title else "contents",
             "snippet": "" if in_title else snippet(plain, q),
             "related": related_for_note(conn, n),
@@ -172,7 +184,7 @@ def search():
         body = " ".join((it[c] or "") for c in fields if c != "title")
         results.append({
             "type": "item", "id": it["id"], "title": it["title"] or "Untitled", "classId": it["class_id"],
-            "classCode": codes.get(it["class_id"], "General"),
+            "classCode": codes.get(it["class_id"], "General"), **term_of(it),
             "matchedIn": "title" if in_title else "details",
             "snippet": "" if in_title else snippet(strip_html(body), q),
             "related": related_for_item(conn, it["id"]),

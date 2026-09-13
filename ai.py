@@ -27,7 +27,7 @@ from flask import Blueprint, abort, jsonify, request
 
 import anthropic
 
-from db import get_db
+from db import get_db, active_semester_id, semester_for
 
 bp = Blueprint("ai", __name__)
 
@@ -644,9 +644,9 @@ def ai_quiz():
         now = datetime.utcnow().isoformat()
         qid = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO quizzes (id, class_id, item_id, title, kind, difficulty, source, created_at, updated_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?)",
-            (qid, class_id, item["id"] if item else None,
+            "INSERT INTO quizzes (id, semester_id, class_id, item_id, title, kind, difficulty, source, created_at, updated_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (qid, semester_for(conn, class_id), class_id, item["id"] if item else None,
              data.get("title") or (("Practice exam" if is_test else "Quiz") +
                                    (" · " + (cls["code"] or "") if cls else "")),
              "practice_test" if is_test else "quiz", difficulty, "headstart", now, now))
@@ -712,9 +712,9 @@ def ai_flashcards():
         today = datetime.utcnow().strftime("%Y-%m-%d")
         did = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO flashcard_decks (id, class_id, name, description, created_at, updated_at)"
-            " VALUES (?,?,?,?,?,?)",
-            (did, class_id, data.get("name") or "Generated deck",
+            "INSERT INTO flashcard_decks (id, semester_id, class_id, name, description, created_at, updated_at)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (did, semester_for(conn, class_id), class_id, data.get("name") or "Generated deck",
              "From " + ", ".join(s["title"] for s in used[:3]) if used else "", now, now))
         for i, c in enumerate(cards):
             conn.execute(
@@ -779,8 +779,7 @@ def quiz_json(conn, q, with_answers=False):
 @bp.route("/api/quizzes")
 def list_quizzes():
     conn = get_db()
-    args = []
-    where = ""
+    where, args = " WHERE q.semester_id=?", [active_semester_id(conn)]
     if request.args.get("classId"):
         where, args = " WHERE q.class_id=?", [request.args["classId"]]
     rows = conn.execute(
@@ -906,15 +905,16 @@ def decks():
         now = datetime.utcnow().isoformat()
         did = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO flashcard_decks (id, class_id, name, description, created_at, updated_at)"
-            " VALUES (?,?,?,?,?,?)",
-            (did, data.get("classId"), (data.get("name") or "New deck").strip(),
+            "INSERT INTO flashcard_decks (id, semester_id, class_id, name, description, created_at, updated_at)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (did, semester_for(conn, data.get("classId")), data.get("classId"),
+             (data.get("name") or "New deck").strip(),
              data.get("description") or "", now, now))
         conn.commit()
         conn.close()
         return jsonify({"id": did}), 201
 
-    args, where = [], ""
+    where, args = " WHERE d.semester_id=?", [active_semester_id(conn)]
     if request.args.get("classId"):
         where, args = " WHERE d.class_id=?", [request.args["classId"]]
     rows = conn.execute(

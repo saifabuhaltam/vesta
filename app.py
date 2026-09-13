@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 
 import anthropic
-from flask import Flask, request, jsonify, send_from_directory, abort, Response
+from flask import Flask, request, jsonify, send_from_directory, abort, Response, session
 from werkzeug.utils import secure_filename
 
 # .env is read before anything else is imported: db.py decides where the database
@@ -37,7 +37,9 @@ def load_env_file(path):
 load_env_file(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 
-from db import get_db, init_db, UPLOAD_DIR
+from db import (get_db, init_db, UPLOAD_DIR, SEMESTER_SCOPED,
+                active_semester, active_semester_id, set_active_semester,
+                default_term_name, semester_for, SEMESTER_ORDER)
 
 
 
@@ -465,30 +467,273 @@ def index():
     return send_from_directory(app.static_folder, "index.html")
 
 
+# ---------------- semesters ----------------
+
+# Unlocking an archived term is deliberately per browser session rather than a stored
+# flag: it lasts while you are working and is gone the next time, which is the right
+# default for a record you are only meant to read.
+UNLOCK_KEY = "unlocked_semester"
+WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+# Managing terms has to keep working while a term is locked, or unlocking one would
+# require unlocking it first.
+UNGUARDED_PREFIXES = ("/api/semesters", "/api/auth")
+
+
+def serialize_semester(r):
+    return {
+        "id": r["id"],
+        "name": r["name"] or "",
+        "startDate": r["start_date"] or "",
+        "endDate": r["end_date"] or "",
+        "status": r["status"] or "active",
+        "archivedAt": r["archived_at"] or "",
+        "createdAt": r["created_at"] or "",
+    }
+
+
+def semester_counts(conn, sid):
+    """What a term holds, for the switcher and for refusing to delete it."""
+    n = lambda sql: conn.execute(sql, (sid,)).fetchone()["n"]
+    return {
+        "classes": n("SELECT COUNT(*) n FROM classes WHERE semester_id=?"),
+        "items": n("SELECT COUNT(*) n FROM items WHERE semester_id=?"),
+        "notes": n("SELECT COUNT(*) n FROM notes WHERE semester_id=? AND (deleted_at IS NULL OR deleted_at='')"),
+        "materials": n("SELECT COUNT(*) n FROM materials WHERE semester_id=?"),
+    }
+
+
+@app.before_request
+def _guard_archived_semester():
+    """Refuse writes to an archived term unless this session has unlocked it.
+
+    Enforced here rather than in the page, because a read-only record that is only
+    read-only in the interface is not read-only. Registered after the accounts gate,
+    so g.user_id is already set and the connection below is the right student's.
+    """
+    if request.method not in WRITE_METHODS or not request.path.startswith("/api/"):
+        return None
+    if request.path.startswith(UNGUARDED_PREFIXES):
+        return None
+    conn = get_db()
+    try:
+        sem = active_semester(conn)
+        sid, status, name = sem["id"], sem["status"], sem["name"]
+    finally:
+        conn.close()
+    if status != "archived" or session.get(UNLOCK_KEY) == sid:
+        return None
+    return jsonify({
+        "error": f"{name} is archived. Unlock it to make changes.",
+        "archived": True, "semesterId": sid, "semester": name,
+    }), 423
+
+
+@app.route("/api/semesters", methods=["GET", "POST"])
+def semesters():
+    conn = get_db()
+    if request.method == "POST":
+        data = request.get_json(force=True) or {}
+        sid = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO semesters (id, name, start_date, end_date, status, created_at)"
+            " VALUES (?,?,?,?,'active',?)",
+            (sid, (data.get("name") or "").strip() or default_term_name(),
+             data.get("startDate") or "", data.get("endDate") or "",
+             datetime.utcnow().isoformat()))
+        conn.commit()
+        # A new term is the one you want to be looking at: that is the whole point of
+        # starting it. Old work stays exactly where it is, one switch away.
+        if data.get("makeActive", True):
+            set_active_semester(conn, sid)
+            session.pop(UNLOCK_KEY, None)
+        row = conn.execute("SELECT * FROM semesters WHERE id=?", (sid,)).fetchone()
+        out = serialize_semester(row)
+        conn.close()
+        return jsonify(out), 201
+
+    active = active_semester(conn)
+    rows = conn.execute(f"SELECT * FROM semesters ORDER BY {SEMESTER_ORDER}").fetchall()
+    out = []
+    for r in rows:
+        d = serialize_semester(r)
+        d["counts"] = semester_counts(conn, r["id"])
+        d["active"] = r["id"] == active["id"]
+        out.append(d)
+    conn.close()
+    return jsonify(out)
+
+
+@app.route("/api/semesters/active", methods=["PUT"])
+def switch_semester():
+    """Point the whole app at another term."""
+    data = request.get_json(force=True) or {}
+    sid = data.get("id") or ""
+    conn = get_db()
+    row = conn.execute("SELECT * FROM semesters WHERE id=?", (sid,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "No such semester."}), 404
+    set_active_semester(conn, sid)
+    # Switching away re-locks whatever was unlocked, including the term being left.
+    session.pop(UNLOCK_KEY, None)
+    out = serialize_semester(row)
+    conn.close()
+    return jsonify(out)
+
+
+@app.route("/api/semesters/<sid>", methods=["PUT", "DELETE"])
+def semester(sid):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM semesters WHERE id=?", (sid,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "No such semester."}), 404
+
+    if request.method == "DELETE":
+        counts = semester_counts(conn, sid)
+        if any(counts.values()):
+            conn.close()
+            # Deleting would take real coursework with it. Archiving is what the
+            # student actually wants here, and it is one button away.
+            return jsonify({
+                "error": "That semester still has work in it. Archive it instead.",
+                "counts": counts,
+            }), 409
+        if conn.execute("SELECT COUNT(*) n FROM semesters").fetchone()["n"] <= 1:
+            conn.close()
+            return jsonify({"error": "This is your only semester."}), 409
+        conn.execute("DELETE FROM semesters WHERE id=?", (sid,))
+        conn.commit()
+        # If that was the active one, the stored pointer now names a row that is gone;
+        # active_semester() falls through to the newest remaining term on the next read.
+        conn.close()
+        return jsonify({"ok": True})
+
+    data = request.get_json(force=True) or {}
+    name = (data.get("name") or row["name"] or "").strip() or default_term_name()
+    status = data.get("status") or row["status"] or "active"
+    if status not in ("active", "archived"):
+        conn.close()
+        return jsonify({"error": "A semester is either active or archived."}), 400
+    archived_at = row["archived_at"] or ""
+    if status == "archived" and (row["status"] or "active") != "archived":
+        archived_at = datetime.utcnow().isoformat()
+    if status == "active":
+        archived_at = ""
+    conn.execute(
+        "UPDATE semesters SET name=?, start_date=?, end_date=?, status=?, archived_at=?"
+        " WHERE id=?",
+        (name,
+         data.get("startDate", row["start_date"]) or "",
+         data.get("endDate", row["end_date"]) or "",
+         status, archived_at, sid))
+    conn.commit()
+    # Unarchiving clears any unlock, so the term goes back to being plainly editable
+    # rather than editable-because-unlocked.
+    if status == "active":
+        session.pop(UNLOCK_KEY, None)
+    out = serialize_semester(conn.execute(
+        "SELECT * FROM semesters WHERE id=?", (sid,)).fetchone())
+    conn.close()
+    return jsonify(out)
+
+
+@app.route("/api/history")
+def history():
+    """Every term's grade material, for the cumulative view.
+
+    Deliberately lean: only what the grade maths needs, because this is the one place
+    that loads several terms at once and a full /api/state per semester would carry
+    every note and file along with it. The page computes the grades itself with the
+    same functions it uses for the current term, so an archived GPA and a live one can
+    never be worked out two different ways.
+    """
+    conn = get_db()
+    out = []
+    for sem in conn.execute(f"SELECT * FROM semesters ORDER BY {SEMESTER_ORDER}").fetchall():
+        sid = sem["id"]
+        classes = []
+        for c in conn.execute(
+                "SELECT * FROM classes WHERE semester_id=? ORDER BY created_at", (sid,)):
+            classes.append({
+                "id": c["id"], "code": c["code"], "name": c["name"], "color": c["color"],
+                "gradeScale": json.loads(c["grade_scale"]) if c["grade_scale"] else None,
+                "gradeCategories": [
+                    {"id": g["id"], "name": g["name"] or "", "weight": g["weight"],
+                     "dropLowest": g["drop_lowest"] or 0}
+                    for g in conn.execute(
+                        "SELECT * FROM grade_categories WHERE class_id=? ORDER BY sort_order",
+                        (c["id"],))],
+            })
+        items = [{"classId": i["class_id"], "weight": i["weight"], "score": i["score"],
+                  "categoryId": i["category_id"], "status": i["status"]}
+                 for i in conn.execute(
+                     "SELECT class_id, weight, score, category_id, status FROM items"
+                     " WHERE semester_id=?", (sid,))]
+        d = serialize_semester(sem)
+        d["classes"] = classes
+        d["items"] = items
+        out.append(d)
+    conn.close()
+    return jsonify(out)
+
+
+@app.route("/api/semesters/<sid>/unlock", methods=["POST"])
+def unlock_semester(sid):
+    """Let an archived term be edited for as long as this session lasts."""
+    conn = get_db()
+    row = conn.execute("SELECT * FROM semesters WHERE id=?", (sid,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "No such semester."}), 404
+    if (request.get_json(silent=True) or {}).get("lock"):
+        session.pop(UNLOCK_KEY, None)
+        return jsonify({"locked": True})
+    session[UNLOCK_KEY] = sid
+    return jsonify({"locked": False})
+
+
 # ---------------- state ----------------
 
 @app.route("/api/state")
 def get_state():
     conn = get_db()
-    classes = conn.execute("SELECT * FROM classes ORDER BY created_at").fetchall()
-    items = conn.execute("SELECT * FROM items ORDER BY created_at").fetchall()
-    events = conn.execute("SELECT * FROM events ORDER BY date, start").fetchall()
-    term = conn.execute("SELECT * FROM term_settings WHERE id=1").fetchone()
+    # Everything below is the current semester's, and only its. Switching terms is a
+    # server-side pointer rather than a query parameter, so a stale tab cannot ask for
+    # a different one and nothing has to be threaded through 200 fetch calls.
+    sem = active_semester(conn)
+    sid = sem["id"]
+    classes = conn.execute(
+        "SELECT * FROM classes WHERE semester_id=? ORDER BY created_at", (sid,)).fetchall()
+    items = conn.execute(
+        "SELECT * FROM items WHERE semester_id=? ORDER BY created_at", (sid,)).fetchall()
+    events = conn.execute(
+        "SELECT * FROM events WHERE semester_id=? ORDER BY date, start", (sid,)).fetchall()
     result = {
+        "semesters": [serialize_semester(r) for r in conn.execute(
+            f"SELECT * FROM semesters ORDER BY {SEMESTER_ORDER}").fetchall()],
+        "semester": serialize_semester(sem),
+        # an archived term opens locked, so last year's grades cannot be edited by a
+        # stray click; the unlock is per browser session and drops on switching away
+        "locked": sem["status"] == "archived" and session.get(UNLOCK_KEY) != sid,
         "classes": [serialize_class(conn, c) for c in classes],
         "items": [serialize_item(conn, i) for i in items],
         "events": [serialize_event(e) for e in events],
+        # kept under its old name so nothing in the page has to be renamed: the
+        # current term is now simply the active semester
         "term": {
-            "name": term["name"] or "",
-            "startDate": term["start_date"] or "",
-            "endDate": term["end_date"] or "",
+            "name": sem["name"] or "",
+            "startDate": sem["start_date"] or "",
+            "endDate": sem["end_date"] or "",
         },
         # syllabi that were read (and paid for) but not reviewed yet
         "pendingImports": [
             {"id": r["id"], "filename": r["filename"], "classId": r["class_id"], "createdAt": r["created_at"]}
             for r in conn.execute(
-                "SELECT id, filename, class_id, created_at FROM syllabus_imports WHERE status='review' "
-                "ORDER BY created_at DESC").fetchall()
+                "SELECT si.id, si.filename, si.class_id, si.created_at FROM syllabus_imports si"
+                " LEFT JOIN classes c ON c.id = si.class_id"
+                " WHERE si.status='review' AND (si.class_id IS NULL OR c.semester_id=?)"
+                " ORDER BY si.created_at DESC", (sid,)).fetchall()
         ],
         # a timetable pulled from SFU but not applied yet, so closing the tab does not
         # lose the review the way it would if the draft only lived in the page
@@ -496,18 +741,20 @@ def get_state():
             {"id": r["id"], "label": r["label"], "source": r["source"],
              "classId": r["class_id"], "createdAt": r["created_at"]}
             for r in conn.execute(
-                "SELECT id, label, source, class_id, created_at FROM calendar_imports "
-                "WHERE status='review' ORDER BY created_at DESC").fetchall()
+                "SELECT ci.id, ci.label, ci.source, ci.class_id, ci.created_at FROM calendar_imports ci"
+                " LEFT JOIN classes c ON c.id = ci.class_id"
+                " WHERE ci.status='review' AND (ci.class_id IS NULL OR c.semester_id=?)"
+                " ORDER BY ci.created_at DESC", (sid,)).fetchall()
         ],
         # Notes and files jotted down or dropped in before there was anywhere to put
         # them. They live outside every class until they are filed.
         "unfiled": {
             "notesList": [serialize_note(n) for n in conn.execute(
-                "SELECT * FROM notes WHERE class_id IS NULL "
-                "ORDER BY pinned DESC, updated_at DESC").fetchall()],
+                "SELECT * FROM notes WHERE class_id IS NULL AND semester_id=? "
+                "ORDER BY pinned DESC, updated_at DESC", (sid,)).fetchall()],
             "materials": [serialize_material(m, item_ids_for_material(conn, m["id"])) for m in conn.execute(
-                "SELECT * FROM materials WHERE class_id IS NULL "
-                "ORDER BY created_at DESC").fetchall()],
+                "SELECT * FROM materials WHERE class_id IS NULL AND semester_id=? "
+                "ORDER BY created_at DESC", (sid,)).fetchall()],
         },
     }
     conn.close()
@@ -516,11 +763,19 @@ def get_state():
 
 @app.route("/api/term", methods=["PUT"])
 def update_term():
+    """Edit the current term's name and dates.
+
+    Term settings used to be their own single-row table. They are now just the active
+    semester, but the endpoint keeps its name and shape so the page's existing call
+    site did not have to change.
+    """
     data = request.get_json(force=True) or {}
     conn = get_db()
+    sem = active_semester(conn)
     conn.execute(
-        "UPDATE term_settings SET name=?, start_date=?, end_date=? WHERE id=1",
-        (data.get("name", ""), data.get("startDate", ""), data.get("endDate", "")),
+        "UPDATE semesters SET name=?, start_date=?, end_date=? WHERE id=?",
+        ((data.get("name", "") or "").strip() or sem["name"] or default_term_name(),
+         data.get("startDate", ""), data.get("endDate", ""), sem["id"]),
     )
     conn.commit()
     conn.close()
@@ -536,9 +791,11 @@ def create_class():
     cid = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     conn.execute(
-        "INSERT INTO classes (id, code, name, professor, color, notes, grade_scale, website, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO classes (id, semester_id, code, name, professor, color, notes, grade_scale, website, created_at)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?)",
         (
             cid,
+            active_semester_id(conn),
             data.get("code", ""),
             data.get("name", ""),
             data.get("professor", ""),
@@ -644,11 +901,12 @@ def create_item():
     iid = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     conn.execute(
-        """INSERT INTO items (id, class_id, title, type, due_date, due_time, status, completed_at, weight, score, notes, created_at,
+        """INSERT INTO items (id, semester_id, class_id, title, type, due_date, due_time, status, completed_at, weight, score, notes, created_at,
                               category_id, location, import_key)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             iid,
+            semester_for(conn, data.get("classId")),
             data.get("classId"),
             data.get("title", ""),
             data.get("type", "assignment"),
@@ -926,9 +1184,9 @@ def add_material(cid):
         title = request.form.get("title") or original
         text = extract_text(path, original)
         conn.execute(
-            """INSERT INTO materials (id, class_id, item_id, category, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (mid, cid, None, category, title, "file", None, original, stored, mimetype, size, text, now),
+            """INSERT INTO materials (id, semester_id, class_id, item_id, category, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (mid, semester_for(conn, cid), cid, None, category, title, "file", None, original, stored, mimetype, size, text, now),
         )
     else:
         data = request.get_json(silent=True) or request.form
@@ -939,9 +1197,9 @@ def add_material(cid):
         title = data.get("title") or url
         category = data.get("category", "other")
         conn.execute(
-            """INSERT INTO materials (id, class_id, item_id, category, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (mid, cid, None, category, title, "link", url, None, None, None, None, None, now),
+            """INSERT INTO materials (id, semester_id, class_id, item_id, category, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (mid, semester_for(conn, cid), cid, None, category, title, "link", url, None, None, None, None, None, now),
         )
     if item_id and conn.execute("SELECT 1 FROM items WHERE id=?", (item_id,)).fetchone():
         conn.execute(
@@ -1222,9 +1480,9 @@ def add_note(cid):
     nid = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     conn.execute(
-        "INSERT INTO notes (id, class_id, title, folder_id, text, linked_item_id, updated_at, created_at)"
-        " VALUES (?,?,?,?,?,?,?,?)",
-        (nid, cid, title, data.get("folderId"), text,
+        "INSERT INTO notes (id, semester_id, class_id, title, folder_id, text, linked_item_id, updated_at, created_at)"
+        " VALUES (?,?,?,?,?,?,?,?,?)",
+        (nid, semester_for(conn, cid), cid, title, data.get("folderId"), text,
          # Only an explicit link. Creating a note from inside an assignment says what
          # it belongs to; anything else is offered as a suggestion, never assumed.
          data.get("linkedItemId") or None, now, now),
@@ -1415,9 +1673,10 @@ def duplicate_note(nid):
     new_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     conn.execute(
-        "INSERT INTO notes (id, class_id, title, folder_id, text, linked_item_id, created_at, updated_at) "
-        "VALUES (?,?,?,?,?,?,?,?)",
-        (new_id, row["class_id"], ((row["title"] or "Untitled note") + " copy"),
+        "INSERT INTO notes (id, semester_id, class_id, title, folder_id, text, linked_item_id, created_at, updated_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
+        # a copy stays in the term of the note it was copied from
+        (new_id, row["semester_id"] or semester_for(conn, row["class_id"]), row["class_id"], ((row["title"] or "Untitled note") + " copy"),
          row["folder_id"], row["text"], row["linked_item_id"], now, now),
     )
     # carry the connections across too, or the copy is only half a copy
@@ -1563,10 +1822,11 @@ def create_event():
     conn = get_db()
     eid = str(uuid.uuid4())
     conn.execute(
-        "INSERT INTO events (id, class_id, title, kind, date, start, \"end\", all_day, location, notes, created_at)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO events (id, semester_id, class_id, title, kind, date, start, \"end\", all_day, location, notes, created_at)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             eid,
+            semester_for(conn, data.get("classId")),
             data.get("classId") or None,
             data.get("title", ""),
             data.get("kind", "other"),
@@ -1641,11 +1901,15 @@ VTIMEZONE = [
 @app.route("/api/export.ics")
 def export_ics():
     conn = get_db()
-    classes = conn.execute("SELECT * FROM classes").fetchall()
+    # The export is of the term you are in. Exporting four years of deadlines into a
+    # calendar at once would be worse than useless.
+    term = active_semester(conn)
+    sid = term["id"]
+    classes = conn.execute("SELECT * FROM classes WHERE semester_id=?", (sid,)).fetchall()
     items_rows = conn.execute(
-        "SELECT * FROM items WHERE due_date IS NOT NULL AND due_date != ''"
+        "SELECT * FROM items WHERE semester_id=? AND due_date IS NOT NULL AND due_date != ''",
+        (sid,)
     ).fetchall()
-    term = conn.execute("SELECT * FROM term_settings WHERE id=1").fetchone()
     class_map = {c["id"]: c for c in classes}
 
     def esc(s):
@@ -1859,6 +2123,20 @@ def health():
         # can only be answered by guessing from behaviour.
         "version": (os.environ.get("RAILWAY_GIT_COMMIT_SHA") or "")[:7] or None,
     }
+    # Which schema migrations this database has actually taken. A deploy can look
+    # healthy while a migration silently did not run, and every symptom of that is a
+    # confusing query error somewhere else entirely.
+    if _db.DATABASE_URL:
+        try:
+            import psycopg
+            with psycopg.connect(_db.DATABASE_URL) as c:
+                with c.cursor() as cur:
+                    cur.execute("select id from schema_migrations order by applied_at")
+                    out["migrations"] = [r[0] for r in cur.fetchall()]
+        except Exception as e:
+            out["migrations"] = f"unreadable: {e.__class__.__name__}"
+    else:
+        out["migrations"] = "sqlite: migrations run in-process at startup"
     # Google's OAuth settings, so a mismatch can be seen rather than inferred from an
     # error page. Neither value is secret: the client id and the callback URL both
     # travel in the address bar during any sign-in, which is precisely why they have to

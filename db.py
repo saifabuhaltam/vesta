@@ -9,8 +9,25 @@ DB_PATH = os.path.join(DATA_DIR, "vesta.db")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 SCHEMA = """
+-- A term: "Fall 2026". Everything academic hangs off a semester through its class,
+-- which is what lets a finished term be archived whole and still be read later.
+CREATE TABLE IF NOT EXISTS semesters (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    start_date TEXT,
+    end_date TEXT,
+    -- 'active' | 'archived'. Archiving hides a term from the current workspace
+    -- without touching a row of its data.
+    status TEXT DEFAULT 'active',
+    archived_at TEXT,
+    created_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS classes (
     id TEXT PRIMARY KEY,
+    -- the term this class was taken in. Deleting a semester is refused while it
+    -- still has classes, so in practice this is never null after the migration.
+    semester_id TEXT REFERENCES semesters(id) ON DELETE SET NULL,
     code TEXT,
     name TEXT,
     professor TEXT,
@@ -32,6 +49,8 @@ CREATE TABLE IF NOT EXISTS schedule_entries (
 
 CREATE TABLE IF NOT EXISTS items (
     id TEXT PRIMARY KEY,
+    -- which term this belongs to; mirrors the class's when there is one
+    semester_id TEXT REFERENCES semesters(id) ON DELETE SET NULL,
     class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
     title TEXT,
     type TEXT,
@@ -55,6 +74,8 @@ CREATE TABLE IF NOT EXISTS subtasks (
 
 CREATE TABLE IF NOT EXISTS materials (
     id TEXT PRIMARY KEY,
+    -- which term this belongs to; mirrors the class's when there is one
+    semester_id TEXT REFERENCES semesters(id) ON DELETE SET NULL,
     -- nullable, for the same reason as notes: upload first, file it later
     class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
     category TEXT,
@@ -71,6 +92,8 @@ CREATE TABLE IF NOT EXISTS materials (
 
 CREATE TABLE IF NOT EXISTS notes (
     id TEXT PRIMARY KEY,
+    -- which term this belongs to; mirrors the class's when there is one
+    semester_id TEXT REFERENCES semesters(id) ON DELETE SET NULL,
     -- nullable: a note can be jotted down before there is anywhere to file it
     class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
     title TEXT,
@@ -144,6 +167,8 @@ CREATE TABLE IF NOT EXISTS rubrics (
 
 CREATE TABLE IF NOT EXISTS events (
     id TEXT PRIMARY KEY,
+    -- which term this belongs to; mirrors the class's when there is one
+    semester_id TEXT REFERENCES semesters(id) ON DELETE SET NULL,
     class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
     title TEXT,
     kind TEXT,
@@ -170,6 +195,8 @@ CREATE TABLE IF NOT EXISTS headstart_sources (
 
 CREATE TABLE IF NOT EXISTS flashcard_decks (
     id TEXT PRIMARY KEY,
+    -- which term this belongs to; mirrors the class's when there is one
+    semester_id TEXT REFERENCES semesters(id) ON DELETE SET NULL,
     class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
     name TEXT,
     description TEXT,
@@ -198,6 +225,8 @@ CREATE TABLE IF NOT EXISTS flashcards (
 
 CREATE TABLE IF NOT EXISTS quizzes (
     id TEXT PRIMARY KEY,
+    -- which term this belongs to; mirrors the class's when there is one
+    semester_id TEXT REFERENCES semesters(id) ON DELETE SET NULL,
     class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
     item_id TEXT REFERENCES items(id) ON DELETE SET NULL,
     title TEXT,
@@ -295,6 +324,8 @@ def get_db(user_id=None):
 
 PG_SCHEMA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                               "cloud", "migrate", "pg_schema.sql")
+PG_MIGRATIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "cloud", "migrate", "pg_migrations.sql")
 # Arbitrary, and only has to agree between workers of the same app.
 SCHEMA_LOCK_ID = 827419901
 
@@ -329,12 +360,69 @@ def ensure_pg_schema():
                 cur.execute("select pg_advisory_unlock(%s)", (SCHEMA_LOCK_ID,))
 
 
+def parse_migrations(text):
+    """Split the migrations file into (id, sql) pairs on its `-- migration:` lines."""
+    blocks, mid, body = [], None, []
+    for line in text.splitlines():
+        if line.startswith("-- migration:"):
+            if mid:
+                blocks.append((mid, "\n".join(body)))
+            mid, body = line.split(":", 1)[1].strip(), []
+        elif mid:
+            body.append(line)
+    if mid:
+        blocks.append((mid, "\n".join(body)))
+    return [(i, sql) for i, sql in blocks if sql.strip()]
+
+
+def run_pg_migrations():
+    """Apply anything in pg_migrations.sql this database has not seen.
+
+    `ensure_pg_schema` builds the tables once and then returns early forever after,
+    so without this a deployed database could never gain a column. Each block is
+    applied in its own transaction and recorded, which is what makes a redeploy a
+    no-op rather than a re-run.
+    """
+    import psycopg
+    if not os.path.exists(PG_MIGRATIONS_FILE):
+        return []
+    blocks = parse_migrations(open(PG_MIGRATIONS_FILE, encoding="utf-8").read())
+    applied = []
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            # Same lock as the schema build: gunicorn starts several workers at once
+            # and they would otherwise apply the same migration side by side.
+            cur.execute("select pg_advisory_lock(%s)", (SCHEMA_LOCK_ID,))
+            try:
+                cur.execute("create table if not exists schema_migrations ("
+                            " id text primary key,"
+                            " applied_at timestamptz not null default now())")
+                conn.commit()
+                cur.execute("select id from schema_migrations")
+                done = {r[0] for r in cur.fetchall()}
+                for mid, sql in blocks:
+                    if mid in done:
+                        continue
+                    cur.execute(sql)
+                    cur.execute("insert into schema_migrations (id) values (%s)", (mid,))
+                    conn.commit()
+                    applied.append(mid)
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                cur.execute("select pg_advisory_unlock(%s)", (SCHEMA_LOCK_ID,))
+                conn.commit()
+    return applied
+
+
 def init_db():
     # On Postgres the tables build themselves on first boot. The ALTER-by-ALTER
     # migration below is a SQLite story: it exists because a local database predates
     # most of these columns.
     if DATABASE_URL:
         ensure_pg_schema()
+        run_pg_migrations()
         return
     conn = get_db()
     conn.executescript(SCHEMA)
@@ -489,7 +577,93 @@ def init_db():
     conn.commit()
     drop_class_not_null(conn)
     move_item_links(conn)
+    # Last, deliberately: drop_class_not_null rebuilds notes and materials from a
+    # fixed column list, so it has to run before those tables grow a new column.
+    migrate_semesters(conn)
     conn.close()
+
+
+# Everything that can exist without a class, and therefore cannot find its term by
+# looking at one. Rows that do have a class mirror that class's semester.
+SEMESTER_SCOPED = ("items", "events", "notes", "materials", "flashcard_decks", "quizzes")
+
+
+def default_term_name(today=None):
+    """"Fall 2026" from a date. Fall starts in September, Spring in January,
+    Summer in May, which is the SFU calendar and close enough everywhere else."""
+    import datetime
+    d = today or datetime.date.today()
+    season = "Spring" if d.month < 5 else ("Summer" if d.month < 9 else "Fall")
+    return f"{season} {d.year}"
+
+
+def migrate_semesters(conn):
+    """Turn the single `term_settings` row into a real list of semesters.
+
+    Before this, Vesta had one term forever: `term_settings` was pinned to id = 1 and
+    no class referenced it, so a new semester meant deleting last term's work or
+    living with it on the dashboard. Everything academic hangs off `classes`, so a
+    `semester_id` there scopes assignments, files, notes and grades for free; the six
+    tables in SEMESTER_SCOPED get their own copy because each of them can exist with
+    no class at all.
+
+    Safe to run on every start. The backfill only ever touches rows whose semester is
+    still null, so a row that has been moved to another term stays where it was put.
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS semesters (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            start_date TEXT,
+            end_date TEXT,
+            status TEXT DEFAULT 'active',
+            archived_at TEXT,
+            created_at TEXT
+        )""")
+    for table in ("classes",) + SEMESTER_SCOPED:
+        cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+        if cols and "semester_id" not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN semester_id TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS classes_by_semester ON classes(semester_id)")
+    for table in SEMESTER_SCOPED:
+        conn.execute(f"CREATE INDEX IF NOT EXISTS {table}_by_semester ON {table}(semester_id)")
+    conn.commit()
+
+    # The first semester is the term that was already there. Its name comes from
+    # whatever was typed into term settings; an empty one gets today's term rather
+    # than "Untitled", so the switcher reads like a calendar from the first boot.
+    if not conn.execute("SELECT id FROM semesters LIMIT 1").fetchone():
+        term = conn.execute("SELECT * FROM term_settings WHERE id=1").fetchone()
+        now = _now()
+        conn.execute(
+            "INSERT INTO semesters (id, name, start_date, end_date, status, created_at)"
+            " VALUES (?,?,?,?, 'active', ?)",
+            (str(uuid.uuid4()),
+             ((term["name"] if term else "") or "").strip() or default_term_name(),
+             (term["start_date"] if term else "") or "",
+             (term["end_date"] if term else "") or "", now))
+        conn.commit()
+
+    fallback = conn.execute(
+        "SELECT id FROM semesters WHERE status='active' ORDER BY created_at LIMIT 1").fetchone()
+    if not fallback:
+        return
+    sid = fallback["id"]
+    conn.execute("UPDATE classes SET semester_id=? WHERE semester_id IS NULL", (sid,))
+    for table in SEMESTER_SCOPED:
+        # a row with a class belongs wherever that class belongs
+        conn.execute(
+            f"UPDATE {table} SET semester_id="
+            f" (SELECT c.semester_id FROM classes c WHERE c.id={table}.class_id)"
+            f" WHERE semester_id IS NULL AND class_id IS NOT NULL")
+        # and one without a class falls back to the term that was current
+        conn.execute(f"UPDATE {table} SET semester_id=? WHERE semester_id IS NULL", (sid,))
+    conn.commit()
+
+
+def _now():
+    import datetime
+    return datetime.datetime.utcnow().isoformat()
 
 
 def move_item_links(conn):
@@ -589,3 +763,78 @@ CREATE TABLE {tmp} (
     item_id TEXT
 )
 """
+
+
+# ---------------------------------------------------------------------------
+# Which semester the app is looking at
+# ---------------------------------------------------------------------------
+# Held server-side rather than in the browser, for two reasons: every device sees the
+# same term, and a request cannot ask for someone else's by passing an id, because the
+# pointer itself lives in the signed-in user's own row.
+
+ACTIVE_KEY = "active_semester"
+
+# Newest first: the term that started most recently, falling back to when the row was
+# made for a semester with no dates typed in yet.
+SEMESTER_ORDER = "COALESCE(NULLIF(start_date,''), created_at) DESC, created_at DESC"
+
+
+def ensure_semester(conn):
+    """Guarantee this user has at least one semester, and return it.
+
+    A new account on Postgres never runs the SQLite migration, so it arrives with no
+    semesters at all. Creating one lazily here means sign-up needs no special case and
+    the first class has somewhere to go.
+    """
+    row = conn.execute(
+        f"SELECT * FROM semesters ORDER BY {SEMESTER_ORDER} LIMIT 1").fetchone()
+    if row:
+        return row
+    sid = str(uuid.uuid4())
+    conn.execute(
+        "INSERT INTO semesters (id, name, start_date, end_date, status, created_at)"
+        " VALUES (?,?,'','','active',?)", (sid, default_term_name(), _now()))
+    conn.commit()
+    return conn.execute("SELECT * FROM semesters WHERE id=?", (sid,)).fetchone()
+
+
+def active_semester(conn):
+    """The semester every scoped query filters on. Never None."""
+    row = conn.execute(
+        f"SELECT value FROM app_settings WHERE key='{ACTIVE_KEY}'").fetchone()
+    sid = (row["value"] if row else None) or ""
+    if sid:
+        found = conn.execute("SELECT * FROM semesters WHERE id=?", (sid,)).fetchone()
+        if found:
+            return found
+    # The pointer is missing or names a semester that has since been deleted. Fall
+    # back to the newest one rather than showing an empty app.
+    return ensure_semester(conn)
+
+
+def active_semester_id(conn):
+    return active_semester(conn)["id"]
+
+
+def set_active_semester(conn, sid):
+    # Not ON CONFLICT: app_settings is keyed (user_id, key) on Postgres and (key) on
+    # SQLite, so the one spelling that works on both is update-then-insert.
+    if not conn.execute("UPDATE app_settings SET value=? WHERE key=?",
+                        (sid, ACTIVE_KEY)).rowcount:
+        conn.execute("INSERT INTO app_settings (key, value) VALUES (?,?)",
+                     (ACTIVE_KEY, sid))
+    conn.commit()
+
+
+def semester_for(conn, class_id=None):
+    """The term a new row belongs to.
+
+    A row with a class belongs wherever that class belongs, which keeps the copy on
+    the row honest even if a class is ever moved between terms. Anything class-less
+    lands in the term the student is currently looking at.
+    """
+    if class_id:
+        row = conn.execute("SELECT semester_id FROM classes WHERE id=?", (class_id,)).fetchone()
+        if row and row["semester_id"]:
+            return row["semester_id"]
+    return active_semester_id(conn)

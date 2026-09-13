@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, abort, jsonify, request
 
 import calsync
-from db import get_db
+from db import get_db, active_semester, active_semester_id, semester_for
 
 bp = Blueprint("calendar_api", __name__)
 
@@ -21,8 +21,7 @@ def now():
 
 
 def current_term(conn):
-    row = conn.execute("SELECT name FROM term_settings WHERE id=1").fetchone()
-    return (row["name"] if row else "") or ""
+    return (active_semester(conn)["name"] or "")
 
 
 # ---------------------------------------------------------------------------
@@ -155,9 +154,10 @@ def apply_import(iid):
             if not it.get("include") or it.get("existingId"):
                 continue
             conn.execute(
-                "INSERT INTO items (id, class_id, title, type, due_date, due_time, status, notes,"
-                " created_at, location, import_key) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                (str(uuid.uuid4()), class_id, it["title"], it["type"], it.get("dueDate"),
+                "INSERT INTO items (id, semester_id, class_id, title, type, due_date, due_time, status, notes,"
+                " created_at, location, import_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (str(uuid.uuid4()), semester_for(conn, class_id), class_id,
+                 it["title"], it["type"], it.get("dueDate"),
                  it.get("dueTime"), "todo", "", t, it.get("location") or "",
                  f"sfu|{it['type']}|{it.get('dueDate') or ''}"))
             counts["items"] += 1
@@ -171,9 +171,9 @@ def apply_import(iid):
         # SFU knows the real term dates; fill them only if nobody has set them yet
         if draft.get("firstDay") and draft.get("lastDay"):
             conn.execute(
-                "UPDATE term_settings SET start_date=COALESCE(NULLIF(start_date,''),?),"
-                " end_date=COALESCE(NULLIF(end_date,''),?) WHERE id=1",
-                (draft["firstDay"], draft["lastDay"]))
+                "UPDATE semesters SET start_date=COALESCE(NULLIF(start_date,''),?),"
+                " end_date=COALESCE(NULLIF(end_date,''),?) WHERE id=?",
+                (draft["firstDay"], draft["lastDay"], active_semester_id(conn)))
 
         conn.execute("UPDATE calendar_imports SET status='imported', imported_at=?, draft=? WHERE id=?",
                      (t, json.dumps(draft, default=str), iid))

@@ -16,7 +16,7 @@ from werkzeug.utils import secure_filename
 
 import ai
 import syllabus as S
-from db import UPLOAD_DIR, get_db
+from db import UPLOAD_DIR, get_db, active_semester, active_semester_id, semester_for
 
 bp = Blueprint("syllabus_import", __name__)
 
@@ -88,8 +88,8 @@ def read(sid):
     row = load(conn, sid)
     path = os.path.join(UPLOAD_DIR, row["stored_name"])
     extract = current_app.config["EXTRACT_TEXT"]
-    term = conn.execute("SELECT * FROM term_settings WHERE id=1").fetchone()
-    term = {"name": term["name"], "startDate": term["start_date"], "endDate": term["end_date"]} if term else {}
+    sem = active_semester(conn)
+    term = {"name": sem["name"], "startDate": sem["start_date"], "endDate": sem["end_date"]}
     try:
         text = extract(path, row["filename"]) if S.ext_of(row["filename"]) not in ("pdf",) + tuple(S.IMAGE_TYPES) else None
         block, tokens = S.document_block(path, row["filename"], text)
@@ -242,9 +242,9 @@ def do_import(sid):
                     conn.execute(f"UPDATE classes SET {ch['field']}=? WHERE id=?", (ch["after"], class_id))
         else:
             class_id = str(uuid.uuid4())
-            conn.execute("INSERT INTO classes (id, code, name, professor, color, notes, grade_scale, website, created_at)"
-                         " VALUES (?,?,?,?,?,?,?,?,?)",
-                         (class_id, c.get("code") or "", c.get("name") or "", c.get("professor") or "",
+            conn.execute("INSERT INTO classes (id, semester_id, code, name, professor, color, notes, grade_scale, website, created_at)"
+                         " VALUES (?,?,?,?,?,?,?,?,?,?)",
+                         (class_id, active_semester_id(conn), c.get("code") or "", c.get("name") or "", c.get("professor") or "",
                           body.get("color") or "", ("Instructor email: " + c["professorEmail"]) if c.get("professorEmail") else "",
                           None, c.get("website") or "", t))
 
@@ -294,9 +294,9 @@ def do_import(sid):
                               cat, weight, import_key(it["title"], it["type"]), it["existingId"], class_id))
                 counts["updated"] += 1
             else:
-                conn.execute("INSERT INTO items (id, class_id, title, type, due_date, due_time, status, weight, notes, created_at,"
-                             " category_id, import_key, location) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                             (str(uuid.uuid4()), class_id, it["title"], it["type"], it.get("dueDate"), it.get("dueTime"),
+                conn.execute("INSERT INTO items (id, semester_id, class_id, title, type, due_date, due_time, status, weight, notes, created_at,"
+                             " category_id, import_key, location) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                             (str(uuid.uuid4()), semester_for(conn, class_id), class_id, it["title"], it["type"], it.get("dueDate"), it.get("dueTime"),
                               "todo", weight, "", t, cat, import_key(it["title"], it["type"]), it.get("location") or ""))
                 counts["items"] += 1
 
@@ -319,18 +319,17 @@ def do_import(sid):
                 n += 1
                 counts["topics"] += 1
 
-        term = conn.execute("SELECT * FROM term_settings WHERE id=1").fetchone()
-        if term is not None:
-            conn.execute("UPDATE term_settings SET name=COALESCE(NULLIF(name,''),?), start_date=COALESCE(NULLIF(start_date,''),?),"
-                         " end_date=COALESCE(NULLIF(end_date,''),?) WHERE id=1",
-                         (c.get("term") or "", draft.get("firstDay") or "", draft.get("lastDay") or ""))
+        conn.execute("UPDATE semesters SET name=COALESCE(NULLIF(name,''),?), start_date=COALESCE(NULLIF(start_date,''),?),"
+                     " end_date=COALESCE(NULLIF(end_date,''),?) WHERE id=?",
+                     (c.get("term") or "", draft.get("firstDay") or "", draft.get("lastDay") or "",
+                      active_semester_id(conn)))
 
         # the syllabus itself lands in the class's files
         path = os.path.join(UPLOAD_DIR, row["stored_name"])
         extract = current_app.config["EXTRACT_TEXT"]
-        conn.execute("INSERT INTO materials (id, class_id, category, title, kind, filename, stored_name, mimetype, size,"
-                     " extracted_text, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                     (str(uuid.uuid4()), class_id, "syllabus",
+        conn.execute("INSERT INTO materials (id, semester_id, class_id, category, title, kind, filename, stored_name, mimetype, size,"
+                     " extracted_text, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                     (str(uuid.uuid4()), semester_for(conn, class_id), class_id, "syllabus",
                       "Syllabus" if not diff else f"Syllabus (updated {t[:10]})", "file", row["filename"],
                       row["stored_name"], row["mimetype"], os.path.getsize(path) if os.path.exists(path) else None,
                       extract(path, row["filename"]) if os.path.exists(path) else None, t))

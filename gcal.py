@@ -356,6 +356,26 @@ class Client:
         made = self._call("POST", "/calendars", json={"summary": name, "timeZone": TZ})
         return made["id"]
 
+    def list_calendars(self):
+        """Every calendar this account can see, so the student can choose.
+
+        `accessRole` decides whether Vesta may write there: a subscribed timetable or a
+        holiday calendar is readable but not writable, and trying to push to one fails
+        in a way that is hard to explain after the fact.
+        """
+        out = []
+        for c in (self._call("GET", "/users/me/calendarList").get("items") or []):
+            role = c.get("accessRole") or "reader"
+            out.append({
+                "calendarId": c.get("id"),
+                "name": c.get("summaryOverride") or c.get("summary") or c.get("id"),
+                "primary": bool(c.get("primary")),
+                "writable": role in ("owner", "writer"),
+                "isVesta": (c.get("summary") or "").strip().lower() == CALENDAR_NAME.lower(),
+                "colour": c.get("backgroundColor"),
+            })
+        return out
+
     def list_events(self, calendar_id, sync_token=None, page_token=None, time_min=None):
         params = {"maxResults": 250, "showDeleted": bool(sync_token)}
         if sync_token:

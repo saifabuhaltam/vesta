@@ -3,7 +3,7 @@
 A running list so nothing is lost between sessions. **needs Saif** means it cannot be
 done from a terminal: a dashboard login, an email click, or a decision that is his.
 
-_Last updated: 2026-09-13, after the Railway deployment came up._
+_Last updated: 2026-09-13, after auditing the schema against Saif's original data plan._
 
 ---
 
@@ -49,6 +49,105 @@ onto the Railway volume.
   from a Settings sub-menu inside the service.
 - **`DATA_DIR=/data` and the volume mount path must agree.** Either one alone looks
   like it works and silently loses uploads on the next deploy.
+
+## Semester management (built 2026-09-13, not yet deployed)
+
+Saif's requirement, in his words:
+
+- Add semesters/terms as a first-class part of Vesta (Fall 2026, Spring 2027, Summer 2027).
+- When the semester ends, add the ability to archive it.
+- Archived courses should remain searchable and readable.
+- Starting a new semester should give a clean current workspace without deleting old work.
+- Allow switching between current and past semesters.
+
+All five are built. His decisions, made before the work started:
+
+- **The whole app switches**, not just the class list. Dashboard, calendar, files,
+  notes, grades, Headstart, quizzes, decks and the .ics export all show one term.
+- **Archived terms open read-only**, with an unlock button. The unlock lasts for the
+  browser session and drops the moment you switch away.
+- **Unfiled notes and files belong to a term** rather than staying global. Worth
+  knowing the consequence he accepted: something dropped into the inbox during finals
+  week is not visible from the new term until you switch back to the old one.
+- **Cumulative GPA was built in the same pass**, since the data was there.
+
+How it works:
+
+- `semesters` is a real table. `classes.semester_id` scopes everything that hangs off
+  a class; the six tables that can exist without one (`items`, `events`, `notes`,
+  `materials`, `flashcard_decks`, `quizzes`) carry their own copy, kept equal to the
+  class's whenever there is a class.
+- The active term is a server-side pointer in `app_settings`, not a query parameter.
+  Two tabs and two devices therefore agree, and a stale tab cannot ask for a term by
+  passing an id.
+- Writes to an archived term are refused by the server with `423`, in a
+  `before_request` hook. A read-only record that is only read-only in the interface is
+  not read-only.
+- Search deliberately still spans every term, archived included, and labels any hit
+  from another term. That is the "archived courses remain searchable" requirement.
+- `/api/history` returns each term's grade material, and the page runs the *same*
+  grade functions over it, so an archived GPA and a live one cannot be worked out two
+  different ways.
+
+Tested locally: the migration against today's database, against a 22-table backup
+from before notes and materials became class-optional, and twice in a row for
+idempotence; then the full lifecycle over HTTP (start a term, clean workspace, switch
+back, archive, `423` on write, unlock, write, switch away, locked again, refuse to
+delete a term with work in it).
+
+### The one real risk: the Postgres migration has never run
+
+`ensure_pg_schema()` builds the tables once and then returns early forever, so a
+deployed database could never gain a column. There is now a migration runner
+(`db.run_pg_migrations`) and `cloud/migrate/pg_migrations.sql`, applied under the same
+advisory lock, each block in its own transaction, recorded in `schema_migrations` so a
+redeploy is a no-op.
+
+None of it has been executed against a real Postgres. There is no Postgres and no
+Docker on this machine, so `001_semesters` will run for the first time on Railway.
+Read it before deploying: it lifts `force row level security` on eight tables to do
+its backfill as the owner and puts it back in the same transaction, which is the part
+worth a second pair of eyes.
+
+- [ ] **After deploying, check `/health` first.** It now reports `migrations`. If that
+      list does not contain `001_semesters`, the app is running against a database
+      that has no semesters and nothing else will make sense.
+- [ ] If the migration fails, the app raises at boot rather than serving a half-migrated
+      database. That is deliberate, but it does mean a failed migration is a failed
+      deploy, so do it when there is time to read the log.
+
+### Rough edges left in this feature
+
+- [ ] **Only the Classes screen hides its create buttons while a term is locked.** The
+      "add" affordances elsewhere still appear and fail with a clear message from the
+      server instead of being disabled up front. Worth tidying, not wrong.
+- [ ] **`term_settings` is now unused.** Every reader moved to the active semester. The
+      table and its rows are left alone rather than dropped, since nothing is deleted
+      here, but it should come out in a later migration once this has been live a while.
+- [ ] **Moving a class between terms is not in the interface.** The schema supports it
+      and `semester_for` keeps child rows honest, but there is no button. A class
+      created in the wrong term has to be deleted and remade.
+
+## Missing from the original data plan
+
+These were in Saif's first round of notes and never got built. Recorded so they are
+not rediscovered a third time.
+
+- [x] ~~**Semesters as a first-class entity.**~~ Built 2026-09-13, see above. Not deployed.
+- [ ] **Separate object storage for uploads.** Uploaded PDFs, videos and images live on
+      the Railway volume at `/data/uploads`, referenced by `materials.stored_name`. The
+      original plan was cloud object storage instead, which is one machine fewer to
+      depend on, plus a CDN and someone else's backups. The R2 work in `cloud/` did
+      exactly this and is currently a delete candidate. Consequences of leaving it:
+      the volume is a single point of failure, backups are ours, and the 25 MB per-file
+      cap in `app.py` stays.
+- [ ] **Friends and sharing.** Accounts work, but there is no users table locally to
+      hang a display name on, and the row level security policies are strictly
+      owner-only. Sharing a class or a note with a friend is not a new join table, it
+      is a policy rewrite on all 28 tables. Worth designing before it is promised.
+- [ ] **File folders.** Notes got a real folder tree (`note_folders.parent_id`); files
+      got a single flat `category` string guessed from the filename. Fine at today's
+      volume, inconsistent as it grows.
 
 ## Bugs found and not yet fixed
 
@@ -124,10 +223,12 @@ onto the Railway volume.
 ## Documentation (deferred by Saif, 2026-09-13)
 
 - [ ] `README.md` still documents SQLite-only, single-user, and `localhost:5000`.
-      Needs Postgres, accounts, Railway, and the real deployment steps.
+      Needs Postgres, accounts, Railway, and the real deployment steps. It now also
+      predates semesters, which are a user-facing feature it says nothing about.
 - [ ] `DESIGN.md` still describes Supabase-plus-Cloudflare. Needs rewriting for
       Railway, with Supabase used only to issue tokens.
-- [ ] A deployment checklist matching what was actually built.
+- [ ] A deployment checklist matching what was actually built, including checking
+      `/health` for `migrations` after any deploy that carries a schema change.
 
 ## Known gaps and rough edges
 
