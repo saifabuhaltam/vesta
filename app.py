@@ -1740,6 +1740,9 @@ def health():
         # Railway sets this only when a volume is actually mounted, so it is the
         # difference between "configured" and "really there".
         "volumeMountedAt": os.environ.get("RAILWAY_VOLUME_MOUNT_PATH"),
+        # Which commit is actually running. Without this, "is the fix deployed yet?"
+        # can only be answered by guessing from behaviour.
+        "version": (os.environ.get("RAILWAY_GIT_COMMIT_SHA") or "")[:7] or None,
     }
     if _db.DATABASE_URL:
         try:
