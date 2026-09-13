@@ -818,6 +818,62 @@
   .cal-group-label{ font-size:12px; font-weight:700; color:var(--text-muted); margin:16px 0 2px; }
   .cal-group-label:first-child{ margin-top:0; }
 
+  /* ---------- Sign-in screen ----------
+     A page in its own right, not a dialog over the app. While it is showing, the app
+     shell is hidden outright: a dimmed dashboard behind a login box implies there is
+     something there to go back to, and for a signed-out visitor there is not. */
+  body.signed-out #app{ display:none; }
+
+  .auth-screen{
+    position:fixed; inset:0; z-index:300; overflow:auto;
+    display:flex; align-items:center; justify-content:center; padding:32px 20px;
+    /* Two soft washes of the accent rather than one, placed off-centre so the card
+       sits in light with some depth behind it instead of on a flat grey field. A
+       single centred gradient was so faint it may as well not have been there. */
+    background:
+      radial-gradient(620px 400px at 16% -8%, var(--accent-soft), transparent 60%),
+      radial-gradient(540px 360px at 88% 104%, var(--accent-soft), transparent 60%),
+      var(--surface-2);
+  }
+  .auth-inner{ width:100%; max-width:406px; }
+
+  .auth-brand{ display:flex; align-items:center; justify-content:center; gap:9px;
+               margin:0 0 22px; font-size:19px; font-weight:750; letter-spacing:-.02em;
+               color:var(--text); }
+  .auth-brand img{ width:27px; height:27px; border-radius:7px; }
+
+  .auth-card{ background:var(--surface); border:1px solid var(--border);
+              border-radius:var(--r-card); box-shadow:var(--shadow-card);
+              padding:30px 28px 22px; }
+  .auth-card h1{ margin:0 0 5px; font-size:22px; font-weight:750; letter-spacing:-.02em;
+                 color:var(--text); }
+  .auth-sub{ margin:0 0 22px; font-size:13.5px; color:var(--text-muted); }
+
+  .auth-field{ display:block; margin-bottom:13px; font-size:12.5px; font-weight:650;
+               color:var(--text-muted); }
+  .auth-field input{ width:100%; margin-top:5px; box-sizing:border-box; height:40px; }
+
+  /* Full-width buttons inherit the toolbar button's left-aligned label, which reads as
+     unfinished once the button is the width of the card. */
+  .auth-primary, .auth-google{ width:100%; height:40px; font-size:14px;
+                               justify-content:center; text-align:center; }
+  .auth-primary{ margin-top:7px; }
+
+  .auth-note{ margin:2px 0 12px; padding:10px 12px; border-radius:var(--r-md);
+              background:var(--accent-soft); color:var(--accent-ink); font-size:12.5px; }
+  .auth-error{ margin:2px 0 12px; padding:10px 12px; border-radius:var(--r-md);
+               background:var(--danger); color:#fff; font-size:12.5px; }
+
+  .auth-links{ display:flex; flex-wrap:wrap; gap:6px 16px; justify-content:center;
+               margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
+  .auth-links button{ border:none; background:none; padding:0; font:inherit;
+                      font-size:12.5px; color:var(--accent); cursor:pointer; }
+  .auth-links button:hover{ text-decoration:underline; }
+
+  .auth-foot{ text-align:center; margin:18px 0 0; font-size:12px; color:var(--text-faint); }
+  .auth-foot a{ color:var(--text-faint); }
+  .auth-foot a:hover{ color:var(--text-muted); }
+
   /* "or" rule between the email fields and the Google button on the sign-in screen */
   .auth-or{ display:flex; align-items:center; gap:10px; margin:16px 0 12px;
             color:var(--text-faint); font-size:12px; }
@@ -2544,35 +2600,46 @@
       root.id = 'login-root';
       document.body.appendChild(root);
     }
+    // The app itself is hidden rather than dimmed behind a dialog. A blurred dashboard
+    // full of someone else's data is a strange thing to show a person who is not
+    // signed in, and it made the screen read as a modal interruption rather than the
+    // front door.
+    document.body.classList.add('signed-out');
+
     var m = AUTH_COPY[authState.mode] || AUTH_COPY.login;
     var wantsPassword = authState.mode !== 'reset';
-    root.innerHTML = '<div class="overlay"><div class="modal" data-action="modal-stop" style="max-width:420px;">'
-      + '<div class="modal-head"><h2>'+m.title+'</h2></div>'
-      + '<div class="modal-body">'
-      + '<label class="field">Email<input type="email" id="auth-email" autocomplete="username" '
-      + 'value="'+escapeHtml(authState.email||'')+'" placeholder="you@example.com"></label>'
-      + (wantsPassword ? '<label class="field" style="margin-top:10px;">Password'
+    var subs = {
+      login:  'Your term, in one place.',
+      signup: 'You will need an email that has been invited.',
+      reset:  'We will email you a link to set a new password.'
+    };
+    root.innerHTML = '<div class="auth-screen"><div class="auth-inner">'
+      + '<div class="auth-brand"><img src="/vesta-mark.png" alt=""><span>Vesta</span></div>'
+      + '<div class="auth-card">'
+      + '<h1>'+m.title.replace(' to Vesta','')+'</h1>'
+      + '<p class="auth-sub">'+subs[authState.mode]+'</p>'
+      + '<label class="auth-field">Email'
+      + '<input type="email" id="auth-email" autocomplete="username" spellcheck="false"'
+      + ' value="'+escapeHtml(authState.email||'')+'" placeholder="you@example.com"></label>'
+      + (wantsPassword ? '<label class="auth-field">Password'
           + '<input type="password" id="auth-password" autocomplete="'
-          + (authState.mode==='signup' ? 'new-password' : 'current-password')+'"></label>' : '')
-      + (authState.mode==='signup'
-          ? '<div class="hint" style="margin-top:8px;">At least 8 characters. '
-            + 'Your email has to be on the invite list before this will work.</div>' : '')
-      + (authState.notice ? '<div class="hs-confirm" style="margin-top:12px;"><div>'
-          + escapeHtml(authState.notice)+'</div></div>' : '')
-      + (authState.error ? '<div class="si-error">'+escapeHtml(authState.error)+'</div>' : '')
+          + (authState.mode==='signup' ? 'new-password' : 'current-password')
+          + '" placeholder="'+(authState.mode==='signup' ? 'At least 8 characters' : '')+'"></label>' : '')
+      + (authState.notice ? '<div class="auth-note">'+escapeHtml(authState.notice)+'</div>' : '')
+      + (authState.error ? '<div class="auth-error">'+escapeHtml(authState.error)+'</div>' : '')
+      + '<button type="button" class="btn primary auth-primary" data-action="auth-submit"'
+      + (authState.busy?' disabled':'')+'>'+(authState.busy ? 'Working…' : m.button)+'</button>'
       + (authState.mode === 'reset' ? '' :
           '<div class="auth-or"><span>or</span></div>'
-          + '<button type="button" class="btn" style="width:100%;" data-action="auth-google">'
+          + '<button type="button" class="btn auth-google" data-action="auth-google">'
           + 'Continue with Google</button>')
+      + '<div class="auth-links">'
+      + (authState.mode!=='login'  ? '<button type="button" data-action="auth-mode" data-mode="login">Sign in</button>' : '')
+      + (authState.mode!=='signup' ? '<button type="button" data-action="auth-mode" data-mode="signup">Create an account</button>' : '')
+      + (authState.mode!=='reset'  ? '<button type="button" data-action="auth-mode" data-mode="reset">Forgot your password?</button>' : '')
       + '</div>'
-      + '<div class="modal-foot"><span></span><div class="right">'
-      + '<button class="btn primary" data-action="auth-submit"'+(authState.busy?' disabled':'')+'>'
-      + (authState.busy ? 'Working…' : m.button)+'</button></div></div>'
-      + '<div class="modal-body" style="padding-top:0;"><div class="hint" style="display:flex;gap:10px;flex-wrap:wrap;">'
-      + (authState.mode!=='login'  ? '<button type="button" class="fd-browse" data-action="auth-mode" data-mode="login">Sign in instead</button>' : '')
-      + (authState.mode!=='signup' ? '<button type="button" class="fd-browse" data-action="auth-mode" data-mode="signup">Create an account</button>' : '')
-      + (authState.mode!=='reset'  ? '<button type="button" class="fd-browse" data-action="auth-mode" data-mode="reset">Forgot your password?</button>' : '')
-      + '</div></div>'
+      + '</div>'
+      + '<p class="auth-foot">Invite only · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>'
       + '</div></div>';
     // Enter submits from either field. A sign-in form that only responds to the mouse
     // is the kind of thing you notice every single morning.
@@ -2586,6 +2653,7 @@
   }
 
   function hideLogin(){
+    document.body.classList.remove('signed-out');
     var root = document.getElementById('login-root');
     if(root) root.remove();
   }

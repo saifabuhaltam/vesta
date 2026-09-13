@@ -79,7 +79,20 @@ onto the Railway volume.
       there is nothing to redo. Neither the client ID nor the secret ever needs to pass
       through a conversation: both go from the Google console straight into the
       Supabase provider page and Railway's variables.
-- [ ] **Decide whether to publish the Google app, or stay in Testing.** Testing mode
+- [ ] **Add the app logo and submit for brand verification.** Deliberately skipped at
+      publish time: uploading a logo triggers brand verification, which gates the
+      consent screen behind a review (minutes if automated, 2-3 business days if
+      manual). Publishing without one shows the domain instead, which is fine. Do it
+      later, when nothing depends on the outcome. Note that the logo on the live consent
+      screen must match the file submitted, so swapping it afterwards without
+      resubmitting puts the app out of compliance. The mark is `static/vesta-mark.png`;
+      Google wants a square PNG around 120x120, so check and resize first.
+- [ ] **Add `--bind 0.0.0.0:$PORT` to the Procfile.** gunicorn currently picks the port
+      up from the `PORT` environment variable, which works, but with `PORT` missing it
+      silently falls back to `127.0.0.1:8000`. The app would look healthy in its own
+      logs while being unreachable from outside, which is a horrible failure to debug.
+- [x] ~~Decide whether to publish the Google app, or stay in Testing.~~ Published
+      2026-09-13 on the custom domain, so no more 7-day token resets. Testing mode
       works and allows up to 100 test users, which covers Saif plus friends: each person
       is added under Google Auth Platform → Audience → Test users. The cost is that
       refresh tokens expire every 7 days, so Google Calendar needs reconnecting about
