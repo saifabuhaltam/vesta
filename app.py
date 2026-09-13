@@ -1720,6 +1720,43 @@ def export_ics():
     )
 
 
+@app.route("/health")
+def health():
+    """What this instance actually is, without revealing anything private.
+
+    Exists because the sign-in screen looks identical whether the app is talking to
+    Postgres or quietly falling back to a throwaway SQLite file, and because a volume
+    that failed to mount is invisible until the day a deploy eats your uploads.
+    """
+    import db as _db
+    import auth as _auth
+    uploads_ok = os.access(UPLOAD_DIR, os.W_OK)
+    out = {
+        "ok": True,
+        "database": "postgres" if _db.DATABASE_URL else "sqlite",
+        "accounts": _auth.enabled(),
+        "dataDir": _db.DATA_DIR,
+        "uploadsWritable": uploads_ok,
+        # Railway sets this only when a volume is actually mounted, so it is the
+        # difference between "configured" and "really there".
+        "volumeMountedAt": os.environ.get("RAILWAY_VOLUME_MOUNT_PATH"),
+    }
+    if _db.DATABASE_URL:
+        try:
+            conn = _db.get_db(user_id=None)
+            conn.as_owner()
+            row = conn.execute(
+                "select count(*) as n from pg_class c join pg_namespace ns"
+                " on ns.oid = c.relnamespace where ns.nspname='public' and c.relkind='r'"
+            ).fetchone()
+            out["tables"] = row["n"] if row else 0
+            conn.close()
+        except Exception as e:
+            out["ok"] = False
+            out["databaseError"] = str(e)[:200]
+    return jsonify(out)
+
+
 @app.errorhandler(413)
 def too_large(_e):
     return jsonify({"error": "File is larger than 25 MB."}), 413
