@@ -817,6 +817,11 @@
   .cal-sec.on span{ color:var(--accent-ink); opacity:.75; }
   .cal-group-label{ font-size:12px; font-weight:700; color:var(--text-muted); margin:16px 0 2px; }
   .cal-group-label:first-child{ margin-top:0; }
+
+  /* "or" rule between the email fields and the Google button on the sign-in screen */
+  .auth-or{ display:flex; align-items:center; gap:10px; margin:16px 0 12px;
+            color:var(--text-faint); font-size:12px; }
+  .auth-or::before, .auth-or::after{ content:""; flex:1; height:1px; background:var(--border); }
   .si-badge.look{ background:var(--warn-soft); color:var(--warn); }
   /* the checklist of everything still standing between the student and the import */
   .si-look{ border:1px solid var(--warn); background:var(--warn-soft); border-radius:var(--r-card);
@@ -2555,6 +2560,10 @@
       + (authState.notice ? '<div class="hs-confirm" style="margin-top:12px;"><div>'
           + escapeHtml(authState.notice)+'</div></div>' : '')
       + (authState.error ? '<div class="si-error">'+escapeHtml(authState.error)+'</div>' : '')
+      + (authState.mode === 'reset' ? '' :
+          '<div class="auth-or"><span>or</span></div>'
+          + '<button type="button" class="btn" style="width:100%;" data-action="auth-google">'
+          + 'Continue with Google</button>')
       + '</div>'
       + '<div class="modal-foot"><span></span><div class="right">'
       + '<button class="btn primary" data-action="auth-submit"'+(authState.busy?' disabled':'')+'>'
@@ -2613,6 +2622,51 @@
       });
   }
 
+  function googleSignIn(){
+    authState.busy = true; authState.error = null; showLogin();
+    apiGet('/api/auth/google/start')
+      .then(function(r){
+        if(r && r.url){ window.location.href = r.url; return; }
+        authState.busy = false;
+        authState.error = 'Google sign-in is not set up on this server yet.';
+        showLogin();
+      })
+      .catch(function(){
+        authState.busy = false;
+        authState.error = 'Could not reach Vesta.';
+        showLogin();
+      });
+  }
+
+  /**
+   * Signing in with Google returns the token to the browser in the URL fragment, which
+   * a server never sees. Read it once, hand it to Vesta, and wipe it from the address
+   * bar: a token left there ends up in browser history and in any screenshot.
+   */
+  function consumeAuthFragment(){
+    var hash = window.location.hash || '';
+    if(hash.indexOf('access_token=') === -1 && hash.indexOf('error=') === -1){
+      return Promise.resolve(false);
+    }
+    var p = {};
+    hash.replace(/^#/, '').split('&').forEach(function(kv){
+      var i = kv.indexOf('=');
+      if(i > 0) p[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' '));
+    });
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    if(p.error || !p.access_token){
+      authState.error = p.error_description || p.error || 'That Google sign-in did not complete.';
+      return Promise.resolve(false);
+    }
+    return apiPostRaw('/api/auth/session', { accessToken: p.access_token })
+      .then(function(r){
+        if(r.ok && r.body.user){ authState.user = r.body.user; return true; }
+        authState.error = r.body.error || 'That Google sign-in was not accepted.';
+        return false;
+      })
+      .catch(function(){ authState.error = 'Could not reach Vesta.'; return false; });
+  }
+
   function init(){
     initSidebar();
     initTheme();
@@ -2628,13 +2682,18 @@
         startLiveSync();
       });
     }
-    // Ask the server whether this copy has accounts at all. One request, and it
-    // decides between the app and a sign-in screen.
-    return authMe().then(function(a){
-      authState.accounts = !!a.accounts;
-      authState.user = (a && a.user) || null;
-      if(authState.accounts && !authState.user){ showLogin(); return; }
-      loadState();
+    // A Google sign-in lands back here with the token in the fragment, so deal with
+    // that before asking the server who is signed in.
+    return consumeAuthFragment().then(function(justSignedIn){
+      if(justSignedIn){ hideLogin(); loadState(); return; }
+      // Ask the server whether this copy has accounts at all. One request, and it
+      // decides between the app and a sign-in screen.
+      return authMe().then(function(a){
+        authState.accounts = !!a.accounts;
+        authState.user = (a && a.user) || null;
+        if(authState.accounts && !authState.user){ showLogin(); return; }
+        loadState();
+      });
     }).catch(function(){ loadState(); });
   }
 
@@ -9391,6 +9450,7 @@
     if(action==='library-upload'){ triggerLibraryUpload(t.dataset.class); return; }
     if(action==='open-search'){ openSearch(); return; }
     if(action==='auth-submit'){ authSubmit(); return; }
+    if(action==='auth-google'){ googleSignIn(); return; }
     if(action==='auth-mode'){
       authState.mode = t.dataset.mode || 'login';
       authState.error = null; authState.notice = null;

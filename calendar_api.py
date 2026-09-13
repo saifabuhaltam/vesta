@@ -221,9 +221,18 @@ def redirect_uri():
         host = request.host or ""
     except RuntimeError:                  # called outside a request context
         return DEFAULT_REDIRECT
+    if not host:
+        return DEFAULT_REDIRECT
     if host.split(":")[0] in ("localhost", "127.0.0.1"):
         return f"http://{host}/api/calendar/google/callback"
-    return DEFAULT_REDIRECT
+    # Any other host is a real deployment, and Google requires https for those. The
+    # scheme is read from the proxy header because Railway terminates TLS in front of
+    # the app, so request.scheme alone says "http" and would produce a callback Google
+    # rejects. Falling back to localhost here, as this used to, meant the deployed app
+    # confidently sent Google a URL that could never match.
+    proto = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip()
+    scheme = "https" if proto in ("", "https") else proto
+    return f"{scheme}://{host}/api/calendar/google/callback"
 
 
 def put_state(conn, value):

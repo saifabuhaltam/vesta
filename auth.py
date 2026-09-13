@@ -26,6 +26,7 @@ import hmac
 import json
 import os
 import time
+import urllib.parse
 
 from flask import Blueprint, g, jsonify, request, session
 
@@ -42,7 +43,8 @@ SESSION_SECONDS = 60 * 60 * 24 * 30
 
 # Paths that must work before anyone is signed in.
 OPEN_PATHS = {"/api/auth/login", "/api/auth/signup", "/api/auth/reset",
-              "/api/auth/logout", "/api/auth/me", "/health"}
+              "/api/auth/logout", "/api/auth/me", "/api/auth/google/start",
+              "/api/auth/session", "/health"}
 
 bp = Blueprint("auth", __name__)
 
@@ -252,6 +254,53 @@ def reset():
         return jsonify({"error": e.message}), e.status
     # Always the same answer, so this cannot be used to find out who has an account.
     return jsonify({"ok": True, "message": "If that email has an account, a reset link is on its way."})
+
+
+def public_origin():
+    """This app's own address, as the outside world sees it.
+
+    Railway terminates TLS in front of the app, so `request.host_url` says http and a
+    redirect built from it would not match what was registered. The proxy header is
+    the only thing that knows the real scheme.
+    """
+    host = request.host or ""
+    if host.split(":")[0] in ("localhost", "127.0.0.1"):
+        return f"http://{host}"
+    proto = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip()
+    return f"{'https' if proto in ('', 'https') else proto}://{host}"
+
+
+@bp.route("/api/auth/google/start")
+def google_start():
+    """Where to send the browser to sign in with Google.
+
+    Built server side so the page needs no Supabase configuration of its own, and so
+    the return address is derived rather than hard-coded.
+    """
+    if not enabled():
+        return jsonify({"error": "This copy of Vesta has no accounts."}), 400
+    back = urllib.parse.quote(public_origin() + "/", safe="")
+    return jsonify({"url": f"{SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to={back}"})
+
+
+@bp.route("/api/auth/session", methods=["POST"])
+def session_from_browser():
+    """Turn a token the browser was handed into a Vesta session.
+
+    Signing in with Google returns the token to the *browser*, in the URL fragment,
+    which never reaches a server on its own. The page posts it here once; after that
+    identity is carried by the session cookie exactly like an email sign-in, so the
+    rest of the app cannot tell the two apart.
+    """
+    if not enabled():
+        return jsonify({"error": "This copy of Vesta has no accounts."}), 400
+    token = (request.get_json(force=True) or {}).get("accessToken") or ""
+    if not token:
+        return jsonify({"error": "That sign-in did not come back with a token."}), 400
+    try:
+        return jsonify({"user": _session_from_token(token)})
+    except AuthError as e:
+        return jsonify({"error": e.message}), e.status
 
 
 @bp.route("/api/auth/logout", methods=["POST"])
