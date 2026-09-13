@@ -1744,6 +1744,20 @@ def health():
         # can only be answered by guessing from behaviour.
         "version": (os.environ.get("RAILWAY_GIT_COMMIT_SHA") or "")[:7] or None,
     }
+    # Google's OAuth settings, so a mismatch can be seen rather than inferred from an
+    # error page. Neither value is secret: the client id and the callback URL both
+    # travel in the address bar during any sign-in, which is precisely why they have to
+    # match what is registered. The client *secret* is never reported.
+    try:
+        import calendar_api as _cal
+        out["google"] = {
+            "configured": bool(os.environ.get("GOOGLE_CLIENT_ID")
+                               and os.environ.get("GOOGLE_CLIENT_SECRET")),
+            "clientId": os.environ.get("GOOGLE_CLIENT_ID") or None,
+            "callbackUrl": _cal.redirect_uri(),
+        }
+    except Exception as e:
+        out["google"] = {"error": str(e)[:120]}
     if _db.DATABASE_URL:
         try:
             conn = _db.get_db(user_id=None)
