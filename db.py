@@ -261,7 +261,7 @@ CREATE TABLE IF NOT EXISTS term_settings (
 # no setup. Deployed, DATABASE_URL points at Postgres and `pgshim` presents the same
 # sqlite3-shaped interface over it, so not one of the app's ~200 get_db() calls or 262
 # queries has to change.
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = (os.environ.get("DATABASE_URL") or "").strip() or None
 
 
 def current_user_id():

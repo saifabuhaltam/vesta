@@ -30,9 +30,9 @@ import urllib.parse
 
 from flask import Blueprint, g, jsonify, request, session
 
-SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or ""
-SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET") or ""
+SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").strip().rstrip("/")
+SUPABASE_ANON_KEY = (os.environ.get("SUPABASE_ANON_KEY") or "").strip()
+SUPABASE_JWT_SECRET = (os.environ.get("SUPABASE_JWT_SECRET") or "").strip()
 
 # How long a sign-in lasts. Supabase's own access token expires in about an hour, but
 # it is used once, at sign-in, and never again: from then on identity is carried by

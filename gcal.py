@@ -43,8 +43,20 @@ class GoogleError(Exception):
         self.resync = resync          # a 410: the sync token is dead, start over
 
 
+def env(name):
+    """An environment variable, with surrounding whitespace removed.
+
+    Credentials get pasted into dashboard fields by hand, and a trailing space rides
+    along more often than anyone expects. A client id with a stray space is sent to
+    Google as `...googleusercontent.com%20`, which is not a client that exists, and the
+    error it produces ("invalid_client: The OAuth client was not found") points at the
+    wrong thing entirely.
+    """
+    return (os.environ.get(name) or "").strip()
+
+
 def configured():
-    return bool(os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET"))
+    return bool(env("GOOGLE_CLIENT_ID") and env("GOOGLE_CLIENT_SECRET"))
 
 
 # ---------------------------------------------------------------------------
@@ -274,7 +286,7 @@ def auth_url(redirect_uri, state):
     access_type=offline is what makes Google return a refresh token at all, and
     prompt=consent forces a fresh one even if they have approved this app before.
     """
-    q = {"client_id": os.environ.get("GOOGLE_CLIENT_ID", ""), "redirect_uri": redirect_uri,
+    q = {"client_id": env("GOOGLE_CLIENT_ID"), "redirect_uri": redirect_uri,
          "response_type": "code", "scope": SCOPE, "access_type": "offline",
          "prompt": "consent", "include_granted_scopes": "true", "state": state}
     return AUTH_URL + "?" + urllib.parse.urlencode(q)
@@ -298,14 +310,14 @@ def _post_token(data):
 
 
 def exchange_code(code, redirect_uri):
-    return _post_token({"code": code, "client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
-                        "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+    return _post_token({"code": code, "client_id": env("GOOGLE_CLIENT_ID"),
+                        "client_secret": env("GOOGLE_CLIENT_SECRET"),
                         "redirect_uri": redirect_uri, "grant_type": "authorization_code"})
 
 
 def refresh_token(refresh):
-    return _post_token({"refresh_token": refresh, "client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
-                        "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+    return _post_token({"refresh_token": refresh, "client_id": env("GOOGLE_CLIENT_ID"),
+                        "client_secret": env("GOOGLE_CLIENT_SECRET"),
                         "grant_type": "refresh_token"})
 
 

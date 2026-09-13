@@ -214,7 +214,7 @@ def redirect_uri():
     Only loopback hosts are trusted. Google rejects a raw LAN IP as a redirect target,
     so reaching Vesta from a phone on the wifi falls back to the configured value.
     """
-    env = os.environ.get("GOOGLE_REDIRECT_URI")
+    env = (os.environ.get("GOOGLE_REDIRECT_URI") or "").strip()
     if env:
         return env
     try:
