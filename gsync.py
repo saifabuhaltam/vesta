@@ -194,3 +194,132 @@ def summarise(plan):
     for p in plan:
         out[p["action"]] = out.get(p["action"], 0) + 1
     return out
+
+
+# ---------------------------------------------------------------------------
+# Feeds: which of the student's calendars Vesta reads
+# ---------------------------------------------------------------------------
+def feeds(conn, account_id, enabled_only=False):
+    sql = "SELECT * FROM calendar_feeds WHERE account_id=?"
+    if enabled_only:
+        sql += " AND enabled=1"
+    return conn.execute(sql + " ORDER BY is_vesta DESC, name", (account_id,)).fetchall()
+
+
+def merge_feeds(conn, account_id, listing):
+    """Reconcile what Google says the account has against what Vesta already knew.
+
+    A calendar Vesta has not seen before arrives switched **off**. Reading somebody's
+    entire Google account the moment they connect it is not a decision Vesta gets to
+    make on their behalf: the picker is the consent, so the default has to be no.
+
+    The exception is Vesta's own calendar, which it created and already writes to.
+    """
+    known = {r["calendar_id"]: r for r in feeds(conn, account_id)}
+    seen = set()
+    for c in listing:
+        cid = c.get("calendarId")
+        if not cid:
+            continue
+        seen.add(cid)
+        row = known.get(cid)
+        if row is None:
+            conn.execute(
+                "INSERT INTO calendar_feeds (id, account_id, calendar_id, name, colour,"
+                " writable, is_vesta, enabled, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                (str(uuid.uuid4()), account_id, cid, c.get("name") or cid,
+                 c.get("colour") or "", 1 if c.get("writable") else 0,
+                 1 if c.get("isVesta") else 0, 1 if c.get("isVesta") else 0, now()))
+        else:
+            # The name, colour and access role are Google's to change, not Vesta's to
+            # remember wrongly. `enabled` is the student's and is left alone.
+            conn.execute(
+                "UPDATE calendar_feeds SET name=?, colour=?, writable=?, is_vesta=? WHERE id=?",
+                (c.get("name") or cid, c.get("colour") or "",
+                 1 if c.get("writable") else 0, 1 if c.get("isVesta") else 0, row["id"]))
+    # A calendar that has disappeared from Google is dropped, along with its sync token,
+    # so re-subscribing later starts clean rather than resuming from a stale cursor.
+    for cid, row in known.items():
+        if cid not in seen:
+            conn.execute("DELETE FROM calendar_feeds WHERE id=?", (row["id"],))
+    conn.commit()
+    return feeds(conn, account_id)
+
+
+def set_enabled(conn, account_id, calendar_ids):
+    """Turn the chosen calendars on and every other one off.
+
+    Switching a calendar off clears its sync token: if it is ever switched back on,
+    Vesta should re-read it in full rather than resume from a cursor that skipped
+    everything that happened while it was ignored.
+    """
+    chosen = set(calendar_ids or [])
+    for row in feeds(conn, account_id):
+        want = 1 if row["calendar_id"] in chosen else 0
+        if want == (row["enabled"] or 0):
+            continue
+        if want:
+            conn.execute("UPDATE calendar_feeds SET enabled=1 WHERE id=?", (row["id"],))
+        else:
+            # Withdraw what it mirrored in. Leaving the events behind would strand them:
+            # they are read-only, so they could never be corrected, and they would never
+            # update again, so they would quietly drift out of date forever.
+            conn.execute("DELETE FROM events WHERE feed_id=?", (row["id"],))
+            conn.execute(
+                "UPDATE calendar_feeds SET enabled=0, sync_token=NULL WHERE id=?", (row["id"],))
+    conn.commit()
+    return feeds(conn, account_id)
+
+
+# ---------------------------------------------------------------------------
+# Absorbing a calendar the student asked for
+# ---------------------------------------------------------------------------
+def absorb(conn, account_id, feed, raw_events, semester_id, tz=gcal.TZ):
+    """Mirror one chosen calendar's events into Vesta's own `events` table.
+
+    This is deliberately not `plan_pull`. That function treats an event Vesta did not
+    create as somebody else's business and offers it for review, which is right for a
+    calendar Vesta stumbled upon and wrong for one the student explicitly picked. Having
+    chosen it, they mean "show me this", so it lands.
+
+    Landed events are marked `read_only`: they belong to Google, and the way to change
+    one is to change it there. Deletions on Google delete here, since a mirror that
+    keeps what the original dropped stops being a mirror.
+    """
+    stats = {"added": 0, "updated": 0, "removed": 0, "unreadable": 0}
+    for raw in raw_events or []:
+        ext = raw.get("id")
+        if not ext:
+            continue
+        existing = conn.execute(
+            "SELECT id FROM events WHERE account_id=? AND external_id=?",
+            (account_id, ext)).fetchone()
+        if (raw.get("status") == "cancelled"):
+            if existing:
+                conn.execute("DELETE FROM events WHERE id=?", (existing["id"],))
+                stats["removed"] += 1
+            continue
+        ev = gcal.from_google(raw, tz)
+        if ev is None:
+            stats["unreadable"] += 1
+            continue
+        if existing:
+            conn.execute(
+                "UPDATE events SET title=?, date=?, start=?, \"end\"=?, all_day=?,"
+                " location=?, notes=?, updated_at=? WHERE id=?",
+                (ev["title"], ev["date"], ev["start"] or "", ev["end"] or "",
+                 1 if ev["allDay"] else 0, ev["location"], ev["notes"], now(),
+                 existing["id"]))
+            stats["updated"] += 1
+        else:
+            conn.execute(
+                "INSERT INTO events (id, semester_id, class_id, title, kind, date, start,"
+                " \"end\", all_day, location, notes, created_at, source, account_id,"
+                " external_id, feed_id, read_only, updated_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (str(uuid.uuid4()), semester_id, None, ev["title"], "external",
+                 ev["date"], ev["start"] or "", ev["end"] or "",
+                 1 if ev["allDay"] else 0, ev["location"], ev["notes"], now(),
+                 "google", account_id, ext, feed["id"], 1, now()))
+            stats["added"] += 1
+    return stats

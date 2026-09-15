@@ -119,3 +119,44 @@ end $$;
 select apply_owner_rls('semesters');
 grant select, insert, update, delete on semesters to authenticated;
 revoke all on semesters from anon;
+
+
+-- migration: 002_calendar_feeds
+-- Which Google calendars the student wants Vesta to read. Before this, Vesta only ever
+-- looked at a calendar it had created for itself, so connecting an account appeared to
+-- do nothing: none of the student's real calendars were ever read.
+--
+-- The sync token belongs here rather than on calendar_accounts because Google issues
+-- one per calendar. A single shared token would send every calendar after the first
+-- through a full pass on every sync.
+--
+-- No backfill, so no FORCE juggling is needed: the table starts empty and fills the
+-- first time the student opens the calendar picker.
+
+create table if not exists calendar_feeds (
+  "id"          text primary key,
+  "account_id"  text not null references calendar_accounts("id") on delete cascade,
+  "calendar_id" text not null,
+  "name"        text,
+  "colour"      text,
+  "writable"    integer default 0,
+  "is_vesta"    integer default 0,
+  "enabled"     integer default 0,
+  "sync_token"  text,
+  "last_sync"   text,
+  "last_error"  text,
+  "created_at"  text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  unique ("account_id", "calendar_id")
+);
+create index if not exists calendar_feeds_user_idx on calendar_feeds(user_id);
+
+-- Events mirrored from a chosen calendar say which one, so that unticking a calendar
+-- can withdraw exactly its events and leave everything else alone.
+alter table events add column if not exists feed_id text references calendar_feeds("id") on delete cascade;
+create index if not exists events_by_feed on events(feed_id);
+create index if not exists calendar_feeds_by_account on calendar_feeds("account_id");
+
+select apply_owner_rls('calendar_feeds');
+grant select, insert, update, delete on calendar_feeds to authenticated;
+revoke all on calendar_feeds from anon;

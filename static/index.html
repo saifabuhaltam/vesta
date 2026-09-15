@@ -1844,6 +1844,14 @@
   .lib-topic-row.undone .lt-mark{ color:var(--text-faint); }
   .lib-topic-row.undone .lt-text{ color:var(--text-muted); }
 
+  /* ---------------- calendar feeds ---------------- */
+  .feed-row{ display:flex; align-items:center; gap:10px; padding:8px 2px; cursor:pointer;
+    font-size:13px; font-weight:600; }
+  .feed-row input{ width:16px; height:16px; accent-color:var(--accent); cursor:pointer; flex:none; }
+  .feed-row input:disabled{ cursor:default; }
+  .feed-dot{ width:10px; height:10px; border-radius:50%; flex:none; }
+  .feed-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
   /* ---------------- semesters ---------------- */
   /* Terms live entirely in Settings. Nothing about them belongs in the sidebar, which
      is for navigation: which term you are in changes rarely, and changing it is a
@@ -3177,8 +3185,16 @@
     quiz:       { label:'Quizzes',     color:'#9CA3AF' },
     discussion: { label:'Discussions', color:'#22A06B' },
     lecture:    { label:'Lectures',    color:'#7DD3FC' },
-    other:      { label:'Other',       color:'#F5B301' }
+    other:      { label:'Other',       color:'#F5B301' },
+    // Mirrored in from a Google calendar the student chose to read. Its own bucket, so
+    // it can be hidden from the legend like anything else: a work rota on the same
+    // grid as coursework is useful right up until it is not.
+    external:   { label:'From Google',  color:'#4285F4' }
   };
+  /** Never let an unknown kind crash a render: an event on the wrong day is a bug, a
+      blank calendar is a broken app. */
+  function eventKind(k){ return EVENT_KINDS[k] || EVENT_KINDS.other; }
+
   // An assignment's item type decides which legend bucket it lands in.
   function itemEventKind(it){
     if(it.type==='exam') return 'exam';
@@ -3219,7 +3235,7 @@
       if(!kindVisible(ev.kind)) return;
       var cls = ev.classId ? classById(ev.classId) : null;
       out.push({ kind:ev.kind, title:ev.title, cls:cls, eventId:ev.id, start:ev.start||'', end:ev.end||'',
-                 allDay:ev.allDay, location:ev.location, color:(cls?cls.color:EVENT_KINDS[ev.kind].color),
+                 allDay:ev.allDay, location:ev.location, color:(cls?cls.color:eventKind(ev.kind).color),
                  sortKey: ev.allDay ? '00:00' : (ev.start||'zz') });
     });
     out.sort(function(a,b){ return (a.sortKey||'').localeCompare(b.sortKey||''); });
@@ -3240,15 +3256,15 @@
     var simple = calDetail === 'simple';
     // the tooltip still carries the full picture, so nothing is lost by simplifying
     var full = e.title + (e.cls ? ' · ' + (e.cls.code||e.cls.name) : '')
-             + ' · ' + EVENT_KINDS[e.kind].label.replace(/s$/,'');
+             + ' · ' + eventKind(e.kind).label.replace(/s$/,'');
     return '<div class="cal-ev'+(e.done?' done':'')+(simple?' simple':'')+'"'
-      + ' style="--c:'+(e.color||EVENT_KINDS[e.kind].color)+'"'+attrs
+      + ' style="--c:'+(e.color||eventKind(e.kind).color)+'"'+attrs
       + ' title="'+escapeHtml(full)+'">'
       + '<span class="cal-ev-title">'+escapeHtml(e.title)+'</span>'
       + (simple ? '' :
           (e.cls ? '<span class="cal-ev-cls">'+escapeHtml(e.cls.code||e.cls.name)+'</span>' : '')
-          + '<span class="cal-ev-kind" style="background:'+EVENT_KINDS[e.kind].color+'22;color:'
-          + EVENT_KINDS[e.kind].color+';">'+EVENT_KINDS[e.kind].label.replace(/s$/,'')+'</span>')
+          + '<span class="cal-ev-kind" style="background:'+eventKind(e.kind).color+'22;color:'
+          + eventKind(e.kind).color+';">'+eventKind(e.kind).label.replace(/s$/,'')+'</span>')
       + '</div>';
   }
 
@@ -3306,9 +3322,9 @@
       var attrs = e.itemId ? ' data-action="open-item-detail" data-id="'+e.itemId+'"'
                 : e.eventId ? ' data-action="open-event-modal" data-id="'+e.eventId+'"' : '';
       return '<div class="today-row"'+attrs+(attrs?' style="cursor:pointer;"':'')+'>'
-        + '<span class="dot" style="--c:'+(e.color||EVENT_KINDS[e.kind].color)+'"></span>'
+        + '<span class="dot" style="--c:'+(e.color||eventKind(e.kind).color)+'"></span>'
         + '<div><div class="t-title">'+escapeHtml(e.title)+'</div>'
-        + '<div class="t-meta">'+(e.cls?escapeHtml(e.cls.code||e.cls.name):EVENT_KINDS[e.kind].label.replace(/s$/,''))
+        + '<div class="t-meta">'+(e.cls?escapeHtml(e.cls.code||e.cls.name):eventKind(e.kind).label.replace(/s$/,''))
         + (time?' · '+time:'') + (e.location?' · '+escapeHtml(e.location):'') + '</div></div></div>';
     }).join('') : '<div class="hint">Nothing on this day.</div>';
     return '<div class="rail-card">'
@@ -7350,16 +7366,85 @@
     return head
       + '<div class="hint">Connected. Last synced: '+escapeHtml(when)+'.</div>'
       + notes
+      + calendarPickerHtml()
       + '<div style="display:flex;gap:8px;margin-top:12px;">'
       + '<button type="button" class="btn primary" data-action="google-sync">Sync now</button>'
       + '<button type="button" class="btn danger" data-action="google-disconnect">Disconnect</button>'
       + '</div></div>';
   }
 
+  /**
+   * Which Google calendars Vesta reads.
+   *
+   * Every calendar is a row with its own switch, rather than a count or a dropdown:
+   * this is a consent decision about someone's personal calendar, so what is being read
+   * has to be readable at a glance. Nothing is on until it is turned on here.
+   */
+  var googleFeeds = null;
+
+  function calendarPickerHtml(){
+    var head = '<div id="g-feeds" style="margin-top:14px;">'
+      + '<div class="file-cat-title" style="margin-top:0;">Calendars to read</div>';
+    if(googleFeeds === null) return head + '<div class="hint">Loading your calendars…</div></div>';
+    if(!googleFeeds.length) return head + '<div class="hint">No calendars found on this account.</div></div>';
+    return head
+      + googleFeeds.map(function(f){
+          return '<label class="feed-row">'
+            + '<input type="checkbox" data-action="toggle-feed" data-cal="'+escapeHtml(f.calendarId)+'"'
+              + (f.enabled ? ' checked' : '')+(f.isVesta ? ' disabled' : '')+'>'
+            + '<span class="feed-dot" style="background:'+escapeHtml(f.colour||'#999')+';"></span>'
+            + '<span class="feed-name">'+escapeHtml(f.name||'')+'</span>'
+            + (f.isVesta ? '<span class="tp-tag">Vesta\u2019s own</span>'
+                         : (f.writable ? '' : '<span class="tp-tag">Read-only</span>'))
+            + '</label>'
+            + (f.lastError ? '<div class="si-error" style="margin:2px 0 8px;">'+escapeHtml(f.lastError)+'</div>' : '');
+        }).join('')
+      + '<div class="hint" style="margin-top:8px;">Events from the calendars you tick appear in Vesta and '
+      + 'update when you change them in Google. They stay read-only here, because Google owns them. '
+      + 'Vesta\u2019s own calendar is where your deadlines are written, so it is always on.</div>'
+      + '</div>';
+  }
+
+  function loadGoogleFeeds(){
+    return apiGet('/api/calendar/google/calendars').then(function(list){
+      googleFeeds = list;
+      var host = document.getElementById('g-feeds');
+      if(host) host.outerHTML = calendarPickerHtml();
+    }).catch(function(){
+      googleFeeds = [];
+      var host = document.getElementById('g-feeds');
+      if(host) host.outerHTML = calendarPickerHtml();
+    });
+  }
+
+  function toggleFeed(calendarId, on){
+    if(!googleFeeds) return;
+    googleFeeds = googleFeeds.map(function(f){
+      return f.calendarId === calendarId ? Object.assign({}, f, { enabled: on }) : f;
+    });
+    var ids = googleFeeds.filter(function(f){ return f.enabled; })
+                         .map(function(f){ return f.calendarId; });
+    apiPut('/api/calendar/google/calendars', { calendarIds: ids }).then(function(list){
+      googleFeeds = list;
+      // Ticking a calendar is a request to see it, so read it now rather than waiting
+      // for the next time something else triggers a sync.
+      return on ? syncGoogleQuietly() : null;
+    }).catch(reportError);
+  }
+
+  function syncGoogleQuietly(){
+    return apiPostRaw('/api/calendar/google/sync', {}).then(function(){
+      // Refresh the section too, or it keeps claiming "Last synced: never" directly
+      // underneath a sync that just finished.
+      return Promise.all([loadState(), loadGoogleStatus()]);
+    }).catch(function(){ /* the error is already shown on the section */ });
+  }
+
   /** Refresh just this section, so opening Settings never waits on the network. */
   function loadGoogleStatus(){
     return apiGet('/api/calendar/google/status').then(function(g){
       googleStatus = g;
+      if(g && g.connected && googleFeeds === null) loadGoogleFeeds();
       var host = document.getElementById('g-cal');
       if(host) host.outerHTML = googleSectionHtml();
     }).catch(function(){
@@ -10450,6 +10535,7 @@
     if(action==='open-settings'){ termList = null; openSettingsModal(); loadGoogleStatus(); loadTermList(); return; }
     if(action==='google-connect'){ googleConnect(); return; }
     if(action==='google-sync'){ googleSync(); return; }
+    if(action==='toggle-feed'){ toggleFeed(t.dataset.cal, t.checked); return; }
     if(action==='google-disconnect'){
       apiDelete('/api/calendar/google').then(loadGoogleStatus).catch(reportError);
       return;

@@ -272,6 +272,51 @@ def access_token(conn, acct):
     return tok.get("access_token")
 
 
+@bp.route("/api/calendar/google/calendars", methods=["GET", "PUT"])
+def google_calendars():
+    """The student's Google calendars, and which of them Vesta reads.
+
+    GET asks Google every time rather than trusting what is stored. Calendars are added,
+    renamed and unsubscribed outside Vesta, and a picker showing last week's list is
+    worse than no picker.
+    """
+    conn = get_db()
+    acct = gsync.account(conn)
+    if not acct:
+        conn.close()
+        return jsonify({"error": "Connect Google Calendar first."}), 400
+
+    if request.method == "PUT":
+        chosen = (request.get_json(force=True) or {}).get("calendarIds") or []
+        rows = gsync.set_enabled(conn, acct["id"], chosen)
+        out = [_feed_json(r) for r in rows]
+        conn.close()
+        return jsonify(out)
+
+    try:
+        client = gcal.Client(access_token(conn, acct))
+        rows = gsync.merge_feeds(conn, acct["id"], client.list_calendars())
+    except gcal.GoogleError as e:
+        conn.close()
+        return jsonify({"error": e.message}), 502
+    out = [_feed_json(r) for r in rows]
+    conn.close()
+    return jsonify(out)
+
+
+def _feed_json(r):
+    return {
+        "calendarId": r["calendar_id"],
+        "name": r["name"] or r["calendar_id"],
+        "colour": r["colour"] or "",
+        "writable": bool(r["writable"]),
+        "isVesta": bool(r["is_vesta"]),
+        "enabled": bool(r["enabled"]),
+        "lastSync": r["last_sync"] or "",
+        "lastError": r["last_error"] or "",
+    }
+
+
 @bp.route("/api/calendar/google/status")
 def google_status():
     conn = get_db()
@@ -385,8 +430,36 @@ def google_sync():
         client = gcal.Client(token)
         cal_id = acct["calendar_id"] or client.ensure_calendar()
 
-        # Pull first: a two-sided change has to be known before anything is pushed,
-        # or Vesta would overwrite a change it had not noticed yet.
+        # Every calendar the student picked, mirrored into Vesta. This is the half that
+        # makes a connected account actually show something: without it Vesta only ever
+        # looked at the calendar it made for itself, which is empty until Vesta fills it.
+        absorbed = {"added": 0, "updated": 0, "removed": 0, "unreadable": 0}
+        sid = active_semester_id(conn)
+        for feed in gsync.feeds(conn, acct["id"], enabled_only=True):
+            if feed["calendar_id"] == cal_id:
+                continue                  # Vesta's own calendar is handled below
+            try:
+                try:
+                    f_raw, f_token = _pull(client, feed["calendar_id"], feed["sync_token"])
+                except gcal.GoogleError as e:
+                    if not e.resync:
+                        raise
+                    f_raw, f_token = _pull(client, feed["calendar_id"], None)
+                got = gsync.absorb(conn, acct["id"], feed, f_raw, sid)
+                for k in absorbed:
+                    absorbed[k] += got.get(k, 0)
+                conn.execute(
+                    "UPDATE calendar_feeds SET sync_token=?, last_sync=?, last_error=NULL"
+                    " WHERE id=?", (f_token, now(), feed["id"]))
+            except gcal.GoogleError as e:
+                # One unreadable calendar should not stop the others, or a single
+                # revoked share would make the whole sync look broken.
+                conn.execute("UPDATE calendar_feeds SET last_error=? WHERE id=?",
+                             (e.message, feed["id"]))
+            conn.commit()
+
+        # Pull Vesta's own calendar second: a two-sided change has to be known before
+        # anything is pushed, or Vesta would overwrite a change it had not noticed yet.
         try:
             raw, next_token = _pull(client, cal_id, acct["sync_token"])
         except gcal.GoogleError as e:
@@ -440,6 +513,7 @@ def google_sync():
         conn.close()
         return jsonify({"error": e.message}), 502
     counts = gsync.summarise(pushed)
-    counts.update({"fromGoogle": gsync.summarise(pulled)})
+    counts.update({"fromGoogle": gsync.summarise(pulled), "absorbed": absorbed})
     conn.close()
-    return jsonify({"ok": True, "counts": counts, "needsReview": len(review)})
+    return jsonify({"ok": True, "counts": counts, "needsReview": len(review),
+                    "absorbed": absorbed})

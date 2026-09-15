@@ -223,11 +223,20 @@ def from_google(ev, tz=TZ):
         all_day = False
     else:
         return None
+    # The finish time, when there is one worth keeping. An all-day event's end is
+    # exclusive in Google and meaningless as a clock time, so it is dropped rather than
+    # stored as midnight of the following day.
+    end_s = None
+    if not all_day:
+        got_end = _local((ev.get("end") or {}).get("dateTime") or "", tz)
+        if got_end and got_end[0] == date_s:
+            end_s = got_end[1]
     return {
         "externalId": ev.get("id"),
         "title": (ev.get("summary") or "(no title)").strip(),
         "date": date_s,
         "start": time_s,
+        "end": end_s,
         "allDay": all_day,
         "location": ev.get("location") or "",
         "notes": ev.get("description") or "",

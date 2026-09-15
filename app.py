@@ -265,6 +265,11 @@ def serialize_event(e):
         "location": e["location"] or "",
         "notes": e["notes"] or "",
         "createdAt": e["created_at"],
+        # Where it came from, and whether the page may offer to edit it. An event
+        # mirrored from a Google calendar belongs to Google: the way to change it is to
+        # change it there, and Vesta would only overwrite the edit on the next sync.
+        "source": (e["source"] if "source" in e.keys() else "") or "",
+        "readOnly": bool(e["read_only"] if "read_only" in e.keys() else 0),
     }
 
 

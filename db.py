@@ -546,6 +546,29 @@ def init_db():
         )""")
     conn.execute("CREATE INDEX IF NOT EXISTS sync_links_by_local ON sync_links(local_kind, local_id)")
 
+    # Which of the student's Google calendars Vesta reads.
+    #
+    # Google issues its incremental sync token per calendar, not per account, so the
+    # token has to live here rather than on calendar_accounts: one shared token would
+    # mean every calendar after the first did a full pass on every sync.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS calendar_feeds (
+            id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL REFERENCES calendar_accounts(id) ON DELETE CASCADE,
+            calendar_id TEXT NOT NULL,        -- Google's id for the calendar
+            name TEXT,
+            colour TEXT,
+            writable INTEGER DEFAULT 0,       -- accessRole owner/writer
+            is_vesta INTEGER DEFAULT 0,       -- the calendar Vesta itself writes to
+            enabled INTEGER DEFAULT 0,        -- chosen by the student
+            sync_token TEXT,
+            last_sync TEXT,
+            last_error TEXT,
+            created_at TEXT,
+            UNIQUE(account_id, calendar_id)
+        )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS calendar_feeds_by_account ON calendar_feeds(account_id)")
+
     # An incoming feed is reviewed before it lands, exactly like a syllabus.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS calendar_imports (
@@ -570,7 +593,10 @@ def init_db():
     ecols = [r["name"] for r in conn.execute("PRAGMA table_info(events)").fetchall()]
     for col, ddl in (("source", "TEXT DEFAULT 'vesta'"), ("account_id", "TEXT"),
                      ("external_id", "TEXT"), ("read_only", "INTEGER DEFAULT 0"),
-                     ("updated_at", "TEXT"), ("deleted_at", "TEXT")):
+                     ("updated_at", "TEXT"), ("deleted_at", "TEXT"),
+                     # which chosen calendar mirrored this in, so unticking one can
+                     # withdraw exactly its events and nobody else's
+                     ("feed_id", "TEXT")):
         if col not in ecols:
             conn.execute(f"ALTER TABLE events ADD COLUMN {col} {ddl}")
 

@@ -234,12 +234,10 @@ not rediscovered a third time.
 
 ## Blocked on Saif
 
-- [ ] **Rotate the Google OAuth client secret.** One was pasted into a chat transcript
-      on 2026-09-13 and must be considered compromised. Google Cloud Console →
-      Credentials → that OAuth client → add a new secret and delete the exposed one, or
-      delete the client and make a fresh one. Nothing had been wired to it yet, so
-      there is nothing to redo. Neither the client ID nor the secret ever needs to pass
-      through a conversation: both go from the Google console straight into the
+- [x] ~~Rotate the Google OAuth client secret.~~ Done by Saif, 2026-09-14. A secret was
+      pasted into a chat transcript on 2026-09-13 and had to be treated as compromised.
+      Standing rule that outlived it: neither the client ID nor the secret ever needs to
+      pass through a conversation. Both go from the Google console straight into the
       Supabase provider page and Railway's variables.
 - [ ] **Add the app logo and submit for brand verification.** Deliberately skipped at
       publish time: uploading a logo triggers brand verification, which gates the
