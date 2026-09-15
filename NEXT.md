@@ -521,22 +521,36 @@ the code, not by trusting the design notes.
 - Headstart sessions belong to the assignment (`headstarts.item_id`, unique per kind),
   and the assignment card has its own Headstart tab.
 
-### Waiting to ship (2026-09-15)
+### Shipped 2026-09-15, and the trap it walked into
 
-The new / edit assignment card is built, reviewed by Saif on localhost and approved
-("it's perfect"). **It is not pushed.** He wants the whole working tree shipped in one
-commit, but only once the other session he has running in this repo is finished, so the
-push is his to trigger. What rides along when it goes:
+The new / edit assignment card went out with the whole working tree in `83e5809`: the
+file-folders feature, Office-to-PDF previews and the LibreOffice build change as well.
 
-- the file-folders feature and Office-to-PDF previews from an earlier session, neither
-  of them committed
-- a schema migration (`file_folders`, `materials.folder_id`, `preview_name`,
-  `preview_status`)
-- `nixpacks.toml`, which installs LibreOffice into the Railway image
+`83e5809` was broken on Postgres and the mistake is worth remembering, because it is
+structural rather than careless. **`init_db()` returns early when `DATABASE_URL` is set.**
+Everything below that early return is the SQLite story: the whole ALTER-by-ALTER
+migration chain, including `migrate_file_folders`, which creates `file_folders` and adds
+`materials.folder_id`, `preview_name` and `preview_status`. A deployed database never
+runs a line of it. So a feature can be fully tested locally, pass every local check, and
+still reach production with none of its schema, and the failure is not at boot — it is
+`relation "file_folders" does not exist` on the first `/api/state`, which is every page
+load.
 
-That is a migration deploy, so it wants someone watching the Railway log: a failed
-migration is a failed deploy here, because the app raises at boot rather than serving a
-half-migrated database.
+`142d82c` adds `003_file_folders` to `cloud/migrate/pg_migrations.sql`, which is the
+only route a schema change has to a deployed database.
+
+- [ ] **Any SQLite ALTER needs a partner block in `pg_migrations.sql` on the same day.**
+      This is the second time the two paths have diverged. Worth a check at the top of
+      the deploy checklist, or better, a test that diffs the two schemas and fails.
+- [ ] **`cloud/migrate/pg_schema.sql` is stale** — it has no `file_folders`. Harmless
+      today, because `run_pg_migrations()` runs straight after `ensure_pg_schema()` and
+      003 is `create ... if not exists`, so a brand-new database is corrected a second
+      later. Regenerating it means running `gen_pg_schema.py` against a *current* local
+      SQLite database, and the copy in `data/` may not be one.
+- [ ] **No folder backfill on Postgres.** Classes that existed before this deploy have
+      no default folders until something is uploaded into them, because
+      `folder_id_for_kind` creates them on demand. Files keep their `category` either
+      way, so nothing is lost or hidden.
 
 ### The gaps, in the order they are worth fixing
 
