@@ -220,9 +220,45 @@ Staged plan, in the order that delivers something usable soonest:
       Verified in a browser: an event added to Google while the tab sat idle appeared on
       its own when the tab was returned to; twenty rapid focus events produced zero extra
       syncs; and an archived term produced zero sync attempts.
-- [ ] **3. Real push.** Google watch channels to `/api/calendar/google/webhook`, plus a
-      Railway cron to renew them: channels expire and Google never renews them. Only
-      worth doing once 1 and 2 are solid.
+### 3. Real push — ON THE BACK BURNER (Saif, 2026-09-14)
+
+Deliberately parked, not abandoned. Stages 1 and 2 are live, and polling is expected to
+be enough for one student and a few friends. Revisit only if the lag is actually felt.
+
+**What stage 2 does not cover, and would be the reason to do this:**
+
+- Nothing happens while Vesta is closed. Changes queue up until the next time it opens.
+- With the tab open but untouched, a change made in Google can take up to three minutes
+  to appear, because the timer is the only trigger that fires on its own.
+- Nothing pushes *out* of Vesta while it is closed either. A deadline added on a laptop
+  does not reach Google Calendar until Vesta is opened somewhere.
+
+**What building it involves:**
+
+- `POST /api/calendar/google/webhook`, one watch channel per enabled feed, registered
+  through `client.watch(calendar_id, ...)` against the live HTTPS URL. Google will not
+  deliver to localhost, so this cannot be tested locally without a tunnel.
+- A `calendar_channels` table, or columns on `calendar_feeds`: channel id, resource id,
+  and expiry. Stopping a channel needs both the channel id and the resource id, so
+  storing only one leaves an undeletable channel behind.
+- A Railway cron to renew before expiry. **Channels last about a week at most and Google
+  never renews them.** Miss the renewal and push sync silently stops, which looks exactly
+  like the bug this whole section exists to fix, so the renewal job needs to be visible
+  in `/health` rather than trusted.
+
+**Traps already known, worth not rediscovering:**
+
+- Notifications are **headers only**. The body is empty: `X-Goog-Channel-ID` and
+  `X-Goog-Resource-State` tell you *that* something changed, never what. The handler's
+  only sane response is to run the same incremental sync stage 1 already does.
+- The first notification after registering is a `sync` ping and means nothing. Acting on
+  it as though an event changed causes a pointless full pass.
+- A `410 Gone` on the sync token means the cursor is too old and the calendar has to be
+  re-read in full. Stage 1 already handles this per feed; push must not bypass it.
+- The endpoint is public and unauthenticated by nature. It must do nothing but look up
+  the channel id, and it must never trust anything else in the request.
+- Google retries aggressively on a non-2xx. The handler should answer 200 immediately
+  and do the work after, or a slow sync turns into a stampede.
 
 Decisions already given by Saif: pick which calendars to sync; Google events become
 editable Vesta events that sync back; everything dated in Vesta pushes out.
