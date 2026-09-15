@@ -29,6 +29,22 @@ onto the Railway volume.
 
 ## Deployment gotchas worth writing into the checklist
 
+- **Turning on auto-deploy does not deploy what is already pushed.** It fires on the
+  next commit. After enabling it, either push something or use ⌘K → Deploy Latest
+  Commit, or the service sits on the old version looking like the setting did not work.
+- **"Could not load branches" means Railway has lost its GitHub access**, and auto-deploy
+  shows as unavailable while that is true. Fix it at
+  github.com/settings/installations → Railway, by confirming the app can see the repo.
+  Retry on the Railway screen first; it is sometimes only a stale token.
+- **A service can be linked to a template as well as a repo** ("Upstream Repo", with an
+  Eject button). That link can fight with ordinary repo deploys. Eject detaches it, and
+  is one-way. Never press **Update** on the "new version of the upstream repo" banner:
+  it pulls the template's version over the service's own configuration.
+- **Do not infer that auto-deploy works because the live version matches a commit.**
+  That inference was made here on 2026-09-14 and was wrong: the commit had been
+  deployed by hand. `/health` reporting the running commit tells you what is running,
+  never how it got there.
+
 - **Railway runs Python 3.13; local development runs 3.9.** Nothing here tests against
   3.13, so a version-specific problem reaches production unseen. Worth either pinning
   the runtime or testing against 3.13 before trusting a release. `datetime.utcnow()`,
@@ -178,9 +194,18 @@ Where it really stands, checked 2026-09-14:
 
 Staged plan, in the order that delivers something usable soonest:
 
-- [ ] **1. Choose which calendars, and read them.** A `calendar_feeds` table, a picker in
-      Settings fed by `list_calendars()`, and the pull side reading every chosen calendar
-      instead of only Vesta's own. This alone fixes "nothing shows up in Vesta".
+- [x] ~~**1. Choose which calendars, and read them.**~~ Shipped in `ee59f75`. A
+      `calendar_feeds` table, a picker in Settings, and the pull side reading every
+      chosen calendar. Calendars arrive switched **off**: the picker is the consent.
+      Chosen calendars are mirrored into `events` as read-only rows tagged "From
+      Google", with their own legend toggle; unticking one withdraws its events, which
+      is what `events.feed_id` is for. Two pre-existing bugs fell out of it: events
+      never exposed `source`/`read_only` to the page, and an unknown event `kind`
+      crashed the whole calendar render.
+      **Not yet confirmed against the real Google** -- all 24 checks run against a stub,
+      which proves Vesta's logic and nothing about Google's behaviour. First real test:
+      open Settings on the live site, confirm the calendar list is right, tick one, and
+      see whether its events land.
 - [ ] **2. Sync without a button.** On page load, on focus, and after any local change,
       with a short debounce. Feels continuous, needs no new infrastructure, and is enough
       for one student and a few friends.
