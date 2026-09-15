@@ -718,6 +718,11 @@ def get_state():
         "semesters": [serialize_semester(r) for r in conn.execute(
             f"SELECT * FROM semesters ORDER BY {SEMESTER_ORDER}").fetchall()],
         "semester": serialize_semester(sem),
+        # Whether there is anything to sync with, so the page can keep itself current
+        # without asking a second endpoint on every load.
+        "googleSync": bool(conn.execute(
+            "SELECT 1 FROM calendar_accounts WHERE provider='google' AND enabled=1"
+        ).fetchone()),
         # an archived term opens locked, so last year's grades cannot be edited by a
         # stray click; the unlock is per browser session and drops on switching away
         "locked": sem["status"] == "archived" and session.get(UNLOCK_KEY) != sid,

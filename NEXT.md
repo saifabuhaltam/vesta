@@ -206,9 +206,20 @@ Staged plan, in the order that delivers something usable soonest:
       which proves Vesta's logic and nothing about Google's behaviour. First real test:
       open Settings on the live site, confirm the calendar list is right, tick one, and
       see whether its events land.
-- [ ] **2. Sync without a button.** On page load, on focus, and after any local change,
-      with a short debounce. Feels continuous, needs no new infrastructure, and is enough
-      for one student and a few friends.
+- [x] ~~**2. Sync without a button.**~~ Shipped. The page syncs when it opens, when the
+      tab is looked at again, about four seconds after a local change to an item, event
+      or class, and on a three-minute timer while it is visible. A 45-second floor means
+      however many triggers fire, only one sync happens; failures back off to a
+      15-minute ceiling instead of retrying into a wall. A sync that changed nothing does
+      not re-render, so the page cannot flicker or eat a half-typed note. Syncing is
+      skipped entirely while an archived term is open, because a sync writes and an
+      archived term refuses writes: without that it would collect a 423 every few
+      minutes. The Sync button stays, since a person who wants to know *now* should be
+      able to ask.
+
+      Verified in a browser: an event added to Google while the tab sat idle appeared on
+      its own when the tab was returned to; twenty rapid focus events produced zero extra
+      syncs; and an archived term produced zero sync attempts.
 - [ ] **3. Real push.** Google watch channels to `/api/calendar/google/webhook`, plus a
       Railway cron to renew them: channels expire and Google never renews them. Only
       worth doing once 1 and 2 are solid.

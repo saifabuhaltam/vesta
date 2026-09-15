@@ -2444,8 +2444,21 @@
   }
 
   function apiGet(url){ return fetch(url).then(checkOk); }
+
+  /**
+   * Did that change anything Google would care about?
+   *
+   * Only deadlines and events are ever pushed, so a note or an upload should not wake
+   * the sync. Checked by URL rather than by threading a flag through every call site.
+   */
+  function touchesCalendar(url){
+    return /^\/api\/(items|events|classes)(\/|$)/.test(url || '');
+  }
+  function noteLocalChange(url){ if(touchesCalendar(url)) syncSoon(); }
+
   function apiPost(url, body){
-    return fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(checkOk);
+    return fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+      .then(checkOk).then(function(r){ noteLocalChange(url); return r; });
   }
   /**
    * Like apiPost, but hands back the status and body instead of throwing.
@@ -2462,9 +2475,13 @@
       });
   }
   function apiPut(url, body){
-    return fetch(url, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(checkOk);
+    return fetch(url, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+      .then(checkOk).then(function(r){ noteLocalChange(url); return r; });
   }
-  function apiDelete(url){ return fetch(url, { method:'DELETE' }).then(checkOk); }
+  function apiDelete(url){
+    return fetch(url, { method:'DELETE' }).then(checkOk)
+      .then(function(r){ noteLocalChange(url); return r; });
+  }
 
   function loadState(){
     return (BE ? BE.loadState() : apiGet('/api/state')).then(function(data){
@@ -2476,6 +2493,11 @@
       inbox = data.unfiled || { notesList:[], materials:[] };
       pendingImports = data.pendingImports || [];
       pendingCalImports = data.pendingCalendarImports || [];
+      // First state load with a connected account starts the background sync and asks
+      // once immediately, so opening Vesta is itself a reason to be up to date.
+      var wasOn = gsyncOn;
+      gsyncOn = !!data.googleSync;
+      if(gsyncOn && !wasOn){ startGoogleSync(); setTimeout(function(){ runGoogleSync('open'); }, 600); }
       document.getElementById('sync-dot').classList.remove('off');
       document.getElementById('sync-label').textContent = BE ? 'Synced to your account' : 'Saved to your server';
       render();
@@ -7433,11 +7455,90 @@
   }
 
   function syncGoogleQuietly(){
-    return apiPostRaw('/api/calendar/google/sync', {}).then(function(){
+    return runGoogleSync('manual').then(function(){
       // Refresh the section too, or it keeps claiming "Last synced: never" directly
       // underneath a sync that just finished.
-      return Promise.all([loadState(), loadGoogleStatus()]);
-    }).catch(function(){ /* the error is already shown on the section */ });
+      return loadGoogleStatus();
+    });
+  }
+
+  /**
+   * Keeping the two calendars level without anyone pressing anything.
+   *
+   * Google will not tell Vesta when something changes here -- that needs watch
+   * channels, which need a public URL and a cron to renew them. Until then the page
+   * asks, at the moments a person would actually notice a difference: when it opens,
+   * when the tab is looked at again, a little after a local change, and on a slow
+   * timer while it is open. Incremental sync tokens make a no-op sync cheap, which is
+   * what makes asking this often reasonable.
+   */
+  var gsyncOn = false;            // is there a Google account to sync with at all
+  var gsyncBusy = false;
+  var gsyncLastAt = 0;
+  var gsyncFailures = 0;
+  var gsyncTimer = null;
+  var gsyncAfterEdit = null;
+  var SYNC_MIN_GAP = 45 * 1000;   // never twice inside this, however many triggers fire
+  var SYNC_POLL = 3 * 60 * 1000;  // while the tab is open and visible
+  var SYNC_MAX_BACKOFF = 15 * 60 * 1000;
+
+  function syncGap(){
+    // After a failure, back off rather than retrying into a wall every 45 seconds.
+    return gsyncFailures ? Math.min(SYNC_MIN_GAP * Math.pow(2, gsyncFailures), SYNC_MAX_BACKOFF)
+                         : SYNC_MIN_GAP;
+  }
+
+  function runGoogleSync(reason){
+    if(gsyncBusy) return Promise.resolve(false);
+    // An archived term refuses writes, and a sync writes. Asking anyway would just
+    // collect 423s every few minutes for as long as the term stayed open.
+    if(termLocked) return Promise.resolve(false);
+    if(reason !== 'manual' && Date.now() - gsyncLastAt < syncGap()) return Promise.resolve(false);
+    gsyncBusy = true;
+    return apiPostRaw('/api/calendar/google/sync', {}).then(function(r){
+      gsyncBusy = false;
+      gsyncLastAt = Date.now();
+      if(!r.ok){ gsyncFailures++; return false; }
+      gsyncFailures = 0;
+      // Only re-render when something actually moved: a silent no-op sync every few
+      // minutes should not make the page flicker or lose a half-typed note.
+      // Counts come back keyed by action, and the set of actions is the server's to
+      // change, so count anything that is not explicitly a no-op rather than listing
+      // the names that mean "something happened" and going stale when one is added.
+      var c = (r.body && r.body.counts) || {};
+      var QUIET = { clean:1, ignore:1, unreadable:1 };
+      var changed = 0;
+      Object.keys(c).forEach(function(k){
+        if(QUIET[k] || typeof c[k] !== 'number') return;
+        changed += c[k];
+      });
+      var ab = c.absorbed || {};
+      changed += (ab.added || 0) + (ab.updated || 0) + (ab.removed || 0);
+      return changed ? loadState().then(function(){ return true; }) : false;
+    }).catch(function(){
+      gsyncBusy = false;
+      gsyncLastAt = Date.now();
+      gsyncFailures++;
+      return false;                 // a failed background sync is not worth a dialog
+    });
+  }
+
+  /** A local change should reach Google without waiting for the next poll. */
+  function syncSoon(){
+    if(!gsyncOn) return;
+    clearTimeout(gsyncAfterEdit);
+    gsyncAfterEdit = setTimeout(function(){ runGoogleSync('edit'); }, 4000);
+  }
+
+  function startGoogleSync(){
+    if(gsyncTimer) return;
+    gsyncTimer = setInterval(function(){
+      if(document.visibilityState === 'visible') runGoogleSync('poll');
+    }, SYNC_POLL);
+    document.addEventListener('visibilitychange', function(){
+      if(document.visibilityState === 'visible') runGoogleSync('focus');
+    });
+    window.addEventListener('focus', function(){ runGoogleSync('focus'); });
   }
 
   /** Refresh just this section, so opening Settings never waits on the network. */
