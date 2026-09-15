@@ -160,3 +160,43 @@ create index if not exists calendar_feeds_by_account on calendar_feeds("account_
 select apply_owner_rls('calendar_feeds');
 grant select, insert, update, delete on calendar_feeds to authenticated;
 revoke all on calendar_feeds from anon;
+
+
+-- migration: 003_file_folders
+-- Files get a real folder tree, and Office uploads get a converted PDF to preview.
+--
+-- This block exists because the SQLite path and the Postgres path diverge here and it
+-- was missed: `db.migrate_file_folders` adds these tables and columns at every local
+-- start, but `init_db()` returns early when DATABASE_URL is set, so a deployed database
+-- never sees it. Without this migration the deployed app raises
+-- `relation "file_folders" does not exist` on the first /api/state, which is every page
+-- load. Any future SQLite ALTER needs a partner block here on the same day.
+--
+-- No backfill of existing files. `folder_id_for_kind` creates a class's folders the
+-- first time something is uploaded into one, so a library that predates this fills in
+-- as it is used rather than being rearranged underneath the student.
+
+create table if not exists file_folders (
+  "id"         text primary key,
+  "class_id"   text not null references classes("id") on delete cascade,
+  "parent_id"  text references file_folders("id") on delete cascade,
+  "name"       text,
+  "kind"       text default 'custom',
+  "sort_order" integer default 0,
+  "created_at" text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade
+);
+create index if not exists file_folders_user_idx on file_folders(user_id);
+create index if not exists file_folders_by_class on file_folders("class_id");
+
+-- Where a file sits, and the state of its converted preview. `preview_status` is one
+-- of null, 'pending', 'ready' or 'failed'; 'ready' means preview_name names a PDF on
+-- the volume.
+alter table materials add column if not exists folder_id text references file_folders("id") on delete set null;
+alter table materials add column if not exists preview_name text;
+alter table materials add column if not exists preview_status text;
+create index if not exists materials_by_folder on materials(folder_id);
+
+select apply_owner_rls('file_folders');
+grant select, insert, update, delete on file_folders to authenticated;
+revoke all on file_folders from anon;
