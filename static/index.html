@@ -199,16 +199,6 @@
   /* thin rules between groups of pages, and above the settings footer */
   .side-divider{ height:1px; background:var(--sidebar-border); margin:7px 10px; flex:none; }
   #app.side-collapsed .side-divider{ margin:7px 8px; }
-  /* At 64px there is no room for a list, but which term you are in is exactly the
-     thing you must not lose sight of. So: the active term only, shortened. */
-  #app.side-collapsed .term-switch{ padding:0 4px 10px; }
-  #app.side-collapsed .term-switch-head,
-  #app.side-collapsed .term-more,
-  #app.side-collapsed .term-pill:not(.active),
-  #app.side-collapsed .term-pill .tp-name,
-  #app.side-collapsed .term-pill .tp-tag{ display:none; }
-  #app.side-collapsed .term-pill{ justify-content:center; padding:8px 4px; }
-  #app.side-collapsed .term-pill .tp-short{ display:block; }
   .side-foot{ display:flex; flex-direction:column; gap:10px; padding-top:14px;
     border-top:1px solid var(--sidebar-border); margin:0 -14px; padding-left:14px; padding-right:14px; }
   #app.side-collapsed .side-foot{ margin:0 -10px; padding-left:10px; padding-right:10px; }
@@ -1855,35 +1845,13 @@
   .lib-topic-row.undone .lt-text{ color:var(--text-muted); }
 
   /* ---------------- semesters ---------------- */
-  /* The term you are in sits at the top of the sidebar, above everything it scopes.
-     Terms are listed as rows rather than folded into a select: which term you are in
-     changes what every screen means, so it should never take a click to find out. */
-  .term-switch{ padding:0 12px 10px; }
-  .term-switch-head{ display:flex; align-items:center; justify-content:space-between;
-    font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
-    color:var(--text-faint); padding:0 4px 6px; }
-  .term-manage{ border:0; background:none; cursor:pointer; color:var(--accent);
-    font:inherit; font-size:11px; font-weight:700; letter-spacing:.04em; padding:2px 4px;
-    border-radius:6px; }
-  .term-manage:hover{ background:var(--accent-soft); }
-  .term-pill{ display:flex; align-items:center; gap:8px; width:100%; text-align:left;
-    border:1px solid transparent; background:var(--surface-2); color:var(--text);
-    border-radius:12px; padding:8px 10px; margin-bottom:6px; cursor:pointer;
-    font:inherit; font-size:13px; font-weight:600; transition:background .12s, border-color .12s; }
-  .term-pill:hover{ background:var(--surface-3); }
-  .term-pill.active{ background:var(--accent-soft); border-color:var(--accent);
-    color:var(--accent-strong, var(--accent)); }
-  .term-pill .tp-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .tp-short{ display:none; font-size:12px; font-weight:800; letter-spacing:.02em; }
-  .term-pill .tp-tag{ font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
-    padding:2px 6px; border-radius:999px; background:var(--surface-3); color:var(--text-muted); }
-  .term-pill.archived .tp-name{ color:var(--text-muted); }
-  .term-pill.archived.active .tp-name{ color:inherit; }
-  .term-more{ width:100%; border:1px dashed var(--border); background:none; color:var(--text-muted);
-    border-radius:12px; padding:7px 10px; cursor:pointer; font:inherit; font-size:12px; font-weight:600; }
-  .term-more:hover{ color:var(--text); border-color:var(--text-faint); }
+  /* Terms live entirely in Settings. Nothing about them belongs in the sidebar, which
+     is for navigation: which term you are in changes rarely, and changing it is a
+     deliberate trip to Settings rather than something to trip over while moving
+     between screens. */
 
-  /* Reading an archived term should feel different from working in a live one. */
+  /* The one exception, because it is a warning rather than a control: reading an
+     archived term should feel different from working in a live one. */
   .term-banner{ display:flex; align-items:center; gap:12px; flex-wrap:wrap;
     background:var(--warn-soft); border:1px solid var(--warn); color:var(--warn);
     border-radius:14px; padding:10px 14px; margin:0 0 14px; font-size:13px; font-weight:600; }
@@ -1891,13 +1859,21 @@
   .term-banner .tb-text b{ font-weight:800; }
   .term-banner.unlocked{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
 
+  /* The term list in Settings. Every term is a readable row with its actions in the
+     open, rather than a select plus a menu: this is the one screen where the whole
+     shape of the year should be visible at once. */
   .term-row{ display:flex; align-items:center; gap:10px; padding:10px 0;
     border-bottom:1px solid var(--border); flex-wrap:wrap; }
   .term-row:last-child{ border-bottom:0; }
   .term-row .tr-main{ flex:1; min-width:160px; }
-  .term-row .tr-name{ font-weight:700; }
+  .term-row .tr-name{ font-weight:700; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   .term-row .tr-meta{ font-size:12px; color:var(--text-muted); margin-top:2px; }
   .term-row .tr-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+  .term-row.is-current{ background:var(--accent-soft); border-radius:12px;
+    padding-left:12px; padding-right:12px; margin:2px -12px; border-bottom-color:transparent; }
+  .tp-tag{ font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    padding:2px 7px; border-radius:999px; background:var(--surface-3); color:var(--text-muted); }
+  .tp-tag.now{ background:var(--accent); color:#fff; }
 
   .gpa-term{ display:flex; align-items:center; gap:10px; padding:7px 0; }
   .gpa-term .gt-name{ width:104px; font-size:12px; font-weight:700; flex:none;
@@ -1920,7 +1896,6 @@
     <div class="brand">
       <div class="brand-mark"><img src="/vesta-mark.png" alt="" class="brand-logo"><span>Vesta</span></div>
     </div>
-    <div class="term-switch" id="term-switch"></div>
     <button type="button" class="side-search" data-action="open-search"><span class="ic" data-icon="search"></span><span>Search…</span><span class="kbd">⌘K</span></button>
     <nav class="tabs" id="tabs">
       <!-- grouped by purpose: where you are, your coursework, your material, study tools -->
@@ -1968,8 +1943,6 @@
   var semesters = [];
   var semester = null;
   var termLocked = false;
-  var TERMS_SHOWN = 4;          // the rest live one click away, in Manage
-  var showAllTerms = false;
   var expandedItems = new Set();
   var activeTab = 'dashboard';
   var activeClassId = null;
@@ -2880,7 +2853,6 @@
   function render(){
     var navTab = (activeTab==='class') ? 'classes' : activeTab;
     document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.tab===navTab); });
-    renderTermSwitcher();
     renderTermBanner();
     renderSideStats();
     renderHeader();
@@ -7434,17 +7406,9 @@
       + '</div>'
       + accountSectionHtml()
       + googleSectionHtml()
-      + '<div class="detail-section">'
-      + '<div class="file-cat-title">Term</div>'
-      + '<label class="field">Term name<input type="text" id="f-term-name" placeholder="Fall 2026" value="'+escapeHtml(termSettings.name||'')+'"></label>'
-      + '<div class="field-row" style="margin-top:10px;">'
-      + '<label class="field">Start date<input type="date" id="f-term-start" value="'+(termSettings.startDate||'')+'"></label>'
-      + '<label class="field">End date<input type="date" id="f-term-end" value="'+(termSettings.endDate||'')+'"></label>'
+      + termsSectionHtml()
       + '</div>'
-      + '<div class="hint" style="margin-top:8px;">Bounds recurring lectures on the calendar and in exports, and sets the default "repeat until" date for weekly items. Setting just one side still works — leave the other blank to leave it open-ended.</div>'
-      + '</div>'
-      + '</div>'
-      + '<div class="modal-foot"><span></span><div class="right"><button class="btn" data-action="modal-close">Close</button><button class="btn primary" data-action="save-term">Save term</button></div></div>'
+      + '<div class="modal-foot"><span></span><div class="right"><button class="btn" data-action="modal-close">Close</button></div></div>'
       + '</div></div>';
     document.getElementById('modal-root').innerHTML = html;
   }
@@ -9215,22 +9179,12 @@
       startDate: document.getElementById('f-term-start').value || '',
       endDate: document.getElementById('f-term-end').value || ''
     };
-    saveTermSettings(data).then(closeModal).catch(reportError);
+    saveTermSettings(data).then(function(){ return loadTermList(); }).catch(reportError);
   }
 
   // ---------------- semesters ----------------
 
   function termLabel(t){ return t && t.name ? t.name : 'Untitled term'; }
-
-  /** "Fall 2026" -> "F26", for the collapsed sidebar. Spring and Summer both start
-      with S, so they get two letters or they would be the same badge. */
-  var SEASON_SHORT = { spring:'Sp', summer:'Su', fall:'F', winter:'W' };
-  function termShort(t){
-    var name = (t && t.name || '').trim();
-    var m = /^(Spring|Summer|Fall|Winter)\s+(\d{4})$/i.exec(name);
-    if(m) return SEASON_SHORT[m[1].toLowerCase()] + m[2].slice(2);
-    return name.replace(/\s+/g, '').slice(0, 3).toUpperCase() || '—';
-  }
 
   function termDates(t){
     if(!t) return '';
@@ -9238,40 +9192,6 @@
     if(t.startDate) return 'From '+fmtDateShort(t.startDate);
     if(t.endDate) return 'Until '+fmtDateShort(t.endDate);
     return 'No dates set';
-  }
-
-  /**
-   * The term list in the sidebar.
-   *
-   * Every term is a row you can read at a glance rather than an option hidden inside
-   * a select: switching term changes what the whole app means, so the current one has
-   * to be obvious and the others one click away. Past a handful the list would take
-   * over the sidebar, so the oldest fold into a single button that shows the rest.
-   */
-  function renderTermSwitcher(){
-    var host = document.getElementById('term-switch');
-    if(!host) return;
-    if(!semesters.length){ host.innerHTML = ''; return; }
-    var shown = showAllTerms ? semesters : semesters.slice(0, TERMS_SHOWN);
-    var hidden = semesters.length - shown.length;
-    var html = '<div class="term-switch-head"><span>Term</span>'
-      + '<button type="button" class="term-manage" data-action="open-terms">Manage</button></div>';
-    html += shown.map(function(t){
-      var active = semester && t.id === semester.id;
-      return '<button type="button" class="term-pill'+(active?' active':'')
-        + (t.status==='archived'?' archived':'')+'" data-action="switch-term" data-id="'+t.id+'">'
-        + '<span class="tp-short">'+escapeHtml(termShort(t))+'</span>'
-        + '<span class="tp-name">'+escapeHtml(termLabel(t))+'</span>'
-        + (t.status==='archived' ? '<span class="tp-tag">Archived</span>' : '')
-        + '</button>';
-    }).join('');
-    if(hidden > 0){
-      html += '<button type="button" class="term-more" data-action="show-all-terms">'
-        + hidden + ' earlier term' + (hidden===1?'':'s') + '</button>';
-    } else if(showAllTerms && semesters.length > TERMS_SHOWN){
-      html += '<button type="button" class="term-more" data-action="show-all-terms">Show fewer</button>';
-    }
-    host.innerHTML = html;
   }
 
   /**
@@ -9317,15 +9237,23 @@
       .then(function(){ return loadState(); });
   }
 
-  function openTermsModal(){
-    apiGet('/api/semesters').then(function(list){
-      semesters = list;
-      renderTermsModal(list);
-    }).catch(reportError);
-  }
+  /**
+   * Every term, with what it holds and what can be done to it. Lives in Settings and
+   * nowhere else.
+   *
+   * The counts come from /api/semesters rather than the page's own state, because the
+   * page only ever holds the current term's rows: it cannot say how many classes are
+   * sitting in last year. So this renders from `termList` when it has arrived and asks
+   * for it when it has not, the same way the Google section handles its status.
+   */
+  var termList = null;
 
-  function renderTermsModal(list){
-    var rows = list.map(function(t){
+  function termsSectionHtml(){
+    var head = '<div class="detail-section" id="terms-section">'
+             + '<div class="file-cat-title">Terms</div>';
+    if(termList === null) return head + '<div class="hint">Loading…</div></div>';
+
+    var rows = termList.map(function(t){
       var c = t.counts || {};
       var bits = [];
       if(c.classes) bits.push(c.classes + (c.classes===1?' class':' classes'));
@@ -9334,48 +9262,57 @@
       if(c.materials) bits.push(c.materials + (c.materials===1?' file':' files'));
       var empty = !bits.length;
       var meta = termDates(t) + (bits.length ? ' · ' + bits.join(' · ') : ' · Empty');
-      return '<div class="term-row">'
+      return '<div class="term-row'+(t.active?' is-current':'')+'">'
         + '<div class="tr-main"><div class="tr-name">'+escapeHtml(termLabel(t))
-          + (t.active ? ' <span class="tp-tag" style="background:var(--accent-soft);color:var(--accent);">Current</span>' : '')
-          + (t.status==='archived' ? ' <span class="tp-tag">Archived</span>' : '')
+          + (t.active ? '<span class="tp-tag now">Current</span>' : '')
+          + (t.status==='archived' ? '<span class="tp-tag">Archived</span>' : '')
           + '</div><div class="tr-meta">'+escapeHtml(meta)+'</div></div>'
         + '<div class="tr-actions">'
         + (t.active ? '' : '<button type="button" class="btn" data-action="switch-term" data-id="'+t.id+'">Open</button>')
         + (t.status==='archived'
             ? '<button type="button" class="btn" data-action="unarchive-term" data-id="'+t.id+'">Unarchive</button>'
             : '<button type="button" class="btn" data-action="archive-term" data-id="'+t.id+'">Archive</button>')
-        + (empty && list.length > 1
+        + (empty && termList.length > 1
             ? '<button type="button" class="btn danger" data-action="delete-term" data-id="'+t.id+'">Delete</button>' : '')
         + '</div></div>';
     }).join('');
 
-    var html = '<div class="overlay" data-action="modal-backdrop">'
-      + '<div class="modal" data-action="modal-stop">'
-      + '<div class="modal-head"><h2>Terms</h2></div>'
-      + '<div class="modal-body">'
-      + '<div class="detail-section">'
-      + '<div class="file-cat-title">Start a new term</div>'
+    return head
+      + rows
+      + '<div class="hint" style="margin-top:10px;">Opening a term points the whole app at it. '
+      + 'Archiving keeps one readable and searchable while locking it against edits, and a term '
+      + 'can only be deleted once it is empty.</div>'
+      + '<div class="file-cat-title" style="margin-top:18px;">Edit this term</div>'
+      + '<label class="field">Term name<input type="text" id="f-term-name" placeholder="Fall 2026" value="'+escapeHtml(termSettings.name||'')+'"></label>'
+      + '<div class="field-row" style="margin-top:10px;">'
+      + '<label class="field">Start date<input type="date" id="f-term-start" value="'+(termSettings.startDate||'')+'"></label>'
+      + '<label class="field">End date<input type="date" id="f-term-end" value="'+(termSettings.endDate||'')+'"></label>'
+      + '</div>'
+      + '<div class="hint" style="margin-top:8px;">These bound recurring lectures on the calendar and in exports, and set the default \u201crepeat until\u201d date for weekly items. Setting just one side still works: leave the other blank to leave it open-ended.</div>'
+      + '<div style="margin-top:10px;"><button type="button" class="btn" data-action="save-term">Save changes</button></div>'
+      + '<div class="file-cat-title" style="margin-top:18px;">Start a new term</div>'
       + '<label class="field">Name<input type="text" id="f-newterm-name" placeholder="'+escapeHtml(nextTermGuess())+'" value=""></label>'
       + '<div class="field-row" style="margin-top:10px;">'
       + '<label class="field">Start date<input type="date" id="f-newterm-start"></label>'
       + '<label class="field">End date<input type="date" id="f-newterm-end"></label>'
       + '</div>'
       + '<div class="hint" style="margin-top:8px;">Starting a term gives you an empty workspace and switches you into it. '
-      + 'Nothing from your other terms is touched: classes, files, notes and grades stay where they are, one click away.</div>'
+      + 'Nothing from your other terms is touched: classes, files, notes and grades stay where they are.</div>'
       + '<div style="margin-top:10px;"><button type="button" class="btn primary" data-action="create-term">Start term</button></div>'
-      + '</div>'
-      + '<div class="detail-section">'
-      + '<div class="file-cat-title">Your terms</div>'
-      + rows
-      + '<div class="hint" style="margin-top:10px;">Archiving keeps a term readable and searchable while locking it against edits. '
-      + 'A term can only be deleted once it is empty.</div>'
-      + '</div>'
-      + '</div>'
-      + '<div class="modal-foot"><span></span><div class="right">'
-      + '<button class="btn" data-action="modal-close">Close</button></div></div>'
-      + '</div></div>';
-    document.getElementById('modal-root').innerHTML = html;
-    paintIcons();
+      + '</div>';
+  }
+
+  function loadTermList(){
+    return apiGet('/api/semesters').then(function(list){
+      termList = list;
+      semesters = list;
+      var host = document.getElementById('terms-section');
+      if(host) host.outerHTML = termsSectionHtml();
+    }).catch(function(){
+      termList = [];
+      var host = document.getElementById('terms-section');
+      if(host) host.outerHTML = termsSectionHtml();
+    });
   }
 
   /** "Fall 2026" -> "Spring 2027": the term most likely to be started next. */
@@ -9409,7 +9346,7 @@
   function setTermStatus(id, status){
     return apiPut('/api/semesters/'+id, { status:status })
       .then(function(){ return loadState(); })
-      .then(function(){ openTermsModal(); })
+      .then(function(){ return loadTermList(); })
       .catch(reportError);
   }
 
@@ -9418,7 +9355,7 @@
     if(!confirmAction('Delete '+termLabel(t)+'?', 'It has nothing in it, so nothing is lost.')) return;
     apiDelete('/api/semesters/'+id)
       .then(function(){ return loadState(); })
-      .then(function(){ openTermsModal(); })
+      .then(function(){ return loadTermList(); })
       .catch(reportError);
   }
 
@@ -10510,7 +10447,7 @@
       renderView();
       return;
     }
-    if(action==='open-settings'){ openSettingsModal(); loadGoogleStatus(); return; }
+    if(action==='open-settings'){ termList = null; openSettingsModal(); loadGoogleStatus(); loadTermList(); return; }
     if(action==='google-connect'){ googleConnect(); return; }
     if(action==='google-sync'){ googleSync(); return; }
     if(action==='google-disconnect'){
@@ -10519,8 +10456,6 @@
     }
     if(action==='save-term'){ saveTermFromForm(); return; }
     if(action==='switch-term'){ closeModal(); switchTerm(t.dataset.id).catch(reportError); return; }
-    if(action==='show-all-terms'){ showAllTerms = !showAllTerms; renderTermSwitcher(); return; }
-    if(action==='open-terms'){ openTermsModal(); return; }
     if(action==='create-term'){ createTermFromForm(); return; }
     if(action==='archive-term'){ setTermStatus(t.dataset.id, 'archived'); return; }
     if(action==='unarchive-term'){ setTermStatus(t.dataset.id, 'active'); return; }
