@@ -3,18 +3,18 @@
 A running list so nothing is lost between sessions. **needs Saif** means it cannot be
 done from a terminal: a dashboard login, an email click, or a decision that is his.
 
-_Last updated: 2026-09-13, after auditing the schema against Saif's original data plan._
+_Last updated: 2026-09-14. Semesters are live; the calendar is the next real piece of work._
 
 ---
 
 ## Deploying
 
-Live at `vesta-production-8a53.up.railway.app`. `/health` reports the truth about any
+Live at **https://vesta.study**, auto-deploying from `main`. `/health` reports the truth about any
 instance: which database, whether accounts are on, the table count, and whether Railway
 actually mounted the volume.
 
-Confirmed working: `database: postgres`, `accounts: true`, `tables: 28`,
-`volumeMountedAt: /data`.
+Confirmed working on 2026-09-14: `database: postgres`, `accounts: true`, `tables: 30`,
+`volumeMountedAt: /data`, `migrations: ["001_semesters"]`.
 
 - [ ] **needs Saif** — Sign in once and start fresh.
 - [ ] Smoke-test the live site: sign in, add a class, import a syllabus, connect the
@@ -50,7 +50,7 @@ onto the Railway volume.
 - **`DATA_DIR=/data` and the volume mount path must agree.** Either one alone looks
   like it works and silently loses uploads on the next deploy.
 
-## Semester management (built 2026-09-13, not yet deployed)
+## Semester management (built 2026-09-13, live since 2026-09-14)
 
 Saif's requirement, in his words:
 
@@ -118,9 +118,7 @@ entirely — the test only found it once the migration was run as a non-superuse
       superuser, the fix above is load-bearing. Either way the migration is now
       correct; this is worth knowing before the next migration is written.
 
-### Deploying it
-
-
+### How schema changes reach a deployed database
 
 `ensure_pg_schema()` builds the tables once and then returns early forever, so a
 deployed database could never gain a column. There is now a migration runner
@@ -132,12 +130,12 @@ It lifts `force row level security` on the tables it backfills and puts it back 
 same transaction, which is still the part worth a second pair of eyes on any future
 migration.
 
-- [ ] **After deploying, check `/health` first.** It now reports `migrations`. If that
-      list does not contain `001_semesters`, the app is running against a database
-      that has no semesters and nothing else will make sense.
-- [ ] If the migration fails, the app raises at boot rather than serving a half-migrated
-      database. That is deliberate, but it does mean a failed migration is a failed
-      deploy, so do it when there is time to read the log.
+- [x] ~~After deploying, check `/health`.~~ Done: live reports
+      `migrations: ["001_semesters"]` and `tables: 30`. The backfill ran on the real
+      database without incident.
+- Note for next time: a failed migration is a failed deploy, because the app raises at
+  boot rather than serving a half-migrated database. Deploy a migration when there is
+  time to read the log.
 
 ### Rough edges left in this feature
 
@@ -157,6 +155,41 @@ migration.
 - [x] ~~The term list grows down the sidebar.~~ Moot: terms left the sidebar entirely
       in `f43a8db`. The sidebar is navigation only and everything term related now lives
       in one Terms section in Settings, which is Saif's standing preference for this app.
+
+## Calendar sync: what Saif asked for, and what actually exists
+
+Saif, 2026-09-13: *"it only updates when i press sync, and it is not two-way. if i add
+something to google calendar, it will not populate in vesta. i want it to be in sync at
+all times, and i want it to go two-way. that's how i have my notion calendar, and i
+expect the same from vesta"*
+
+Where it really stands, checked 2026-09-14:
+
+- **Two-way in mechanism, yes.** `/api/calendar/google/sync` pulls from Google first and
+  then pushes, deliberately in that order so a change made on both sides is known before
+  anything is overwritten. `gsync.plan_pull` / `plan_push` / `resolve` all exist.
+- **Continuous, no.** That route runs only when the Sync button is pressed. There are no
+  watch channels, no polling, no cron, and nothing calls it on page load.
+- **It only ever touches a calendar Vesta created for itself**, named "Vesta"
+  (`gcal.ensure_calendar`). It never reads the calendars Saif already has. This is almost
+  certainly why connecting the account appeared to do nothing.
+- `gcal.list_calendars()` was written as groundwork for choosing calendars and is wired
+  to nothing yet.
+
+Staged plan, in the order that delivers something usable soonest:
+
+- [ ] **1. Choose which calendars, and read them.** A `calendar_feeds` table, a picker in
+      Settings fed by `list_calendars()`, and the pull side reading every chosen calendar
+      instead of only Vesta's own. This alone fixes "nothing shows up in Vesta".
+- [ ] **2. Sync without a button.** On page load, on focus, and after any local change,
+      with a short debounce. Feels continuous, needs no new infrastructure, and is enough
+      for one student and a few friends.
+- [ ] **3. Real push.** Google watch channels to `/api/calendar/google/webhook`, plus a
+      Railway cron to renew them: channels expire and Google never renews them. Only
+      worth doing once 1 and 2 are solid.
+
+Decisions already given by Saif: pick which calendars to sync; Google events become
+editable Vesta events that sync back; everything dated in Vesta pushes out.
 
 ## Missing from the original data plan
 
