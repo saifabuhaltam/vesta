@@ -154,9 +154,9 @@ migration.
       Seen in the browser: the dashboard of a locked term invites you into actions the
       server then refuses with a 423. Reading old coursework should not look like
       working on it.
-- [ ] **The term list grows down the sidebar.** Two terms look right; eight terms over
-      four years will push the navigation off the screen. Needs a scroll or a "show
-      older" once there are more than about four, without hiding the current one.
+- [x] ~~The term list grows down the sidebar.~~ Moot: terms left the sidebar entirely
+      in `f43a8db`. The sidebar is navigation only and everything term related now lives
+      in one Terms section in Settings, which is Saif's standing preference for this app.
 
 ## Missing from the original data plan
 
