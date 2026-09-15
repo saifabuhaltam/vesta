@@ -191,6 +191,27 @@ lift:
   action bar, colored type pills, a clickable status pill that cycles Not started → In progress
   → Completed, weight, and pagination. By Class swaps to collapsible per-class groups with an
   extra Grade column.
+- **New / edit assignment is the detail card with editable fields** (`openItemModal`,
+  `.aform-*`). It shares the detail card's head, bordered cards and foot, so adding an
+  assignment looks like the card you get afterwards: the title is typed at the card's own
+  30px on a hairline rule, the class sits under it as one chip per class, and the body is
+  four cards — Due (date and time in the `.ac-when` split, plus Today / Tomorrow / Friday /
+  Next week shortcuts and Repeat weekly), Type and status, Grading, Details (description
+  and steps).
+  - **Every small fixed set is chips, never a `<select>`.** Class, type, status and grade
+    category are chip rows. Type chips carry the same colour pair as the type pill they
+    become, status chips the same pair as the status pill. This is the Notes class-pill
+    rule applied again: a dropdown hides both what is picked and what else there was.
+  - **No click re-renders the modal.** Each pick moves one `active` class and writes one
+    hidden input (`f-class`, `f-type`, `f-status`, `f-category`), which is what keeps the
+    ids the save path already reads. Only the grade-category row is redrawn, because
+    categories belong to a class, and a class without any says so in place rather than
+    collapsing the row.
+  - **Weight is disabled, not hidden, while a category carries it**, and its hint changes
+    to "Set by the category". Score only appears when editing: a brand-new assignment
+    cannot have a mark yet.
+  - The title input is `input.aform-title`, not `.aform-title`. Same specificity trap as
+    `input.nt-title` in Notes.
 - **Work status is three-state.** `item.status` stores `todo` | `in_progress` | `done`; Overdue
   is *derived* from the due date and never stored. Use `workStatusKey(item)` rather than reading
   `status` directly when you need the display state.
@@ -201,6 +222,27 @@ lift:
   clip.
 - **Files:** All Files / By Class / Recent / Starred tabs, class folder cards, and a grid/list
   toggle. Starred lives in `localStorage`, not the database, since it's a per-device convenience.
+  - **Navigation is a real tree**: All files → a class → a folder → its subfolders, held in two
+    variables (`filesFolder` is the class, `filesSubfolder` the folder inside it) because a
+    folder belongs to exactly one class and the pair is what the breadcrumb rebuilds. Browsing
+    shows one folder's own files and nothing nested below it; the folder cards carry the
+    recursive count.
+  - **Searching is global on purpose.** A search scoped to the folder you happen to have open
+    is a search that hides the answer, so the query ignores where you are standing and matches
+    name, class, folder path and type, word by word.
+  - **You can always get out.** The old search replaced the body, hid the folder cards and said
+    nothing about how to return. There are now four ways back and all of them are visible: the
+    ✕ inside the search box, the Clear search button in the results strip, Escape while the box
+    has focus, and the breadcrumb, which stays put. The results strip also says how many
+    matched, so "nothing here" and "nothing matches" stop looking the same.
+  - **Filters are chips, never a `<select>`** — type and age, both rows always on screen. Same
+    rule as the assignment form: a dropdown hides both what is picked and what else there was.
+  - **Dragging moves, it never copies.** A file has one home class and one home folder, so
+    "where does this live" keeps one answer; what it is *used by* lives in `item_files` and
+    survives the move. Every drop target lights up the same way (`.fdrop-over`), whether it is
+    a class card, a folder card, a breadcrumb or a folder section inside a class.
+  - **Deleting a folder never deletes a file.** Its files and subfolders move up to its parent.
+    Losing a folder should cost an organising decision, not a file, and the confirm says so.
 - **Grades:** stat tiles (Term GPA, Completed, Graded courses, To Be Graded), a By Course table
   with letter chips tinted by grade tier and progress bars, a By Assignment table, plus Grade
   Distribution and Grade Points cards.

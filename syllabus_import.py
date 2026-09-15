@@ -8,6 +8,7 @@ completion and subtasks are never written.
 import json
 import os
 import re
+import shutil
 import uuid
 from datetime import datetime
 
@@ -16,7 +17,8 @@ from werkzeug.utils import secure_filename
 
 import ai
 import syllabus as S
-from db import UPLOAD_DIR, get_db, active_semester, active_semester_id, semester_for
+from db import (UPLOAD_DIR, get_db, active_semester, active_semester_id, semester_for,
+                folder_id_for_kind)
 
 bp = Blueprint("syllabus_import", __name__)
 
@@ -324,15 +326,27 @@ def do_import(sid):
                      (c.get("term") or "", draft.get("firstDay") or "", draft.get("lastDay") or "",
                       active_semester_id(conn)))
 
-        # the syllabus itself lands in the class's files
-        path = os.path.join(UPLOAD_DIR, row["stored_name"])
+        # The syllabus itself lands in the class's files, as its own copy of the
+        # bytes. It used to point at the same stored file as the syllabus_imports
+        # row, which meant two owners for one file: deleting either side silently
+        # broke the other, and that is exactly what orphaned the first two syllabus
+        # rows. A duplicated PDF costs a few hundred kilobytes; a file that vanishes
+        # from the Files page because an import was tidied up costs a lot more.
+        mid = str(uuid.uuid4())
+        src = os.path.join(UPLOAD_DIR, row["stored_name"])
         extract = current_app.config["EXTRACT_TEXT"]
-        conn.execute("INSERT INTO materials (id, semester_id, class_id, category, title, kind, filename, stored_name, mimetype, size,"
-                     " extracted_text, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                     (str(uuid.uuid4()), semester_for(conn, class_id), class_id, "syllabus",
+        stored, size, text = None, None, None
+        if os.path.exists(src):
+            stored = f"{mid}_{secure_filename(row['filename'] or 'syllabus')}"
+            shutil.copyfile(src, os.path.join(UPLOAD_DIR, stored))
+            size = os.path.getsize(os.path.join(UPLOAD_DIR, stored))
+            text = extract(src, row["filename"])
+        folder = folder_id_for_kind(conn, class_id, "syllabus") if class_id else None
+        conn.execute("INSERT INTO materials (id, semester_id, class_id, category, folder_id, title, kind, filename, stored_name, mimetype, size,"
+                     " extracted_text, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                     (mid, semester_for(conn, class_id), class_id, "syllabus", folder,
                       "Syllabus" if not diff else f"Syllabus (updated {t[:10]})", "file", row["filename"],
-                      row["stored_name"], row["mimetype"], os.path.getsize(path) if os.path.exists(path) else None,
-                      extract(path, row["filename"]) if os.path.exists(path) else None, t))
+                      stored, row["mimetype"], size, text, t))
 
         conn.execute("UPDATE syllabus_imports SET status='imported', class_id=?, imported_at=?, draft=? WHERE id=?",
                      (class_id, t, json.dumps(draft, default=str), sid))

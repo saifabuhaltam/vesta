@@ -1334,6 +1334,88 @@
   .ac-card-head .btn svg{ width:14px; height:14px; flex:none; }
   .ac-card-actions{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 
+  /* ---- new / edit assignment: the detail card's twin, but every field editable ----
+     Same head, same bordered cards, same foot as .ac-modal, so adding an assignment
+     looks like the thing you get afterwards. Every choice with a small fixed set of
+     options (class, type, status, grade category) is a visible control, never a
+     <select>: what you picked and what else there was both have to be readable
+     without opening anything. */
+  .aform-modal{ max-width:660px; }
+  .aform-head{ position:relative; padding:22px 26px 18px; }
+  .aform-kicker{ font-size:13px; font-weight:600; color:var(--text-muted); }
+  input.aform-title{ display:block; width:100%; margin:8px 0 2px; padding:0 0 8px; border:none;
+    border-bottom:1.5px solid var(--border); border-radius:0; background:transparent;
+    font-family:inherit; font-size:30px; font-weight:800; letter-spacing:-0.02em; line-height:1.2;
+    color:var(--text); transition:border-color .14s cubic-bezier(.22,1,.36,1); }
+  input.aform-title::placeholder{ color:var(--text-faint); font-weight:700; }
+  input.aform-title:focus{ outline:none; border-bottom-color:var(--accent); }
+  input.aform-title.missing{ border-bottom-color:var(--danger); }
+  .aform-label{ font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--text-faint); margin-bottom:8px; }
+  .aform-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .aform-chip{ display:inline-flex; align-items:center; gap:7px; border:1px solid var(--border);
+    background:var(--surface); color:var(--text-muted); font-family:inherit; font-size:12.5px;
+    font-weight:600; padding:6px 12px; border-radius:var(--r-pill); cursor:pointer;
+    transition:background .14s cubic-bezier(.22,1,.36,1), color .14s cubic-bezier(.22,1,.36,1); }
+  .aform-chip:hover{ background:var(--surface-2); color:var(--text); }
+  .aform-chip:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .aform-chip.active{ border-color:transparent; background:var(--accent-soft); color:var(--accent-ink); }
+  /* a type chip carries its own colour once chosen, the same pair the type pill uses
+     everywhere else, so the chip and the pill it becomes are the same object */
+  .aform-chip.type.active{ background:var(--tp-bg); color:var(--tp-ink); }
+  /* status keeps the colours of the status pill it will become */
+  .aform-chip.status.active{ background:var(--st-bg); color:var(--st-ink); }
+  .aform-chip .dot{ width:8px; height:8px; }
+
+  .aform-body{ padding:0 26px 4px; display:flex; flex-direction:column; gap:14px;
+    max-height:58vh; overflow:auto; }
+  .aform-card{ border:1px solid var(--border); border-radius:var(--r-card); padding:16px; }
+  .aform-card-head{ display:flex; align-items:center; justify-content:space-between;
+    gap:10px; margin-bottom:12px; }
+  .aform-card-head h3{ font-size:15px; font-weight:700; }
+  .aform-hint{ font-size:12px; color:var(--text-faint); }
+
+  /* the Due row mirrors .ac-when: icon tile, label, value — except the value is typed */
+  .aform-when{ display:flex; align-items:stretch; gap:0; }
+  .aform-when-cell{ display:flex; align-items:center; gap:12px; flex:1; min-width:0; }
+  .aform-when-cell + .aform-when-cell{ border-left:1px solid var(--border); padding-left:22px; margin-left:22px; }
+  .aform-when-ic{ width:34px; height:34px; border-radius:var(--r-md); background:var(--surface-2);
+    color:var(--text-muted); display:flex; align-items:center; justify-content:center; flex:none; }
+  .aform-when-ic svg{ width:17px; height:17px; }
+  .aform-when-field{ flex:1; min-width:0; }
+  .aform-when-field .aform-label{ margin-bottom:2px; }
+  .aform-when-field input{ border:none; background:transparent; padding:2px 0; font-size:14px;
+    font-weight:700; color:var(--text); }
+  .aform-when-field input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px;
+    border-radius:4px; }
+  .aform-quick{ display:flex; flex-wrap:wrap; gap:6px; margin-top:14px; }
+  .aform-quick .aform-chip{ font-size:12px; padding:5px 11px; }
+
+  .aform-switch{ display:flex; align-items:center; gap:9px; font-size:13px; font-weight:600;
+    color:var(--text); cursor:pointer; margin-top:14px; padding-top:14px;
+    border-top:1px solid var(--border); }
+  .aform-switch input[type="checkbox"]{ width:15px; height:15px; accent-color:var(--accent); flex:none; }
+  .aform-switch .aform-hint{ font-weight:400; }
+
+  .aform-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .aform-num{ display:flex; flex-direction:column; gap:6px; }
+  .aform-num input{ font-family:"IBM Plex Mono",monospace; }
+  .aform-num.off input{ background:var(--surface-2); color:var(--text-faint); }
+
+  .aform-steps{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+  .aform-divide{ border-top:1px solid var(--border); margin:16px 0 14px; }
+
+  @media (max-width:560px){
+    input.aform-title{ font-size:24px; }
+    .aform-when{ display:block; }
+    .aform-when-cell + .aform-when-cell{ border-left:none; padding-left:0; margin-left:0;
+      margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+    .aform-grid{ grid-template-columns:1fr; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    .aform-chip, input.aform-title{ transition:none; }
+  }
+
   /* ---- Attach an existing note to an assignment ---- */
   .an-search{ width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--r-md);
     background:var(--surface-2); font-family:inherit; font-size:13.5px; color:var(--text); }
@@ -1585,7 +1667,7 @@
   .file-star.on{ color:#F5B301; }
   .file-star:hover{ color:#F5B301; }
 
-  .file-row-t{ display:grid; grid-template-columns:minmax(0,2.2fr) 1fr .9fr .8fr 1fr 76px; gap:12px;
+  .file-row-t{ display:grid; grid-template-columns:minmax(0,2.1fr) .9fr 1fr .8fr .7fr .9fr 76px; gap:12px;
     align-items:center; padding:11px 16px; border-bottom:1px solid var(--border); font-size:13px; }
   .file-row-t:last-child{ border-bottom:none; }
   .file-row-t:not(.file-head):hover{ background:var(--surface-2); }
@@ -1599,8 +1681,47 @@
 
   @media (max-width:1050px){
     .file-row-t{ grid-template-columns:minmax(0,2fr) 1fr 76px; }
-    .file-row-t > span:nth-child(3), .file-row-t > span:nth-child(4), .file-row-t > span:nth-child(5){ display:none; }
+    .file-row-t > span:nth-child(3), .file-row-t > span:nth-child(4),
+    .file-row-t > span:nth-child(5), .file-row-t > span:nth-child(6){ display:none; }
   }
+
+  /* ---- folders, drag targets, filters and the way out of a search ---- */
+
+  /* The one visual answer to "will it land here": every drop target lights up the
+     same way, whether it is a class card, a folder card or a breadcrumb. */
+  .fdrop-over{ outline:2px dashed var(--accent); outline-offset:-2px;
+    background:var(--accent-soft) !important; }
+  .file-tile[draggable="true"], .file-row-t[draggable="true"]{ cursor:grab; }
+  .file-tile.dragging, .file-row-t.dragging, .folder-card.dragging{ opacity:.45; }
+  .file-tile-where{ font-size:11.5px; color:var(--text-faint); margin-top:5px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .folder-card-new{ border-style:dashed; box-shadow:none; background:transparent;
+    text-align:left; font-family:inherit; color:var(--text-muted); align-items:center; }
+  .folder-card-new:hover{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+  .folder-ic-new{ display:flex; align-items:center; justify-content:center;
+    background:var(--surface-2); color:var(--text-faint); }
+  .folder-ic-new:before{ display:none; }
+  .folder-ic-new svg{ width:16px; height:16px; }
+
+  .files-filters{ display:flex; flex-direction:column; gap:8px; margin:0 0 16px; }
+  .ff-row{ display:flex; flex-wrap:wrap; gap:6px; }
+
+  .files-result-banner{ display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:var(--accent-soft); border:1px solid var(--accent); border-radius:var(--r-card);
+    padding:11px 14px; margin-bottom:16px; font-size:13px; }
+  .files-result-banner .fr-count{ font-weight:700; color:var(--accent-ink); }
+  .files-result-banner .fr-scope{ color:var(--text-muted); flex:1; }
+  .files-result-banner .btn{ margin-left:auto; }
+
+  .input-search .search-clear{ border:none; background:transparent; cursor:pointer; padding:0 2px;
+    color:var(--text-faint); font-size:13px; line-height:1; font-family:inherit; flex:none; }
+  .input-search .search-clear:hover{ color:var(--text); }
+
+  .cp-crumb-link{ border:none; background:transparent; color:var(--accent); font-size:13px;
+    font-weight:500; cursor:pointer; padding:2px 5px; border-radius:var(--r-sm); font-family:inherit; }
+  .cp-crumb-link:hover{ text-decoration:underline; }
+  .cp-crumb-cur{ color:var(--text-muted); padding:2px 5px; border-radius:var(--r-sm); }
 
   /* ---------- Calendar rebuild ---------- */
   .cal-layout{ display:grid; grid-template-columns:minmax(0,1fr) 290px; gap:18px; align-items:start; }
@@ -2054,17 +2175,6 @@
     other: Object.keys(HEADSTART_LABELS)
   };
   function kindsForType(type){ return HEADSTART_KIND_BY_TYPE[type] || HEADSTART_KIND_BY_TYPE.other; }
-
-  var FILE_CATEGORIES = [
-    {key:'syllabus', label:'Syllabus'},
-    {key:'slides', label:'Lecture slides'},
-    {key:'readings', label:'Readings'},
-    {key:'rubrics', label:'Rubrics'},
-    {key:'exams', label:'Past exams'},
-    {key:'projects', label:'Projects'},
-    {key:'personal', label:'Personal notes/files'},
-    {key:'other', label:'Other'}
-  ];
 
   function uid(){ return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2); }
   function isoLocal(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0'); return y+'-'+m+'-'+day; }
@@ -2527,16 +2637,17 @@
     if(classId === INBOX_ID) return apiPost('/api/materials', data).then(loadState);
     return route('addMaterialLink', [classId, data], function(){ return apiPost('/api/classes/'+classId+'/materials', data); }).then(loadState);
   }
-  function uploadMaterialFile(file, classId, category, title, onProgress){
+  function uploadMaterialFile(file, classId, category, title, onProgress, folderId){
     if(BE && BE.uploadFile){
       // Direct to R2 with progress and resume. Nothing is linked into the class
       // until the bytes are confirmed, so a failed upload leaves no ghost row.
       return BE.uploadFile(file, { type:'class', id:classId },
-                           { category:category, title:title }, onProgress).then(loadState);
+                           { category:category, title:title, folderId:folderId }, onProgress).then(loadState);
     }
     var fd = new FormData();
     fd.append('file', file);
     fd.append('category', category || 'other');
+    if(folderId) fd.append('folderId', folderId);
     if(title) fd.append('title', title);
     return fetch('/api/classes/'+classId+'/materials', { method:'POST', body: fd }).then(checkOk).then(loadState);
   }
@@ -2583,6 +2694,70 @@
   function updateHeadstart(id, data){ return route('updateHeadstart', [id, data], function(){ return apiPut('/api/headstarts/'+id, data); }); }
   function deleteHeadstart(id){ return route('deleteHeadstart', [id], function(){ return apiDelete('/api/headstarts/'+id); }); }
   function updateMaterial(id, data){ return route('updateMaterial', [id, data], function(){ return apiPut('/api/materials/'+id, data); }).then(loadState); }
+  function addFileFolder(classId, name, opts){
+    opts = opts || {};
+    return route('addFileFolder', [classId, name, opts], function(){
+      return apiPost('/api/classes/'+classId+'/file-folders',
+                     { name:name, parentId:opts.parentId || null });
+    }).then(loadState);
+  }
+  function updateFileFolder(fid, data){ return route('updateFileFolder', [fid, data], function(){ return apiPut('/api/file-folders/'+fid, data); }).then(loadState); }
+  function deleteFileFolder(fid){ return route('deleteFileFolder', [fid], function(){ return apiDelete('/api/file-folders/'+fid); }).then(loadState); }
+
+  // ---- reading the folder tree ----
+  // Folders arrive on their class as a flat list with parentId, the same shape the
+  // note tree uses. Everything below is derived rather than cached, because a tree
+  // held in two places is a tree that goes out of date.
+
+  /** Every folder in a class. The Inbox has none: it is the place things go before filing. */
+  function classFileFolders(classId){
+    var c = classById(classId);
+    return (c && c.fileFolders) || [];
+  }
+  function allFileFolders(){
+    var out = [];
+    classes.forEach(function(c){
+      (c.fileFolders||[]).forEach(function(f){ out.push(Object.assign({}, f, { cls:c })); });
+    });
+    return out;
+  }
+  function fileFolderById(id){
+    if(!id) return null;
+    return allFileFolders().find(function(f){ return f.id===id; }) || null;
+  }
+  /** The folders sitting directly inside a parent, or at the top when parentId is null. */
+  function fileFolderChildren(classId, parentId){
+    return classFileFolders(classId)
+      .filter(function(f){ return (f.parentId||null) === (parentId||null); })
+      .sort(function(a,b){ return (a.sortOrder||0)-(b.sortOrder||0) || (a.name||'').localeCompare(b.name||''); });
+  }
+  /** Root to this folder, for the breadcrumb. Guarded against a cycle it should never see. */
+  function fileFolderPath(id){
+    var out = [], seen = {}, f = fileFolderById(id);
+    while(f && !seen[f.id]){
+      seen[f.id] = 1;
+      out.unshift(f);
+      f = f.parentId ? fileFolderById(f.parentId) : null;
+    }
+    return out;
+  }
+  /** A folder and everything nested inside it, so "move into itself" can be refused. */
+  function fileFolderDescendants(id){
+    var out = [id], frontier = [id];
+    while(frontier.length){
+      var next = allFileFolders()
+        .filter(function(f){ return frontier.indexOf(f.parentId) >= 0; })
+        .map(function(f){ return f.id; });
+      frontier = next.filter(function(x){ return out.indexOf(x) < 0; });
+      out = out.concat(frontier);
+    }
+    return out;
+  }
+  /** How many files a folder holds, counting everything in its subfolders too. */
+  function fileFolderCount(id){
+    var branch = fileFolderDescendants(id);
+    return allMaterials().filter(function(m){ return branch.indexOf(m.folderId) >= 0; }).length;
+  }
   function fetchRubric(materialId){ return route('fetchRubric', [materialId], function(){ return apiGet('/api/materials/'+materialId+'/rubric'); }); }
   function parseRubric(materialId){
     if(BE) return Promise.reject(new Error('Rubric parsing has not moved to the cloud yet.'));
@@ -4018,16 +4193,6 @@
   }
 
   // ---------------- Files (global) ----------------
-  function fileRowHtml(m, classId){
-    var name = m.filename || m.title || m.url;
-    return '<div class="material-row">'
-      + '<div class="file-ic" style="background:'+fileTypeColor(name)+';">'+fileTypeInitials(name)+'</div>'
-      + '<a href="#" data-action="preview-file" data-id="'+m.id+'">'+escapeHtml(m.title||name)+'</a>'
-      + '<span class="hint" style="flex:none;">'+relTimeAgo(m.createdAt)+'</span>'
-      + '<button type="button" class="btn ghost" data-action="remove-material" data-class="'+classId+'" data-mid="'+m.id+'">✕</button>'
-      + '</div>';
-  }
-
   function noteRowHtml(n, classId){
     var text = stripHtml(n.text).trim() || 'Untitled note';
     return '<div class="material-row" data-action="preview-note" data-id="'+n.id+'" style="cursor:pointer;">'
@@ -4037,14 +4202,14 @@
       + '</div>';
   }
 
-  function triggerLibraryUpload(classId){
+  function triggerLibraryUpload(classId, opts){
     var input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;          // pick as many as you like in one go
     input.style.display = 'none';
     document.body.appendChild(input);
     input.addEventListener('change', function(){
-      if(input.files && input.files.length) uploadFilesToClass(classId, input.files);
+      if(input.files && input.files.length) uploadFilesToClass(classId, input.files, opts || {});
       document.body.removeChild(input);
     });
     input.click();
@@ -4083,6 +4248,9 @@
         var fd = new FormData();
         fd.append('file', file);
         fd.append('category', guessFileCategory(file.name));
+        // An explicit folder means "the one I am standing in". With none, the server
+        // files it by the filename guess instead.
+        if(opts.folderId) fd.append('folderId', opts.folderId);
         if(opts.itemId) fd.append('itemId', opts.itemId);
         var target = classId === INBOX_ID ? '/api/materials' : '/api/classes/'+classId+'/materials';
         return fetch(target, { method:'POST', body: fd })
@@ -4133,11 +4301,7 @@
     var topics = c.syllabus || [];
     var topicsDone = topics.filter(function(t){ return t.done; }).length;
 
-    var fileGroups = FILE_CATEGORIES.map(function(cat){
-      var rows = mats.filter(function(m){ return (m.category||'other')===cat.key; });
-      if(rows.length===0) return '';
-      return '<div class="file-cat-title">'+cat.label+'</div>' + rows.map(function(m){ return fileRowHtml(m, c.id); }).join('');
-    }).join('');
+    var fileGroups = classFolderSectionsHtml(c, { hideEmpty:true });
 
     var syllabusHtml = '';
     if(topics.length){
@@ -4166,10 +4330,17 @@
   }
 
   // ---------------- Files ----------------
+  // Navigation is a real tree: All files → a class → a folder → its subfolders.
+  // filesFolder holds the class being browsed and filesSubfolder the folder inside
+  // it, because a folder belongs to exactly one class and the pair is what a
+  // breadcrumb has to rebuild.
   var filesTab = 'all';
   var filesLayout = 'grid';
   var filesSearch = '';
-  var filesFolder = null;
+  var filesFolder = null;         // class id
+  var filesSubfolder = null;      // file folder id within that class
+  var filesType = 'all';
+  var filesWhen = 'any';
   var filesUploadClassId = null;
 
   /** Which class a drop on the Files page belongs to. */
@@ -4180,10 +4351,18 @@
       || INBOX_ID;
   }
 
+  /** Is anything narrowing the view right now? Drives the Clear button and the banner. */
+  function filesFiltering(){
+    return !!filesSearch || filesType !== 'all' || filesWhen !== 'any';
+  }
+  function clearFilesFilters(){
+    filesSearch = ''; filesType = 'all'; filesWhen = 'any';
+  }
+
   /**
    * The Files page needs somewhere to drop onto, and a file has to belong to a
    * class, so the class picker sits inside the zone rather than in a dialog
-   * afterwards.
+   * afterwards. When a folder is open the drop lands in that folder.
    */
   function filesDropzoneHtml(){
     var current = filesDropClassId();
@@ -4191,12 +4370,17 @@
       return '<option value="'+c.id+'"'+(c.id===current?' selected':'')+'>'
         + escapeHtml(c.id===INBOX_ID ? 'Inbox (sort it later)' : (c.code||c.name||''))+'</option>';
     }).join('');
-    return '<div class="files-drop dropzone" id="files-drop" data-classid="'+(current||'')+'">'
+    var here = filesSubfolder ? fileFolderById(filesSubfolder) : null;
+    var where = here
+      ? '<div class="fd-sub">Landing in <b>'+escapeHtml(here.name||'this folder')+'</b>, or '
+      : '<div class="fd-sub">Several at once is fine, or ';
+    return '<div class="files-drop dropzone" id="files-drop" data-classid="'+(current||'')+'"'
+      + ' data-folderid="'+(here ? here.id : '')+'">'
       + '<div class="fd-ic">'+iconSvg('upload')+'</div>'
       + '<div class="fd-text"><div class="fd-main">Drag files here</div>'
-      + '<div class="fd-sub">Several at once is fine, or '
+      + where
       + '<button type="button" class="fd-browse" data-action="files-upload-prompt">browse</button></div></div>'
-      + '<label class="fd-class">Into<select id="files-drop-class" data-action="files-drop-class">'+opts+'</select></label>'
+      + (here ? '' : '<label class="fd-class">Into<select id="files-drop-class" data-action="files-drop-class">'+opts+'</select></label>')
       + '</div>';
   }
   var filesStarred = new Set(loadStarredFiles());
@@ -4221,30 +4405,81 @@
   }
   function fileSizeLabel(m){ return (m.kind==='file' && m.size!=null) ? humanSize(m.size) : '—'; }
 
-  function filesMatching(){
-    var list = allMaterials();
-    if(filesFolder) list = list.filter(function(m){ return m.cls.id===filesFolder; });
-    if(filesTab==='recent'){
-      list = list.slice().sort(function(a,b){ return (b.createdAt||'').localeCompare(a.createdAt||''); }).slice(0,20);
-    } else if(filesTab==='starred'){
-      list = list.filter(function(m){ return filesStarred.has(m.id); });
-    }
-    if(filesSearch){
-      var q = filesSearch.toLowerCase();
-      list = list.filter(function(m){
-        return ((m.title||'')+' '+(m.filename||'')+' '+(m.cls.code||'')).toLowerCase().indexOf(q) >= 0;
-      });
-    }
-    return list;
+  // The type filter groups the labels above into the handful of things worth
+  // filtering by. Kept as chips rather than a select so every option is on screen.
+  var FILE_TYPE_FILTERS = [
+    ['all', 'All types', null],
+    ['pdf', 'PDF', ['PDF']],
+    ['doc', 'Documents', ['Document', 'Text']],
+    ['slides', 'Slides', ['Presentation']],
+    ['sheet', 'Sheets', ['Spreadsheet']],
+    ['image', 'Images', ['Image']],
+    ['link', 'Links', ['Link']]
+  ];
+  var FILE_WHEN_FILTERS = [
+    ['any', 'Any time', null],
+    ['today', 'Today', 1],
+    ['week', 'Past week', 7],
+    ['month', 'Past month', 31]
+  ];
+  function fileMatchesType(m){
+    if(filesType === 'all') return true;
+    var row = FILE_TYPE_FILTERS.find(function(t){ return t[0]===filesType; });
+    return !!row && row[2].indexOf(fileTypeLabel(m)) >= 0;
+  }
+  function fileMatchesWhen(m){
+    if(filesWhen === 'any') return true;
+    var row = FILE_WHEN_FILTERS.find(function(t){ return t[0]===filesWhen; });
+    if(!row || !m.createdAt) return false;
+    var age = (Date.now() - new Date(m.createdAt).getTime()) / 86400000;
+    return age >= 0 && age < row[2];
+  }
+  /** The folder a file shows under, as text. Used by search results and the list view. */
+  function fileFolderLabel(m){
+    var path = fileFolderPath(m.folderId);
+    if(!path.length) return m.cls.id===INBOX_ID ? 'Inbox' : 'Top level';
+    return path.map(function(f){ return f.name; }).join(' / ');
   }
 
+  /**
+   * What the page should show.
+   *
+   * Searching is deliberately global: a search that only looked inside the folder
+   * you happen to have open is a search that hides the answer. Browsing is the
+   * opposite, and shows one folder's own files and nothing nested below it.
+   */
+  function filesMatching(){
+    var list = allMaterials();
+    if(filesTab==='starred'){
+      list = list.filter(function(m){ return filesStarred.has(m.id); });
+    } else if(filesTab==='recent'){
+      list = list.slice().sort(function(a,b){ return (b.createdAt||'').localeCompare(a.createdAt||''); }).slice(0,20);
+    } else if(!filesSearch){
+      if(filesFolder) list = list.filter(function(m){ return m.cls.id===filesFolder; });
+      if(filesFolder) list = list.filter(function(m){ return (m.folderId||null) === (filesSubfolder||null); });
+    }
+    if(filesSearch){
+      // Every word has to appear somewhere in the file's own text: name, class,
+      // folder path or type. Word-by-word so "phil rubric" finds it.
+      var words = filesSearch.toLowerCase().split(/\s+/).filter(Boolean);
+      list = list.filter(function(m){
+        var hay = ((m.title||'')+' '+(m.filename||'')+' '+(m.cls.code||'')+' '+(m.cls.name||'')
+                   +' '+fileFolderLabel(m)+' '+fileTypeLabel(m)).toLowerCase();
+        return words.every(function(w){ return hay.indexOf(w) >= 0; });
+      });
+    }
+    return list.filter(fileMatchesType).filter(fileMatchesWhen);
+  }
+
+  /** The class cards at the top level of All Files. Each one is a drop target. */
   function folderCardsHtml(){
     var counts = {};
     allMaterials().forEach(function(m){ counts[m.cls.id] = (counts[m.cls.id]||0)+1; });
-    return '<h2 class="files-section-h">Folders</h2><div class="folder-grid">'
+    return '<h2 class="files-section-h">Classes</h2><div class="folder-grid">'
       + classes.concat([inboxClass()]).map(function(c){
           var n = counts[c.id] || 0;
-          return '<div class="folder-card" data-action="files-open-folder" data-id="'+c.id+'">'
+          return '<div class="folder-card" data-action="files-open-folder" data-id="'+c.id+'"'
+            + ' data-fdrop="class" data-class="'+c.id+'">'
             + '<div class="folder-ic" style="background:'+c.color+'"></div>'
             + '<div style="flex:1;min-width:0;"><div class="folder-name">'+escapeHtml(c.code||c.name||'Class')+'</div>'
             + '<div class="folder-sub">'+escapeHtml(c.name||'')+'</div>'
@@ -4255,27 +4490,64 @@
       + '</div>';
   }
 
+  /**
+   * The folders sitting inside wherever you are. Each is draggable (to re-nest it)
+   * and a drop target (for files and for other folders).
+   */
+  function subfolderCardsHtml(classId, parentId){
+    if(!classId || classId === INBOX_ID) return '';
+    var kids = fileFolderChildren(classId, parentId);
+    var newBtn = '<button type="button" class="folder-card folder-card-new" data-action="file-folder-new"'
+      + ' data-class="'+classId+'" data-parent="'+(parentId||'')+'">'
+      + '<div class="folder-ic folder-ic-new">'+iconSvg('plus')+'</div>'
+      + '<div style="flex:1;min-width:0;"><div class="folder-name">New folder</div>'
+      + '<div class="folder-sub">inside '+escapeHtml(parentId ? (fileFolderById(parentId)||{}).name||'here' : (classById(classId)||{}).code||'this class')+'</div></div>'
+      + '</button>';
+    var cards = kids.map(function(f){
+      var n = fileFolderCount(f.id);
+      var sub = fileFolderChildren(classId, f.id).length;
+      return '<div class="folder-card" data-action="files-open-subfolder" data-id="'+f.id+'"'
+        + ' data-fdrop="folder" data-class="'+classId+'" data-folder="'+f.id+'"'
+        + ' draggable="true" data-drag="filefolder" data-dragid="'+f.id+'">'
+        + '<div class="folder-ic" style="background:'+((classById(classId)||{}).color||'var(--accent)')+'"></div>'
+        + '<div style="flex:1;min-width:0;"><div class="folder-name">'+escapeHtml(f.name||'Folder')+'</div>'
+        + '<div class="folder-sub">'+(sub ? sub+' folder'+(sub===1?'':'s') : 'No subfolders')+'</div>'
+        + '<div class="folder-count">'+n+' file'+(n===1?'':'s')+'</div></div>'
+        + '<button type="button" class="btn ghost folder-menu" data-action="file-folder-menu" data-id="'+f.id+'" title="Rename or delete">⋯</button>'
+        + '</div>';
+    }).join('');
+    return '<h2 class="files-section-h">Folders</h2><div class="folder-grid">' + cards + newBtn + '</div>';
+  }
+
   function fileListHtml(list){
-    if(list.length===0) return '<div class="card"><div class="empty" style="border:none;box-shadow:none;background:transparent;">No files here yet.</div></div>';
+    if(list.length===0){
+      var why = filesFiltering()
+        ? 'Nothing matches. <button type="button" class="link-btn" data-action="files-clear-search">Clear the search and filters</button>'
+        : 'No files here yet. Drag some in above.';
+      return '<div class="card"><div class="empty" style="border:none;box-shadow:none;background:transparent;">'+why+'</div></div>';
+    }
     if(filesLayout==='grid'){
       return '<div class="file-grid">' + list.map(function(m){
         var name = m.filename || m.title || m.url;
-        return '<div class="file-tile" data-action="preview-file" data-id="'+m.id+'">'
+        return '<div class="file-tile" data-action="preview-file" data-id="'+m.id+'"'
+          + ' draggable="true" data-drag="file" data-dragid="'+m.id+'" title="Drag to move into a folder">'
           + '<div class="file-ic file-ic-lg" style="background:'+fileTypeColor(name)+';">'+fileTypeInitials(name)+'</div>'
           + '<div class="file-tile-name">'+escapeHtml(m.title||name)+'</div>'
           + '<div class="file-tile-meta">'+escapeHtml(m.cls.code||'')+' · '+fileSizeLabel(m)+'</div>'
+          + (filesSearch ? '<div class="file-tile-where">'+escapeHtml(fileFolderLabel(m))+'</div>' : '')
           + '<button type="button" class="file-star'+(filesStarred.has(m.id)?' on':'')+'" data-action="toggle-star" data-id="'+m.id+'" title="Star">★</button>'
           + '</div>';
       }).join('') + '</div>';
     }
-    var head = '<div class="file-row-t file-head"><span>Name</span><span>Class</span><span>Type</span><span>Size</span><span>Date Modified</span><span></span></div>';
+    var head = '<div class="file-row-t file-head"><span>Name</span><span>Class</span><span>Folder</span><span>Type</span><span>Size</span><span>Added</span><span></span></div>';
     var rows = list.map(function(m){
       var name = m.filename || m.title || m.url;
-      return '<div class="file-row-t">'
+      return '<div class="file-row-t" draggable="true" data-drag="file" data-dragid="'+m.id+'">'
         + '<span class="file-name-cell" data-action="preview-file" data-id="'+m.id+'">'
           + '<span class="file-ic" style="background:'+fileTypeColor(name)+';">'+fileTypeInitials(name)+'</span>'
           + '<span class="file-name-txt">'+escapeHtml(m.title||name)+'</span></span>'
         + '<span class="file-cls"><span class="dot" style="--c:'+m.cls.color+'"></span>'+escapeHtml(m.cls.code||'')+'</span>'
+        + '<span class="cp-dim">'+escapeHtml(fileFolderLabel(m))+'</span>'
         + '<span class="cp-dim">'+fileTypeLabel(m)+'</span>'
         + '<span class="cp-dim">'+fileSizeLabel(m)+'</span>'
         + '<span class="cp-dim">'+(m.createdAt?fmtDateShort(m.createdAt.slice(0,10)):'')+'</span>'
@@ -4284,19 +4556,104 @@
           + '<button type="button" class="btn ghost" data-action="remove-material" data-class="'+m.cls.id+'" data-mid="'+m.id+'">✕</button>'
         + '</span></div>';
     }).join('');
-    return '<div class="card asg-card">'+head+rows+'</div>';
+    return '<div class="card asg-card file-table">'+head+rows+'</div>';
+  }
+
+  /** All files › PHIL 110 › Lectures › Week 1-4. Every crumb is also a drop target. */
+  function filesCrumbsHtml(){
+    if(!filesFolder) return '';
+    var cls = classById(filesFolder) || {};
+    var crumbs = ['<button type="button" class="cp-crumb-back" data-action="files-open-folder" data-id="">‹ All files</button>'];
+    crumbs.push('<span class="cp-crumb-sep">›</span>'
+      + '<button type="button" class="cp-crumb-link" data-action="files-open-folder" data-id="'+filesFolder+'"'
+      + ' data-fdrop="class" data-class="'+filesFolder+'">'+escapeHtml(cls.code||cls.name||'Class')+'</button>');
+    var path = fileFolderPath(filesSubfolder);
+    path.forEach(function(f, i){
+      var last = i === path.length - 1;
+      crumbs.push('<span class="cp-crumb-sep">›</span>'
+        + (last
+            ? '<span class="cp-crumb-cur" data-fdrop="folder" data-class="'+filesFolder+'" data-folder="'+f.id+'">'+escapeHtml(f.name||'')+'</span>'
+            : '<button type="button" class="cp-crumb-link" data-action="files-open-subfolder" data-id="'+f.id+'"'
+              + ' data-fdrop="folder" data-class="'+filesFolder+'" data-folder="'+f.id+'">'+escapeHtml(f.name||'')+'</button>'));
+    });
+    return '<div class="cp-crumbs">' + crumbs.join('') + '</div>';
+  }
+
+  /** The filter chips. Always on screen, never folded into a menu. */
+  function filesFiltersHtml(){
+    var types = FILE_TYPE_FILTERS.map(function(t){
+      return '<button type="button" class="asg-filter'+(filesType===t[0]?' active':'')+'"'
+        + ' data-action="files-type" data-type="'+t[0]+'">'+t[1]+'</button>';
+    }).join('');
+    var whens = FILE_WHEN_FILTERS.map(function(t){
+      return '<button type="button" class="asg-filter'+(filesWhen===t[0]?' active':'')+'"'
+        + ' data-action="files-when" data-when="'+t[0]+'">'+t[1]+'</button>';
+    }).join('');
+    return '<div class="files-filters"><div class="ff-row">'+types+'</div><div class="ff-row">'+whens+'</div></div>';
+  }
+
+  /**
+   * The banner that sits above search results.
+   *
+   * It exists because the old Files search had no way out: the body was replaced,
+   * the folder cards vanished, and nothing on screen said how to get back. Now the
+   * count, the query and the way out are all in one strip you cannot miss.
+   */
+  function filesResultBannerHtml(n){
+    if(!filesFiltering()) return '';
+    var what = filesSearch
+      ? n + ' file' + (n===1?'':'s') + ' matching “' + escapeHtml(filesSearch) + '”'
+      : n + ' file' + (n===1?'':'s') + ' after filtering';
+    var where = filesSearch
+      ? ' <span class="fr-scope">across every class</span>'
+      : '';
+    return '<div class="files-result-banner">'
+      + '<span class="fr-count">'+what+'</span>'+where
+      + '<button type="button" class="btn" data-action="files-clear-search">✕ Clear search</button>'
+      + '</div>';
+  }
+
+  /**
+   * Rename or delete one folder. Deliberately a modal with two labelled buttons
+   * rather than a hover menu: both actions and their consequences are on screen.
+   */
+  function openFileFolderModal(fid){
+    var f = fileFolderById(fid);
+    if(!f) return;
+    var n = fileFolderCount(f.id);
+    var subs = fileFolderChildren(f.classId, f.id).length;
+    document.getElementById('modal-root').innerHTML =
+      '<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop">'
+      + '<div class="modal-head"><h2>'+escapeHtml(f.name||'Folder')+'</h2>'
+      + '<div class="hint">'+escapeHtml((classById(f.classId)||{}).code||'')+' · '
+        + n+' file'+(n===1?'':'s')+(subs?' · '+subs+' subfolder'+(subs===1?'':'s'):'')+'</div></div>'
+      + '<div class="modal-body">'
+      + '<div class="hint" style="margin-bottom:12px;">Deleting a folder never deletes files. '
+        + 'Everything inside it moves up one level.</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      + '<button type="button" class="btn" data-action="file-folder-rename" data-id="'+f.id+'">Rename</button>'
+      + '<button type="button" class="btn" data-action="file-folder-new" data-class="'+f.classId+'" data-parent="'+f.id+'">New folder inside</button>'
+      + '<button type="button" class="btn danger" data-action="file-folder-delete" data-id="'+f.id+'">Delete folder</button>'
+      + '</div></div>'
+      + '<div class="modal-foot"><span></span><div class="right">'
+      + '<button class="btn primary" data-action="modal-close">Done</button></div></div>'
+      + '</div></div>';
+    paintIcons(document.getElementById('modal-root'));
   }
 
   function viewFilesPage(){
-
     var tabs = [['all','All Files'],['byclass','By Class'],['recent','Recent'],['starred','Starred']];
+    var clearBtn = filesSearch
+      ? '<button type="button" class="search-clear" data-action="files-clear-search" title="Clear search">✕</button>'
+      : '';
     var toolbar = '<div class="asg-toolbar"><div class="seg-tabs">'
       + tabs.map(function(t){
           return '<button type="button" class="seg-tab'+(filesTab===t[0]?' active':'')+'" data-action="files-tab" data-tab="'+t[0]+'">'+t[1]+'</button>';
         }).join('')
       + '</div><div class="asg-toolbar-right">'
-      + '<div class="input-search"><span class="ic" data-icon="search"></span>'
-      + '<input type="text" id="files-search" placeholder="Search files..." value="'+escapeHtml(filesSearch)+'"></div>'
+      + '<div class="input-search'+(filesSearch?' has-value':'')+'"><span class="ic" data-icon="search"></span>'
+      + '<input type="text" id="files-search" placeholder="Search every class..." value="'+escapeHtml(filesSearch)+'">'
+      + clearBtn + '</div>'
       + '<button type="button" class="btn primary" data-action="files-upload-prompt">+ Upload files</button>'
       + '</div></div>';
 
@@ -4308,28 +4665,40 @@
       return toolbar + drop + '<div id="files-body">' + homes.map(classLibrarySectionHtml).join('') + '</div>';
     }
 
+    return toolbar + drop + filesCrumbsHtml() + filesFiltersHtml()
+      + '<div id="files-body">' + filesBodyHtml() + '</div>';
+  }
+
+  /**
+   * Everything below the toolbar. Split out from viewFilesPage so typing in the
+   * search box can repaint just this, and get the banner and the folder cards with
+   * it rather than a bare list with no way back.
+   */
+  function filesBodyHtml(){
+    var list = filesMatching();
     var layoutToggle = '<div class="layout-toggle">'
       + '<button type="button" class="lt-btn'+(filesLayout==='grid'?' active':'')+'" data-action="files-layout" data-layout="grid" title="Grid">▦</button>'
       + '<button type="button" class="lt-btn'+(filesLayout==='list'?' active':'')+'" data-action="files-layout" data-layout="list" title="List">☰</button>'
       + '</div>';
 
-    var crumb = filesFolder
-      ? '<div class="cp-crumbs"><button type="button" class="cp-crumb-back" data-action="files-open-folder" data-id="">‹ All files</button>'
-        + '<span class="cp-crumb-sep">›</span><span class="cp-crumb-cur">'+escapeHtml((classById(filesFolder)||{}).code||'')+'</span></div>'
-      : '';
+    // While searching, folder cards would be lying about what is on screen.
+    var browsing = !filesSearch && filesTab==='all';
+    var cards = '';
+    if(browsing && !filesFolder) cards = folderCardsHtml();
+    else if(browsing) cards = subfolderCardsHtml(filesFolder, filesSubfolder);
 
-    var list = filesMatching();
-    var heading = filesFolder ? escapeHtml((classById(filesFolder)||{}).code||'Folder')
+    var heading = filesSearch ? 'Results'
                 : filesTab==='recent' ? 'Recent Files'
-                : filesTab==='starred' ? 'Starred' : 'Recent Files';
+                : filesTab==='starred' ? 'Starred'
+                : filesSubfolder ? ((fileFolderById(filesSubfolder)||{}).name || 'Folder')
+                : filesFolder ? ((classById(filesFolder)||{}).code || 'Folder')
+                : 'Recent Files';
 
-    var body = (filesTab==='all' && !filesFolder && !filesSearch ? folderCardsHtml() : '')
+    return filesResultBannerHtml(list.length)
+      + cards
       + '<div class="files-list-head"><h2 class="files-section-h">'+heading+'</h2>'+layoutToggle+'</div>'
       + fileListHtml(list);
-
-    return toolbar + drop + crumb + '<div id="files-body">' + body + '</div>';
   }
-
   // ---------------- Grades (global) ----------------
   // ---------------- Grades ----------------
   var gradesView = 'course';
@@ -4707,29 +5076,90 @@
     }).join('');
   }
 
+  /**
+   * A class's folders as a <select>, so a file can be refiled without dragging.
+   * Flat, with indentation showing depth: a nested <optgroup> tree is not a thing
+   * browsers do, and the path is what identifies a folder anyway.
+   */
+  function folderSelectOptionsHtml(classId, selectedId){
+    var out = ['<option value=""'+(selectedId?'':' selected')+'>Top level</option>'];
+    (function walk(parentId, depth){
+      fileFolderChildren(classId, parentId).forEach(function(f){
+        out.push('<option value="'+f.id+'"'+(f.id===selectedId?' selected':'')+'>'
+          + new Array(depth+1).join('— ') + escapeHtml(f.name||'Folder') + '</option>');
+        walk(f.id, depth+1);
+      });
+    })(null, 1);
+    return out.join('');
+  }
+
+  /** One file inside a class view: open it, refile it, or remove it. */
+  function classFileRowHtml(m, c){
+    var label = escapeHtml(m.title || m.filename || m.url);
+    var titleAttr = m.kind==='file' && m.size!=null ? ' title="'+humanSize(m.size)+'"' : '';
+    // The rubric parser only makes sense on a file that is actually a rubric, which
+    // is now "lives in the Rubrics folder" rather than "was guessed as one".
+    var inRubrics = (fileFolderById(m.folderId)||{}).kind === 'rubrics';
+    var rubricBtn = inRubrics
+      ? '<button type="button" class="btn ghost" data-action="open-rubric" data-mid="'+m.id+'" data-class="'+c.id+'">Rubric</button>'
+      : '';
+    var picker = c.id === INBOX_ID ? ''
+      : '<select class="mat-cat-select" data-action="change-material-folder" data-class="'+c.id+'" data-mid="'+m.id+'">'
+        + folderSelectOptionsHtml(c.id, m.folderId || '') + '</select>';
+    return '<div class="material-row" draggable="true" data-drag="file" data-dragid="'+m.id+'">'
+      + '<a href="#" data-action="preview-file" data-id="'+m.id+'"'+titleAttr+'>'+label+'</a>'
+      + picker + rubricBtn
+      + '<button type="button" class="btn ghost" data-action="remove-material" data-class="'+c.id+'" data-mid="'+m.id+'">✕</button>'
+      + '</div>';
+  }
+
+  /**
+   * Every folder in a class, in tree order, each with its own files and its own
+   * drop target. Empty folders are still shown: a folder you cannot see is a folder
+   * you cannot drag anything into.
+   */
+  function classFolderSectionsHtml(c, opts){
+    opts = opts || {};
+    var mats = c.materials || [];
+    var loose = mats.filter(function(m){ return !m.folderId; });
+    var html = '';
+    if(loose.length){
+      html += '<div class="detail-section" data-fdrop="class" data-class="'+c.id+'">'
+        + '<h4 class="file-cat-title">Top level</h4>'
+        + loose.map(function(m){ return classFileRowHtml(m, c); }).join('')
+        + '</div>';
+    }
+    (function walk(parentId, depth){
+      fileFolderChildren(c.id, parentId).forEach(function(f){
+        var rows = mats.filter(function(m){ return m.folderId === f.id; });
+        // The By Class overview is for reading, so an empty folder is noise there:
+        // five classes times seven starting folders is a page of headings and
+        // nothing else. The class's own Files tab is where you organise, and it
+        // keeps every folder visible so there is always something to drag onto.
+        if(opts.hideEmpty && fileFolderCount(f.id) === 0){ walk(f.id, depth+1); return; }
+        var path = fileFolderPath(f.id).map(function(x){ return escapeHtml(x.name||''); }).join(' / ');
+        html += '<div class="detail-section" data-fdrop="folder" data-class="'+c.id+'" data-folder="'+f.id+'">'
+          + '<h4 class="file-cat-title">'+path+' <span class="hint">'+rows.length+'</span></h4>'
+          + (rows.length
+              ? rows.map(function(m){ return classFileRowHtml(m, c); }).join('')
+              : '<div class="hint" style="margin:0 0 4px;">Empty. Drag a file here.</div>')
+          + '</div>';
+        walk(f.id, depth+1);
+      });
+    })(null, 0);
+    return html;
+  }
+
   function filesTabHtml(c){
     var mats = c.materials || [];
     var html = assignmentFilesHtml(c, 'tab');
-    FILE_CATEGORIES.forEach(function(cat){
-      var rows = mats.filter(function(m){ return (m.category||'other')===cat.key; });
-      if(rows.length===0) return;
-      html += '<div class="detail-section"><h4 class="file-cat-title">'+cat.label+'</h4>'
-        + rows.map(function(m){
-            var label = escapeHtml(m.title || m.filename || m.url);
-            var titleAttr = m.kind==='file' ? ' title="'+humanSize(m.size)+'"' : '';
-            var rubricBtn = cat.key==='rubrics' ? '<button type="button" class="btn ghost" data-action="open-rubric" data-mid="'+m.id+'" data-class="'+c.id+'">Rubric</button>' : '';
-            var catSelect = '<select class="mat-cat-select" data-action="change-material-category" data-class="'+c.id+'" data-mid="'+m.id+'">'
-              + FILE_CATEGORIES.map(function(fc){ return '<option value="'+fc.key+'"'+((m.category||'other')===fc.key?' selected':'')+'>'+fc.label+'</option>'; }).join('')
-              + '</select>';
-            return '<div class="material-row"><a href="'+escapeHtml(m.url)+'" target="_blank" rel="noopener noreferrer"'+titleAttr+'>'+label+'</a>'+catSelect+rubricBtn+'<button type="button" class="btn ghost" data-action="remove-material" data-class="'+c.id+'" data-mid="'+m.id+'">✕</button></div>';
-          }).join('')
-        + '</div>';
-    });
+    html += classFolderSectionsHtml(c);
     if(mats.length===0) html += '<div class="hint" style="margin-bottom:14px;">Nothing added yet.</div>';
 
     html += '<div class="detail-section">'
       + '<h4 class="file-cat-title">Add material</h4>'
-      + '<label class="field" style="margin-bottom:8px;">Category<select id="mat-category">'+FILE_CATEGORIES.map(function(cat){ return '<option value="'+cat.key+'">'+cat.label+'</option>'; }).join('')+'</select></label>'
+      + '<label class="field" style="margin-bottom:8px;">Folder<select id="mat-folder">'
+        + folderSelectOptionsHtml(c.id, '') + '</select></label>'
       + '<div class="dropzone" data-classid="'+c.id+'">Drag a file here, or <button type="button" class="btn ghost" data-action="browse-file">browse</button>'
       + '<input type="file" id="file-input" data-action="material-file-input" data-classid="'+c.id+'" hidden></div>'
       + '<div class="material-add-row">'
@@ -4737,6 +5167,8 @@
       + '<input type="text" id="mat-url" placeholder="Link">'
       + '<button type="button" class="btn" data-action="add-material-link" data-class="'+c.id+'">Add link</button>'
       + '</div>'
+      + '<button type="button" class="btn" style="margin-top:10px;" data-action="file-folder-new" data-class="'+c.id+'" data-parent="">'
+        + iconSvg('plus')+' New folder</button>'
       + '</div>';
     return html;
   }
@@ -4744,7 +5176,7 @@
   function assignmentsTabHtml(c){
     var classItems = items.filter(function(it){ return it.classId===c.id; })
       .sort(function(a,b){ return (a.dueDate||'zzzz').localeCompare(b.dueDate||'zzzz') || (a.dueTime||'').localeCompare(b.dueTime||''); });
-    return '<button type="button" class="btn ghost" data-action="open-add-item" data-classid="'+c.id+'" style="margin-bottom:10px;">+ Add item</button>'
+    return '<button type="button" class="btn ghost" data-action="open-add-item" data-classid="'+c.id+'" style="margin-bottom:10px;">+ Add assignment</button>'
       + (classItems.length
           ? classItems.map(function(it){ return calListRowHtml(it, {withGrade:true}); }).join('')
           : '<div class="hint">Nothing tracked for this class yet.</div>');
@@ -4872,7 +5304,7 @@
       + '<button type="button" data-action="rte-ins" data-ins="code">&lt;/&gt; Code block</button>'
       + '<button type="button" data-action="rte-ins" data-ins="math">∑ Equation</button>'
       + '<button type="button" data-action="rte-ins" data-ins="hr">— Divider</button>'
-      + (opts.classId ? '<button type="button" data-action="rte-ins" data-ins="embed">📎 Embed a file</button>' : '')
+      + '<button type="button" data-action="rte-ins" data-ins="embed">📎 Embed a file</button>'
       + '<div class="rte-dd-label">Formatting</div>'
       + '<button type="button" data-action="rte-cmd" data-cmd="removeFormat">⌫ Clear formatting</button>';
 
@@ -5180,48 +5612,78 @@
     return clone.innerHTML;
   }
 
-  // ---- embedding a file the class already has ---------------------------
-  function openEmbedFilePicker(editor){
+  // ---- embedding a file in a note ---------------------------------------
+  // The embed is a reference, never a copy: one file on disk, named from as many
+  // notes as you like. The picker reaches every class because a note about an essay
+  // routinely wants a rubric or reading that lives somewhere else.
+  var embedTargetEditorId = null;
+  var embedPickerSearch = '';
+
+  function embedPickerRowsHtml(){
     var cls = notesActiveClass();
-    var files = (cls && cls.materials || []).filter(function(m){ return m.kind === 'file'; });
+    var q = embedPickerSearch.toLowerCase();
+    var files = allMaterials().filter(function(m){
+      if(m.kind !== 'file') return false;
+      if(!q) return true;
+      return ((m.title||'')+' '+(m.filename||'')+' '+(m.cls.code||'')+' '+fileFolderLabel(m))
+        .toLowerCase().indexOf(q) >= 0;
+    });
+    // This class first: it is what you usually want, without hiding the rest.
+    files.sort(function(a,b){
+      var an = (cls && a.cls.id===cls.id) ? 0 : 1, bn = (cls && b.cls.id===cls.id) ? 0 : 1;
+      return an-bn || (b.createdAt||'').localeCompare(a.createdAt||'');
+    });
     if(!files.length){
-      reportError(new Error('This class has no uploaded files yet. Add one on the Files page first.'));
-      return;
+      return '<div class="hint">'+(embedPickerSearch ? 'No file matches that.' : 'No uploaded files yet. Add one on the Files page first.')+'</div>';
     }
-    var rows = files.map(function(m){
+    return files.map(function(m){
       var name = m.filename || m.title || 'File';
       return '<button type="button" class="material-row" style="width:100%;text-align:left;cursor:pointer;background:none;border:none;"'
         + ' data-action="rte-embed-pick" data-mid="'+m.id+'">'
         + '<div class="file-ic" style="background:'+fileTypeColor(name)+';">'+fileTypeInitials(name)+'</div>'
-        + '<span style="flex:1;">'+escapeHtml(m.title || name)+'</span>'
+        + '<span style="flex:1;min-width:0;"><span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+          + escapeHtml(m.title || name)+'</span>'
+        + '<span class="hint">'+escapeHtml((m.cls.code||'Inbox')+' · '+fileFolderLabel(m))+'</span></span>'
         + '<span class="hint">'+(m.size!=null?humanSize(m.size):'')+'</span></button>';
     }).join('');
+  }
+
+  function openEmbedFilePicker(editor){
+    if(editor) embedTargetEditorId = editor.id;
+    embedPickerSearch = '';
     document.getElementById('modal-root').innerHTML =
       '<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop">'
       + '<div class="modal-head"><h2>Embed a file</h2></div>'
       + '<div class="modal-body"><div class="hint" style="margin-bottom:10px;">'
-      + 'The note will link to the file. Nothing is copied, so the file stays in one place.</div>'
-      + rows + '</div>'
+      + 'The note points at the file. Nothing is copied, so there is still one file, '
+      + 'and opening it from here opens it inside Vesta.</div>'
+      + '<div class="input-search" style="margin-bottom:10px;"><span class="ic" data-icon="search"></span>'
+      + '<input type="text" id="embed-search" placeholder="Search every class..." autocomplete="off"></div>'
+      + '<div id="embed-rows">' + embedPickerRowsHtml() + '</div></div>'
       + '<div class="modal-foot"><span></span><div class="right">'
       + '<button class="btn" data-action="modal-close">Cancel</button></div></div></div></div>';
-    embedTargetEditorId = editor.id;
+    paintIcons(document.getElementById('modal-root'));
+    var box = document.getElementById('embed-search');
+    if(box) box.focus();
   }
-  var embedTargetEditorId = null;
 
   function rteEmbedFile(materialId){
     var editor = embedTargetEditorId ? document.getElementById(embedTargetEditorId) : null;
-    var cls = notesActiveClass();
-    var m = (cls && cls.materials || []).find(function(x){ return x.id === materialId; });
+    var m = allMaterials().find(function(x){ return x.id === materialId; });
     if(!editor || !m) return;
     var name = m.filename || m.title || 'File';
     closeModal();
-    rteInsert(editor, '<a class="rte-embed" contenteditable="false" href="'+escapeHtml(m.url||'#')+'"'
-      + ' target="_blank" rel="noopener noreferrer" data-file-id="'+escapeHtml(m.fileId||m.id)+'">'
+    // No href: clicking opens Vesta's own preview rather than leaving the app.
+    rteInsert(editor, '<a class="rte-embed" contenteditable="false" href="#"'
+      + ' data-action="preview-file" data-id="'+escapeHtml(m.id)+'"'
+      + ' data-file-id="'+escapeHtml(m.fileId||m.id)+'">'
       + '<span class="file-ic" style="background:'+fileTypeColor(name)+';">'+fileTypeInitials(name)+'</span>'
       + '<span>'+escapeHtml(m.title || name)+'</span></a><p><br></p>');
-    // Record the connection properly as well, not just as markup in the body.
-    if(BE && BE.linkNote && notesOpenId){
-      BE.linkNote(notesOpenId, { type:'file', id: m.fileId || m.id }).catch(function(){});
+    // Record the connection properly as well, not just as markup in the body, so
+    // the file shows under "What this note is about" and survives an edit that
+    // deletes the chip. Both backends, not just the cloud one.
+    if(notesOpenId){
+      addNoteLink(notesOpenId, { type:'file', id: m.fileId || m.id }).catch(function(){});
     }
   }
 
@@ -5588,10 +6050,18 @@
           meta:(TYPE_LABELS[x.type]||x.type)+(x.dueDate?' · '+fmtDateShort(x.dueDate):'') }; });
     }
     if(kind === 'file'){
-      return (cls.materials||[]).map(function(m){
-        return { id:m.fileId || m.id, label:m.title || m.filename || 'File',
-                 meta:(m.kind==='file' ? (m.size!=null?humanSize(m.size):'file') : 'link') };
+      // Every file, not just this class's. A note about an essay often wants the
+      // rubric that lives in another course, and scoping the picker to one class
+      // made those files unreachable from the note side.
+      var own = [], rest = [];
+      allMaterials().forEach(function(m){
+        var row = { id:m.fileId || m.id, label:m.title || m.filename || 'File',
+                    meta:(m.cls.id===cls.id ? '' : (m.cls.code||'Inbox')+' · ')
+                         + fileFolderLabel(m) + ' · '
+                         + (m.kind==='file' ? (m.size!=null?humanSize(m.size):'file') : 'link') };
+        (m.cls.id===cls.id ? own : rest).push(row);
       });
+      return own.concat(rest);
     }
     if(kind === 'lecture'){
       return (cls.schedule||[]).map(function(sc, i){
@@ -7065,6 +7535,10 @@
   function materialDownloadUrl(m){
     return m.kind==='file' ? m.url+'?download=1' : m.url;
   }
+  var OFFICE_EXTS = ['doc','docx','odt','rtf','ppt','pptx','odp','xls','xlsx','ods'];
+  function isOfficeMaterial(m){
+    return m.kind==='file' && OFFICE_EXTS.indexOf(fileExt(m)) >= 0;
+  }
 
   function openFilePreviewModal(id){
     var m = findMaterial(id);
@@ -7077,20 +7551,40 @@
       body = '<iframe src="'+escapeHtml(m.url)+'#view=FitH" title="'+escapeHtml(name)+'"></iframe>';
     } else if(isImageMaterial(m)){
       body = '<img src="'+escapeHtml(m.url)+'" alt="'+escapeHtml(name)+'">';
+    } else if(m.previewUrl){
+      // A Word, PowerPoint or Excel file converted to PDF on upload. The original is
+      // still what Download hands back; this is only what the browser can render.
+      body = '<iframe src="'+escapeHtml(m.previewUrl)+'#view=FitH" title="'+escapeHtml(name)+'"></iframe>';
+    } else if(m.previewStatus === 'pending'){
+      body = '<div class="preview-fallback">Converting this for preview…'
+        + '<div style="margin-top:12px;" class="hint">It takes a few seconds. '
+        + '<button type="button" class="link-btn" data-action="preview-refresh" data-id="'+m.id+'">Check again</button></div></div>';
     } else if(m.kind!=='file'){
       body = '<div class="preview-fallback">This is a link, not an uploaded file.<div style="margin-top:12px;"><a class="btn primary" href="'+escapeHtml(m.url)+'" target="_blank" rel="noopener noreferrer">Open link →</a></div></div>';
     } else {
-      body = '<div class="preview-fallback">Preview isn\'t available for this file type.<div style="margin-top:12px;"><a class="btn primary" href="'+escapeHtml(materialDownloadUrl(m))+'">Download '+escapeHtml(name)+'</a></div></div>';
+      var why = (isOfficeMaterial(m) && m.previewStatus === 'failed')
+        ? 'This one could not be converted for preview.'
+        : 'Preview isn\'t available for this file type.';
+      body = '<div class="preview-fallback">'+why+'<div style="margin-top:12px;"><a class="btn primary" href="'+escapeHtml(materialDownloadUrl(m))+'">Download '+escapeHtml(name)+'</a></div></div>';
     }
     var html = '<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide" data-action="modal-stop" style="max-width:760px;">'
       + '<div class="modal-head"><h2>'+escapeHtml(m.title||name)+'</h2>'
-      + '<label class="hint" style="margin-top:6px;display:flex;align-items:center;gap:8px;">Filed under'
+      + '<label class="hint" style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">Filed under'
       + '<select data-action="material-set-class" data-id="'+m.id+'" style="width:auto;padding:4px 8px;">'
       + classes.concat([inboxClass()]).map(function(o){
           return '<option value="'+o.id+'"'+(o.id===m.cls.id?' selected':'')+'>'
             + escapeHtml(o.id===INBOX_ID ? 'Inbox (no class)' : (o.code||o.name||''))+'</option>';
         }).join('')
-      + '</select></label>' + filePreviewLinksHtml(m) + '</div>'
+      + '</select>'
+      + (m.cls.id===INBOX_ID ? ''
+          : 'in<select data-action="material-set-folder" data-id="'+m.id+'" style="width:auto;padding:4px 8px;">'
+            + folderSelectOptionsHtml(m.cls.id, m.folderId||'') + '</select>')
+      + '</label>'
+      + '<div class="hint" style="margin-top:6px;">'+escapeHtml(fileTypeLabel(m))
+        + (m.kind==='file' && m.size!=null ? ' · '+humanSize(m.size) : '')
+        + (m.createdAt ? ' · added '+relTimeAgo(m.createdAt) : '')
+        + '</div>'
+      + filePreviewLinksHtml(m) + '</div>'
       + '<div class="preview-body">'+body+'</div>'
       + '<div class="modal-foot"><span></span><div class="right">'
       + (m.kind==='file' ? '<a class="btn" href="'+escapeHtml(materialDownloadUrl(m))+'">Download</a>' : '')
@@ -7289,56 +7783,235 @@
 
   var editingSubtasks = [];
 
+  // ---- new / edit assignment ----------------------------------------------
+  // The form is the detail card with every field editable, so adding an assignment
+  // looks like the card you get afterwards. Class, type, status and grade category
+  // are chip rows, not <select>s: the sets are small enough to show whole, and a
+  // dropdown hides both what is picked and what else there was.
+  //
+  // Nothing here re-renders the modal on a click. Each pick moves one `active`
+  // class and writes one hidden input, the same rule the Focus settings modal and
+  // the notes editor follow, so the caret, the scroll position and the button under
+  // the pointer all survive. The hidden inputs keep the ids the save path already
+  // reads (`f-class`, `f-type`, `f-status`, `f-category`).
+  var STATUS_TINT = {
+    todo:        ['var(--surface-3)', 'var(--text-muted)'],
+    in_progress: ['#E8EFFE', '#2456C7'],
+    done:        ['var(--success-soft)', 'var(--success)']
+  };
+
+  /** Move the `active` mark within one chip row without redrawing anything else. */
+  function aformSetActive(action, el){
+    var root = el.closest('.aform-modal') || document;
+    Array.prototype.forEach.call(root.querySelectorAll('[data-action="'+action+'"]'), function(n){
+      var on = n === el;
+      n.classList.toggle('active', on);
+      n.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  function aformChip(action, value, label, opts){
+    opts = opts || {};
+    return '<button type="button" class="aform-chip'+(opts.cls?' '+opts.cls:'')+(opts.active?' active':'')+'"'
+      + ' data-action="'+action+'" data-value="'+escapeHtml(String(value))+'"'
+      + ' aria-pressed="'+(opts.active?'true':'false')+'"'
+      + (opts.style ? ' style="'+opts.style+'"' : '')
+      + '>'+(opts.dot?'<span class="dot" style="--c:'+opts.dot+'"></span>':'')
+      + escapeHtml(label)+'</button>';
+  }
+
+  /** Grade categories belong to a class, so this row is redrawn when the class changes. */
+  function aformCategoryRowHtml(classId, selectedId){
+    var cls = classById(classId);
+    var cats = (cls && cls.gradeCategories) || [];
+    if(!cats.length){
+      return '<div class="aform-hint">'
+        + (cls ? escapeHtml(cls.code||cls.name)+' has no grade categories, so this assignment carries its own weight.'
+               : 'Pick a class to file this under one of its grade categories.')
+        + '</div>';
+    }
+    return '<div class="aform-chips">'
+      + aformChip('aform-pick-cat', '', 'Own weight', { active: !selectedId })
+      + cats.map(function(g){
+          return aformChip('aform-pick-cat', g.id,
+            g.name + (isNum(g.weight) ? ' · '+g.weight+'%' : ''),
+            { active: selectedId===g.id });
+        }).join('')
+      + '</div>';
+  }
+
+  /** Due-date shortcuts. Typing a date is the slow path for work due this week. */
+  function aformQuickDates(){
+    var today = new Date();
+    var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+    var friday = new Date();
+    // always a Friday still ahead, so it never duplicates the Today chip
+    var toFriday = (5 - friday.getDay() + 7) % 7 || 7;
+    friday.setDate(friday.getDate() + toFriday);
+    var week = new Date(); week.setDate(week.getDate()+7);
+    return [
+      ['Today', isoLocal(today)],
+      ['Tomorrow', isoLocal(tomorrow)],
+      ['Friday', isoLocal(friday)],
+      ['Next week', isoLocal(week)]
+    ];
+  }
+
+  function aformQuickHtml(current){
+    return aformQuickDates().map(function(q){
+      return aformChip('aform-due-quick', q[1], q[0], { active: current===q[1] });
+    }).join('');
+  }
+
+  /** Repaint the quick-date row in place after the date changes either way. */
+  function syncAformQuick(){
+    var host = document.getElementById('aform-quick');
+    var dateEl = document.getElementById('f-date');
+    if(!host || !dateEl) return;
+    host.innerHTML = aformQuickHtml(dateEl.value || '');
+  }
+
+  /** Weight is ignored when a category carries it, so say so instead of accepting a number. */
+  function syncAformWeight(){
+    var catEl = document.getElementById('f-category');
+    var wrap = document.getElementById('aform-weight-wrap');
+    var input = document.getElementById('f-weight');
+    if(!wrap || !input) return;
+    var owned = !!(catEl && catEl.value);
+    wrap.classList.toggle('off', owned);
+    input.disabled = owned;
+    var hint = document.getElementById('aform-weight-hint');
+    if(hint) hint.textContent = owned ? 'Set by the category' : 'Share of the course grade';
+  }
+
   function openItemModal(existing, prefillDate, prefillClassId){
     var isEdit = !!existing;
     editingSubtasks = existing && existing.subtasks ? existing.subtasks.map(function(s){ return Object.assign({}, s); }) : [];
-    var repeatBlock = isEdit ? '' : (
-      '<label class="check-label"><input type="checkbox" id="f-repeat">Repeat weekly</label>'
-      + '<div class="repeat-row" id="f-repeat-until-wrap" style="display:none;"><span class="hint">Until</span><input type="date" id="f-repeat-until" value="'+(termSettings.endDate||'')+'"></div>'
-    );
-    var html = '<div class="overlay" data-action="modal-backdrop">'
-      + '<div class="modal" data-action="modal-stop">'
-      + '<div class="modal-head"><h2>'+(isEdit?'Edit item':'Add item')+'</h2></div>'
-      + '<div class="modal-body">'
-      + '<label class="field">Title<input type="text" id="f-title" placeholder="Problem set 3" value="'+escapeHtml(existing?existing.title:'')+'"></label>'
-      + '<div class="field-row">'
-      + '<label class="field">Class<select id="f-class">'+classOptionsHtml(existing?existing.classId:(prefillClassId||''))+'</select></label>'
-      + '<label class="field">Type<select id="f-type">'+typeOptionsHtml(existing?existing.type:'assignment')+'</select></label>'
-      + '</div>'
-      + '<label class="field">Status<select id="f-status">'
-      + ['todo','in_progress','done'].map(function(k){
-          var sel = existing ? (existing.status||'todo') : 'todo';
-          return '<option value="'+k+'"'+(k===sel?' selected':'')+'>'+WORK_STATUS[k].label+'</option>';
+
+    var classId = existing ? (existing.classId || '') : (prefillClassId || '');
+    var type = existing ? (existing.type || 'assignment') : 'assignment';
+    var status = existing ? (existing.status || 'todo') : 'todo';
+    var catId = existing ? (existing.categoryId || '') : '';
+    var dueDate = existing ? (existing.dueDate || '') : (prefillDate || '');
+
+    var classChips = '<div class="aform-chips">'
+      + aformChip('aform-pick-class', '', 'General', { active: !classId, dot: 'var(--none)' })
+      + classes.map(function(c){
+          return aformChip('aform-pick-class', c.id, c.code || c.name, { active: c.id===classId, dot: c.color });
         }).join('')
-      + '</select></label>'
-      + '<div class="field-row">'
-      + '<label class="field">Due date<input type="date" id="f-date" value="'+(existing?(existing.dueDate||''):(prefillDate||''))+'"></label>'
-      + '<label class="field">Due time (optional)<input type="time" id="f-time" value="'+(existing?(existing.dueTime||''):'')+'"></label>'
+      + '</div>';
+
+    var typeChips = '<div class="aform-chips">'
+      + Object.keys(TYPE_LABELS).map(function(k){
+          var t = TYPE_PILL[k] || TYPE_PILL.other;
+          return aformChip('aform-pick-type', k, TYPE_LABELS[k],
+            { cls:'type', active: k===type, style:'--tp-bg:'+t[0]+';--tp-ink:'+t[1]+';' });
+        }).join('')
+      + '</div>';
+
+    var statusChips = '<div class="aform-chips">'
+      + ['todo','in_progress','done'].map(function(k){
+          var t = STATUS_TINT[k];
+          return aformChip('aform-pick-status', k, WORK_STATUS[k].label,
+            { cls:'status', active: k===status, style:'--st-bg:'+t[0]+';--st-ink:'+t[1]+';' });
+        }).join('')
+      + '</div>';
+
+    var repeatBlock = isEdit ? '' : (
+      '<label class="aform-switch"><input type="checkbox" id="f-repeat">Repeat weekly'
+      + '<span class="aform-hint">One copy a week until the date you set</span></label>'
+      + '<div class="repeat-row" id="f-repeat-until-wrap" style="display:none;">'
+      + '<span class="hint">Until</span>'
+      + '<input type="date" id="f-repeat-until" value="'+(termSettings.endDate||'')+'"></div>'
+    );
+
+    var scoreField = isEdit
+      ? '<label class="aform-num"><span class="aform-label">Score %</span>'
+        + '<input type="number" id="f-score" min="0" max="100" step="0.1" placeholder="Not marked yet"'
+        + ' value="'+(existing.score!=null?existing.score:'')+'">'
+        + '<span class="aform-hint">Leave empty until it comes back</span></label>'
+      : '';
+
+    var html = '<div class="overlay" data-action="modal-backdrop">'
+      + '<div class="modal aform-modal" data-action="modal-stop">'
+
+      + '<div class="aform-head">'
+      + '<button type="button" class="ac-close" data-action="modal-close" title="Close">✕</button>'
+      + '<div class="aform-kicker">'+(isEdit?'Edit assignment':'New assignment')+'</div>'
+      + '<input type="text" class="aform-title" id="f-title" autocomplete="off"'
+        + ' placeholder="Problem set 3" value="'+escapeHtml(existing?existing.title:'')+'">'
+      + '<input type="hidden" id="f-class" value="'+escapeHtml(classId)+'">'
+      + '<input type="hidden" id="f-type" value="'+escapeHtml(type)+'">'
+      + '<input type="hidden" id="f-status" value="'+escapeHtml(status)+'">'
+      + '<div class="aform-label" style="margin-top:16px;">Class</div>'
+      + classChips
       + '</div>'
+
+      + '<div class="aform-body">'
+
+      + '<div class="aform-card">'
+      + '<div class="aform-when">'
+      + '<div class="aform-when-cell"><span class="aform-when-ic">'+iconSvg('calendar')+'</span>'
+      + '<div class="aform-when-field"><div class="aform-label">Due date</div>'
+      + '<input type="date" id="f-date" value="'+escapeHtml(dueDate)+'"></div></div>'
+      + '<div class="aform-when-cell"><span class="aform-when-ic">'+iconSvg('clock')+'</span>'
+      + '<div class="aform-when-field"><div class="aform-label">Due time</div>'
+      + '<input type="time" id="f-time" value="'+escapeHtml(existing?(existing.dueTime||''):'')+'"></div></div>'
+      + '</div>'
+      + '<div class="aform-quick" id="aform-quick">'+aformQuickHtml(dueDate)+'</div>'
       + repeatBlock
-      + '<div class="field-row">'
-      + (function(){
-          var cls = classById(existing ? existing.classId : prefillClassId);
-          var cats = (cls && cls.gradeCategories) || [];
-          if(!cats.length) return '';
-          return '<label class="field">Grade category<select id="f-category"><option value="">Own weight</option>'
-            + cats.map(function(g){
-                return '<option value="'+g.id+'"'+(existing && existing.categoryId===g.id?' selected':'')+'>'
-                  + escapeHtml(g.name)+(isNum(g.weight)?' ('+g.weight+'%)':'')+'</option>';
-              }).join('') + '</select></label>';
-        })()
-      + '<label class="field">Grade weight % (optional)<input type="number" id="f-weight" min="0" max="100" step="0.1" value="'+(existing&&existing.weight!=null?existing.weight:'')+'"></label>'
-      + '<label class="field">Score % (optional)<input type="number" id="f-score" min="0" max="100" step="0.1" value="'+(existing&&existing.score!=null?existing.score:'')+'"></label>'
       + '</div>'
-      + '<label class="field">Subtasks<div id="f-subtasks"></div><button type="button" class="btn ghost" data-action="add-subtask-row" style="width:fit-content">+ Add subtask</button></label>'
-      + '<label class="field">Notes<textarea id="f-inotes" placeholder="Details, links…">'+escapeHtml(existing?existing.notes:'')+'</textarea></label>'
+
+      + '<div class="aform-card">'
+      + '<div class="aform-label">Type</div>'
+      + typeChips
+      + '<div class="aform-label" style="margin-top:16px;">Status</div>'
+      + statusChips
       + '</div>'
-      + '<div class="modal-foot">'
-      + (isEdit ? '<button class="btn danger" data-action="save-item-delete" data-id="'+existing.id+'">Delete</button>' : '<span></span>')
-      + '<div class="right"><button class="btn" data-action="modal-close">Cancel</button><button class="btn primary" data-action="save-item" data-id="'+(existing?existing.id:'')+'">Save</button></div>'
-      + '</div></div></div>';
+
+      + '<div class="aform-card">'
+      + '<div class="aform-card-head"><h3>Grading</h3></div>'
+      + '<input type="hidden" id="f-category" value="'+escapeHtml(catId)+'">'
+      + '<div id="aform-catrow">'+aformCategoryRowHtml(classId, catId)+'</div>'
+      + '<div class="aform-divide"></div>'
+      + '<div class="aform-grid">'
+      + '<label class="aform-num" id="aform-weight-wrap"><span class="aform-label">Weight %</span>'
+      + '<input type="number" id="f-weight" min="0" max="100" step="0.1" placeholder="0"'
+        + ' value="'+(existing&&existing.weight!=null?existing.weight:'')+'">'
+      + '<span class="aform-hint" id="aform-weight-hint">Share of the course grade</span></label>'
+      + scoreField
+      + '</div></div>'
+
+      + '<div class="aform-card">'
+      + '<div class="aform-card-head"><h3>Details</h3></div>'
+      + '<textarea id="f-inotes" placeholder="What does this assignment ask for?">'
+        + escapeHtml(existing?existing.notes:'')+'</textarea>'
+      + '<div class="aform-divide"></div>'
+      + '<div class="aform-label">Steps</div>'
+      + '<div class="aform-steps" id="f-subtasks"></div>'
+      + '<button type="button" class="btn ghost" data-action="add-subtask-row" style="width:fit-content">'
+        + '+ Add step</button>'
+      + '</div>'
+
+      + '</div>'
+
+      + '<div class="ac-foot">'
+      + (isEdit
+          ? '<button type="button" class="ac-del" data-action="save-item-delete" data-id="'+existing.id+'">'
+            + iconSvg('trash')+' Delete</button>'
+          : '<span></span>')
+      + '<div class="right">'
+      + '<button type="button" class="btn" data-action="modal-close">Cancel</button>'
+      + '<button type="button" class="btn primary" data-action="save-item" data-id="'+(existing?existing.id:'')+'">'
+        + (isEdit ? 'Save changes' : 'Add assignment') + '</button>'
+      + '</div></div></div></div>';
+
     document.getElementById('modal-root').innerHTML = html;
     renderSubtaskRows();
+    syncAformWeight();
+    paintIcons(document.getElementById('modal-root'));
+    var titleEl = document.getElementById('f-title');
+    if(titleEl && !isEdit) titleEl.focus();
   }
 
   function renderSubtaskRows(){
@@ -7633,19 +8306,20 @@
   /** Attach files to an assignment, from the picker or from a drop. */
   function uploadFilesToItem(itemId, fileList){
     var it = items.find(function(i){ return i.id===itemId; });
-    if(!it || !it.classId){
-      reportError(new Error('Give this assignment a class first, so the file has somewhere to live.'));
-      return;
-    }
+    if(!it) return;
     var list = Array.prototype.slice.call(fileList || []);
     if(!list.length) return;
+    // An assignment with no class used to refuse the upload outright. The Inbox is
+    // already the home for a file with nowhere to live, so it goes there and stays
+    // attached to the assignment either way; filing it is a separate decision.
+    var target = it.classId ? '/api/classes/'+it.classId+'/materials' : '/api/materials';
     list.reduce(function(chain, file){
       return chain.then(function(){
         var fd = new FormData();
         fd.append('file', file);
         fd.append('itemId', itemId);
         fd.append('category', guessFileCategory(file.name));
-        return fetch('/api/classes/'+it.classId+'/materials', { method:'POST', body: fd }).then(checkOk);
+        return fetch(target, { method:'POST', body: fd }).then(checkOk);
       });
     }, Promise.resolve())
       .then(loadState)
@@ -7927,10 +8601,19 @@
   }
 
   function saveItemFromForm(id){
-    var title = document.getElementById('f-title').value.trim();
-    if(!title){ document.getElementById('f-title').focus(); return; }
+    var titleEl = document.getElementById('f-title');
+    var title = titleEl.value.trim();
+    if(!title){
+      // the title is the whole heading of this card, so say it is missing there
+      titleEl.classList.add('missing');
+      titleEl.placeholder = 'Give this assignment a name';
+      titleEl.focus();
+      return;
+    }
+    titleEl.classList.remove('missing');
     var weightVal = document.getElementById('f-weight').value;
-    var scoreVal = document.getElementById('f-score').value;
+    var scoreEl = document.getElementById('f-score');
+    var scoreVal = scoreEl ? scoreEl.value : '';
     var subtasks = editingSubtasks.filter(function(s){ return s.title && s.title.trim(); }).map(function(s){ return { id:s.id, title:s.title.trim(), done:!!s.done }; });
     var base = {
       title: title,
@@ -7963,6 +8646,12 @@
     var repeat = !!(repeatEl && repeatEl.checked);
     var until = repeat ? document.getElementById('f-repeat-until').value : '';
 
+    // The form has always shown Status while adding and then ignored it. It is a
+    // visible control now, so it has to mean something: a repeated item still starts
+    // at todo, since "done" cannot describe next month's copy.
+    var newStatus = (document.getElementById('f-status') || {}).value || 'todo';
+    var newDone = newStatus==='done' ? todayIso() : null;
+
     var creates = [];
     if(repeat && dueDate && until && until>=dueDate){
       var cursor = parseISODate(dueDate);
@@ -7972,7 +8661,7 @@
         cursor.setDate(cursor.getDate()+7);
       }
     } else {
-      creates.push(Object.assign({}, base, { dueDate: dueDate, status:'todo', completedAt:null }));
+      creates.push(Object.assign({}, base, { dueDate: dueDate, status:newStatus, completedAt:newDone }));
     }
     Promise.all(creates.map(function(d){
       return route('addItem', [d], function(){ return apiPost('/api/items', d); });
@@ -9562,7 +10251,12 @@
     });
     allMaterials().forEach(function(m){
       var name = m.title || m.filename || m.url;
-      idx.push({ type:'Files', icon:'❐', title:name, meta:m.cls.code||'', action:'preview-file', id:m.id, text:(name||'').toLowerCase() });
+      // The folder path and type are searchable here too, so ⌘K and the Files page
+      // agree about what "search" means rather than being two different searches.
+      idx.push({ type:'Files', icon:'❐', title:name,
+                 meta:(m.cls.code||'') + ' · ' + fileFolderLabel(m),
+                 action:'preview-file', id:m.id,
+                 text:((name||'')+' '+(m.cls.code||'')+' '+fileFolderLabel(m)+' '+fileTypeLabel(m)).toLowerCase() });
     });
     return idx;
   }
@@ -9738,13 +10432,25 @@
       return;
     }
     if(e.target.id==='asg-search'){ asgSearch = e.target.value; asgPage = 1; renderAsgBody(); return; }
+    if(e.target.id==='embed-search'){
+      embedPickerSearch = e.target.value;
+      var er = document.getElementById('embed-rows');
+      if(er) er.innerHTML = embedPickerRowsHtml();
+      return;
+    }
     if(e.target.id==='files-search'){
+      var hadSearch = !!filesSearch;
       filesSearch = e.target.value;
-      var fb = document.getElementById('files-body');
-      if(fb){
-        var lst = filesMatching();
-        fb.innerHTML = '<div class="files-list-head"><h2 class="files-section-h">Results</h2></div>' + fileListHtml(lst);
+      // The clear button only exists while there is something to clear, so its
+      // appearing or disappearing needs the toolbar repainted, not just the body.
+      if(hadSearch !== !!filesSearch){
+        renderView(); paintIcons();
+        var box = document.getElementById('files-search');
+        if(box){ box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+        return;
       }
+      var fb = document.getElementById('files-body');
+      if(fb){ fb.innerHTML = filesBodyHtml(); paintIcons(fb); }
       return;
     }
   });
@@ -9755,7 +10461,7 @@
   document.addEventListener('dragstart', function(e){
     var item = e.target.closest && e.target.closest('[data-drag]');
     if(!item) return;
-    dragPayload = { kind: item.dataset.drag, id: item.dataset.id };
+    dragPayload = { kind: item.dataset.drag, id: item.dataset.dragid || item.dataset.id };
     item.classList.add('dragging');
     try{ e.dataTransfer.setData('text/plain', item.dataset.id); }catch(err){}
     e.dataTransfer.effectAllowed = 'move';
@@ -9818,6 +10524,78 @@
       updateNoteFolder(payload.id, { parentId: folderId }).catch(reportError);
     }
   });
+
+  // ---- dragging files and file folders into folders ----
+  // Dropping moves, it does not copy. A file has one home class and one home folder,
+  // so "where does this live" keeps a single answer; what it is *used by* stays in
+  // item_files and survives the move untouched.
+
+  /** Read a drop target's class and folder off the element. */
+  function fileDropTarget(zone){
+    return {
+      classId: zone.dataset.class || null,
+      folderId: zone.dataset.folder || null
+    };
+  }
+
+  function fileDropAllowed(zone){
+    if(!dragPayload) return false;
+    var to = fileDropTarget(zone);
+    if(dragPayload.kind === 'file') return !!to.classId;
+    if(dragPayload.kind === 'filefolder'){
+      var f = fileFolderById(dragPayload.id);
+      // A folder belongs to one class, and a folder cannot be dropped inside itself
+      // or inside its own child: that would cut the branch loose from the tree.
+      if(!f || f.classId !== to.classId) return false;
+      if(to.folderId && fileFolderDescendants(f.id).indexOf(to.folderId) >= 0) return false;
+      return (f.parentId||null) !== (to.folderId||null);
+    }
+    return false;
+  }
+
+  function clearFileDropMarks(){
+    document.querySelectorAll('.fdrop-over').forEach(function(el){ el.classList.remove('fdrop-over'); });
+  }
+
+  document.addEventListener('dragover', function(e){
+    var zone = e.target.closest && e.target.closest('[data-fdrop]');
+    if(!zone || !fileDropAllowed(zone)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if(!zone.classList.contains('fdrop-over')){
+      clearFileDropMarks();
+      zone.classList.add('fdrop-over');
+    }
+  });
+
+  document.addEventListener('dragleave', function(e){
+    var zone = e.target.closest && e.target.closest('[data-fdrop]');
+    if(zone) zone.classList.remove('fdrop-over');
+  });
+
+  document.addEventListener('drop', function(e){
+    var zone = e.target.closest && e.target.closest('[data-fdrop]');
+    if(!zone || !dragPayload) return;
+    // An OS file drop carries files and belongs to the upload handler, not here.
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) return;
+    if(!fileDropAllowed(zone)) return;
+    e.preventDefault();
+    clearFileDropMarks();
+    var to = fileDropTarget(zone);
+    var payload = dragPayload;
+    dragPayload = null;
+    if(payload.kind === 'file'){
+      updateMaterial(payload.id, {
+        classId: to.classId === INBOX_ID ? null : to.classId,
+        folderId: to.classId === INBOX_ID ? null : (to.folderId || null)
+      }).then(function(){ renderView(); paintIcons(); }).catch(reportError);
+    } else if(payload.kind === 'filefolder'){
+      updateFileFolder(payload.id, { parentId: to.folderId || null })
+        .then(function(){ renderView(); paintIcons(); }).catch(reportError);
+    }
+  });
+
+  document.addEventListener('dragend', clearFileDropMarks);
 
   // Pressing a toolbar button must not move focus out of the editor, or the
   // selection the command is meant to act on is gone before it runs.
@@ -10003,6 +10781,11 @@
     }
     if(action==='quick-start-focus'){ quickStartFocus(t.dataset.id); return; }
     if(action==='preview-file'){ openFilePreviewModal(t.dataset.id); return; }
+    if(action==='preview-refresh'){
+      var prId = t.dataset.id;
+      loadState().then(function(){ openFilePreviewModal(prId); }).catch(reportError);
+      return;
+    }
     if(action==='preview-note'){ openNotePreviewModal(t.dataset.id); return; }
     if(action==='library-upload'){ triggerLibraryUpload(t.dataset.class); return; }
     if(action==='open-search'){ openSearch(); return; }
@@ -10165,7 +10948,7 @@
     if(action==='class-tab'){ classDetailTab = t.dataset.tab; openClassDetailModal(t.dataset.id); return; }
     if(action==='open-syllabus-editor'){ openSyllabusModal(t.dataset.id); return; }
     if(action==='open-event-modal'){ openEventModal(t.dataset.id||null, t.dataset.date||null); return; }
-    if(action==='files-tab'){ filesTab = t.dataset.tab; filesFolder = null; renderView(); paintIcons(); return; }
+    if(action==='files-tab'){ filesTab = t.dataset.tab; filesFolder = null; filesSubfolder = null; renderView(); paintIcons(); return; }
     if(action==='grades-view'){ gradesView = t.dataset.view; renderView(); paintIcons(); return; }
     if(action==='notes-pick-class'){
       e.preventDefault();
@@ -10431,7 +11214,60 @@
       return;
     }
     if(action==='files-layout'){ filesLayout = t.dataset.layout; renderView(); paintIcons(); return; }
-    if(action==='files-open-folder'){ filesFolder = t.dataset.id || null; renderView(); paintIcons(); return; }
+    if(action==='files-open-folder'){
+      // Opening a class always lands at its top level, never inside whatever folder
+      // happened to be open in the class you were in before.
+      filesFolder = t.dataset.id || null; filesSubfolder = null;
+      renderView(); paintIcons(); return;
+    }
+    if(action==='files-open-subfolder'){
+      var of = fileFolderById(t.dataset.id);
+      if(of){ filesFolder = of.classId; filesSubfolder = of.id; }
+      renderView(); paintIcons(); return;
+    }
+    if(action==='files-clear-search'){
+      clearFilesFilters();
+      renderView(); paintIcons();
+      var sb = document.getElementById('files-search');
+      if(sb) sb.focus();
+      return;
+    }
+    if(action==='files-type'){ filesType = t.dataset.type; renderView(); paintIcons(); return; }
+    if(action==='files-when'){ filesWhen = t.dataset.when; renderView(); paintIcons(); return; }
+    if(action==='file-folder-new'){
+      var nfName = window.prompt('Name this folder');
+      if(nfName === null) return;
+      nfName = nfName.trim();
+      if(!nfName) return;
+      addFileFolder(t.dataset.class, nfName, { parentId: t.dataset.parent || null })
+        .then(function(){ renderView(); paintIcons(); }).catch(reportError);
+      return;
+    }
+    if(action==='file-folder-menu'){ openFileFolderModal(t.dataset.id); return; }
+    if(action==='file-folder-rename'){
+      var rf = fileFolderById(t.dataset.id);
+      if(!rf) return;
+      var rn = window.prompt('Rename folder', rf.name || '');
+      if(rn === null) return;
+      rn = rn.trim();
+      if(!rn) return;
+      updateFileFolder(rf.id, { name: rn }).then(function(){ closeModal(); renderView(); paintIcons(); }).catch(reportError);
+      return;
+    }
+    if(action==='file-folder-delete'){
+      var df = fileFolderById(t.dataset.id);
+      if(!df) return;
+      var dn = fileFolderCount(df.id);
+      if(!confirmAction('Delete “'+(df.name||'this folder')+'”?',
+                        dn ? dn+' file'+(dn===1?'':'s')+' and any subfolders move up one level. Nothing is deleted.'
+                           : 'It is empty, so nothing moves.')) return;
+      // Whatever view was open may have just been deleted out from under us.
+      if(filesSubfolder && fileFolderDescendants(df.id).indexOf(filesSubfolder) >= 0){
+        filesSubfolder = df.parentId || null;
+      }
+      deleteFileFolder(df.id).then(function(){ closeModal(); renderView(); paintIcons(); }).catch(reportError);
+      return;
+    }
     if(action==='toggle-star'){
       var sid = t.dataset.id;
       if(filesStarred.has(sid)) filesStarred.delete(sid); else filesStarred.add(sid);
@@ -10440,7 +11276,7 @@
     if(action==='files-upload-prompt'){
       var target = filesDropClassId();
       if(!target){ window.alert('Add a class first, then you can upload files to it.'); return; }
-      triggerLibraryUpload(target);
+      triggerLibraryUpload(target, { folderId: (target === filesFolder ? filesSubfolder : null) });
       return;
     }
     if(action==='save-event'){ saveEventFromForm(t.dataset.id||null); return; }
@@ -10522,9 +11358,9 @@
       var mc = t.dataset.class;
       var mTitle = document.getElementById('mat-title').value.trim();
       var mUrl = document.getElementById('mat-url').value.trim();
-      var mCat = document.getElementById('mat-category') ? document.getElementById('mat-category').value : 'other';
+      var mFolder = document.getElementById('mat-folder') ? document.getElementById('mat-folder').value : '';
       if(mUrl){
-        addMaterialLink(mc, { title: mTitle||mUrl, url: mUrl, category: mCat })
+        addMaterialLink(mc, { title: mTitle||mUrl, url: mUrl, folderId: mFolder || null })
           .then(function(){ openClassDetailModal(mc); }).catch(reportError);
       }
       return;
@@ -10624,6 +11460,46 @@
       var d=new Date(); d.setDate(1); d.setHours(0,0,0,0); calMonth=d;
       calSelectedDay = todayIso();
       renderView(); paintIcons(); return;
+    }
+    if(action==='aform-pick-class'){
+      var pickedClass = document.getElementById('f-class');
+      if(!pickedClass) return;
+      pickedClass.value = t.dataset.value || '';
+      aformSetActive('aform-pick-class', t);
+      // a grade category belongs to one class, so switching class clears it
+      var catEl = document.getElementById('f-category');
+      if(catEl) catEl.value = '';
+      var catRow = document.getElementById('aform-catrow');
+      if(catRow) catRow.innerHTML = aformCategoryRowHtml(pickedClass.value, '');
+      syncAformWeight();
+      return;
+    }
+    if(action==='aform-pick-type'){
+      var typeEl = document.getElementById('f-type');
+      if(typeEl) typeEl.value = t.dataset.value;
+      aformSetActive('aform-pick-type', t);
+      return;
+    }
+    if(action==='aform-pick-status'){
+      var statusEl = document.getElementById('f-status');
+      if(statusEl) statusEl.value = t.dataset.value;
+      aformSetActive('aform-pick-status', t);
+      return;
+    }
+    if(action==='aform-pick-cat'){
+      var catPick = document.getElementById('f-category');
+      if(catPick) catPick.value = t.dataset.value || '';
+      aformSetActive('aform-pick-cat', t);
+      syncAformWeight();
+      return;
+    }
+    if(action==='aform-due-quick'){
+      var dateEl = document.getElementById('f-date');
+      if(!dateEl) return;
+      // a second click on the chip you are already on clears the date
+      dateEl.value = (dateEl.value === t.dataset.value) ? '' : t.dataset.value;
+      syncAformQuick();
+      return;
     }
     if(action==='add-subtask-row'){ editingSubtasks.push({id:uid(), title:'', done:false}); renderSubtaskRows(); return; }
     if(action==='remove-subtask-row'){ editingSubtasks.splice(Number(t.dataset.idx),1); renderSubtaskRows(); return; }
@@ -10899,6 +11775,7 @@
       renderFocusOverlay();
       return;
     }
+    if(t.id==='f-date'){ syncAformQuick(); return; }
     if(t.id==='f-repeat'){
       var wrap = document.getElementById('f-repeat-until-wrap');
       if(wrap) wrap.style.display = t.checked ? 'flex' : 'none';
@@ -10950,6 +11827,12 @@
         .then(function(){ openFilePreviewModal(movedId); }).catch(reportError);
       return;
     }
+    if(t.matches('[data-action="material-set-folder"]')){
+      var refiledId = t.dataset.id;
+      updateMaterial(refiledId, { folderId: t.value || null })
+        .then(function(){ openFilePreviewModal(refiledId); }).catch(reportError);
+      return;
+    }
     if(t.matches('[data-action="note-set-class"]')){
       // follow the note to its new home so it stays open in front of you
       flushNoteSave();
@@ -10975,9 +11858,10 @@
       toggleTopic(t.dataset.tid, t.checked).then(function(){ refreshClassContext(tcId2); }).catch(reportError);
       return;
     }
-    if(t.matches('[data-action="change-material-category"]')){
+    if(t.matches('[data-action="change-material-folder"]')){
       var mcId = t.dataset.class;
-      updateMaterial(t.dataset.mid, { category: t.value }).then(function(){ openClassDetailModal(mcId); }).catch(reportError);
+      updateMaterial(t.dataset.mid, { folderId: t.value || null })
+        .then(function(){ openClassDetailModal(mcId); }).catch(reportError);
       return;
     }
     if(t.matches('[data-action="rubric-link-select"]')){
@@ -11005,9 +11889,11 @@
         var cid = t.dataset.classid;
         var file = t.files[0];
         var guess = guessFileCategory(file.name);
-        var catSel = document.getElementById('mat-category');
-        if(catSel) catSel.value = guess;
-        uploadMaterialFile(file, cid, guess).then(function(){ openClassDetailModal(cid); }).catch(reportError);
+        // Whatever folder is picked in the form wins; with none picked the server
+        // files it by the filename guess.
+        var folderSel = document.getElementById('mat-folder');
+        uploadMaterialFile(file, cid, guess, null, null, folderSel ? folderSel.value : null)
+          .then(function(){ openClassDetailModal(cid); }).catch(reportError);
       }
       return;
     }
@@ -11052,6 +11938,7 @@
     var cid = zone.dataset.classid || filesDropClassId();
     var wasInModal = !!document.getElementById('modal-root').firstElementChild;
     uploadFilesToClass(cid, files, {
+      folderId: zone.dataset.folderid || null,
       onDone: function(){ if(wasInModal && zone.dataset.classid) openClassDetailModal(zone.dataset.classid); }
     });
   });
@@ -11061,9 +11948,24 @@
       var ed = e.target.closest && e.target.closest('.rte-editor');
       if(ed){ rteHandleTab(e, ed); return; }
     }
+    // Enter on the assignment title saves, the way a one-field form would.
+    if(e.key==='Enter' && e.target && e.target.id==='f-title'){
+      e.preventDefault();
+      var saveBtn = document.querySelector('.aform-modal [data-action="save-item"]');
+      if(saveBtn) saveItemFromForm(saveBtn.dataset.id || null);
+      return;
+    }
     if((e.metaKey||e.ctrlKey) && e.key === '\\'){ e.preventDefault(); setSidebarCollapsed(!sidebarCollapsed); return; }
     if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); openSearch(); return; }
     if(e.key==='Escape'){
+      // Escape in the Files search box clears the search rather than doing nothing,
+      // which is the other half of never being stranded on a results screen.
+      if(e.target && e.target.id === 'files-search' && filesFiltering()){
+        clearFilesFilters(); renderView(); paintIcons();
+        var esb = document.getElementById('files-search');
+        if(esb) esb.focus();
+        return;
+      }
       if(document.getElementById('search-root').firstElementChild){ closeSearch(); return; }
       if(document.getElementById('modal-root').firstElementChild){ closeModal(); return; }
       if(notesFullscreen){ notesFullscreen = false; notesZen = false; render(); return; }

@@ -1,7 +1,10 @@
 import os
 import re
+import shutil
 import mimetypes
 import json
+import subprocess
+import threading
 import uuid
 from datetime import datetime, timedelta
 
@@ -39,7 +42,9 @@ load_env_file(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 from db import (get_db, init_db, UPLOAD_DIR, SEMESTER_SCOPED,
                 active_semester, active_semester_id, set_active_semester,
-                default_term_name, semester_for, SEMESTER_ORDER)
+                default_term_name, semester_for, SEMESTER_ORDER,
+                ensure_default_file_folders, folder_id_for_kind, folder_descendants,
+                CATEGORY_TO_FOLDER_KIND)
 
 
 
@@ -203,16 +208,24 @@ def serialize_material(m, item_ids=None):
         "itemIds": item_ids,
         "itemId": item_ids[0] if item_ids else None,   # older callers read a single id
         "category": m["category"],
+        "folderId": m["folder_id"] if "folder_id" in m.keys() else None,
         "title": m["title"],
         "kind": m["kind"],
         "hasText": bool(m["extracted_text"]),
         "createdAt": m["created_at"],
     }
     if m["kind"] == "file":
+        keys = m.keys()
         d["filename"] = m["filename"]
         d["size"] = m["size"]
         d["mimetype"] = m["mimetype"]
         d["url"] = f"/api/materials/{m['id']}/download"
+        # An Office file gets a converted PDF the browser can actually render.
+        # previewStatus lets the page say "converting…" instead of showing nothing.
+        status = (m["preview_status"] if "preview_status" in keys else None) or ""
+        d["previewStatus"] = status
+        if status == "ready" and ("preview_name" in keys) and m["preview_name"]:
+            d["previewUrl"] = f"/api/materials/{m['id']}/preview"
         # the row can outlive the upload (a deleted class removes the file), and
         # a preview that says so beats an empty frame
         d["missing"] = not (m["stored_name"] and os.path.exists(os.path.join(UPLOAD_DIR, m["stored_name"])))
@@ -321,6 +334,9 @@ def serialize_class(conn, row):
             for s in schedule
         ],
         "materials": [serialize_material(m, item_ids_for_material(conn, m["id"])) for m in materials],
+        "fileFolders": [serialize_file_folder(f) for f in conn.execute(
+            "SELECT * FROM file_folders WHERE class_id=? ORDER BY sort_order, created_at",
+            (row["id"],)).fetchall()],
         "notesList": [serialize_note(n) for n in notes],
         "noteFolders": [
             {
@@ -390,15 +406,27 @@ def serialize_item(conn, row):
     }
 
 
+def extract_pdf_text(filepath):
+    """Read a PDF's text, or None. Shared by uploads and by Office conversions.
+
+    PowerPoint, Excel and the older Word formats have no reader here, but LibreOffice
+    already converts them to PDF for the preview pane, so that PDF is what gets read.
+    """
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(filepath)
+        text = "\n".join((page.extract_text() or "") for page in reader.pages)
+        return text[:200000]
+    except Exception:
+        return None
+
+
 def extract_text(filepath, filename):
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     try:
         if ext == "pdf":
-            from pypdf import PdfReader
-
-            reader = PdfReader(filepath)
-            text = "\n".join((page.extract_text() or "") for page in reader.pages)
-            return text[:200000]
+            return extract_pdf_text(filepath)
         if ext == "docx":
             import docx
             from docx.table import Table
@@ -823,6 +851,7 @@ def create_class():
             (str(uuid.uuid4()), cid, s.get("day"), s.get("start"), s.get("end"), s.get("location", ""),
              s.get("kind") or "lecture", s.get("section") or "", s.get("startDate"), s.get("endDate")),
         )
+    ensure_default_file_folders(conn, cid)
     conn.commit()
     conn.close()
     return jsonify({"id": cid}), 201
@@ -1163,6 +1192,293 @@ def delete_headstart(hid):
 
 # ---------------- materials (files & links) ----------------
 
+# ---------------- Office previews ----------------
+
+# Word, PowerPoint and Excel cannot be shown in a browser, so LibreOffice converts
+# them to PDF once, on upload, and the PDF is what the preview pane loads. Converting
+# on upload rather than on view means the cost is paid per file instead of per open,
+# which matters because each conversion spawns a real LibreOffice process.
+OFFICE_EXTS = {"doc", "docx", "odt", "rtf",
+               "ppt", "pptx", "odp",
+               "xls", "xlsx", "ods"}
+
+# Where the binary lives: on Linux it is on PATH, on a Mac it is inside the app bundle.
+SOFFICE_CANDIDATES = (
+    "soffice",
+    "libreoffice",
+    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+)
+
+
+def soffice_path():
+    """The LibreOffice binary, or None if this machine has not got it.
+
+    Without it the app still works: Office files simply fall back to the download
+    button they had before, which is why nothing here ever raises.
+    """
+    override = os.environ.get("SOFFICE_PATH")
+    if override and os.path.exists(override):
+        return override
+    for candidate in SOFFICE_CANDIDATES:
+        found = shutil.which(candidate) if not candidate.startswith("/") else (
+            candidate if os.path.exists(candidate) else None)
+        if found:
+            return found
+    return None
+
+
+def office_ext(filename):
+    ext = (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
+    return ext if ext in OFFICE_EXTS else None
+
+
+def convert_to_pdf(src_path, out_dir, timeout=120):
+    """Run LibreOffice once. Returns the produced PDF's path, or None.
+
+    `-env:UserInstallation` gives each run its own profile directory. Without it two
+    concurrent conversions fight over the same profile lock and the second one exits
+    having produced nothing.
+    """
+    binary = soffice_path()
+    if not binary or not os.path.exists(src_path):
+        return None
+    profile = os.path.join(out_dir, ".soffice-profile")
+    try:
+        subprocess.run(
+            [binary, f"-env:UserInstallation=file://{profile}",
+             "--headless", "--norestore", "--convert-to", "pdf",
+             "--outdir", out_dir, src_path],
+            check=True, timeout=timeout,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (subprocess.SubprocessError, OSError):
+        return None
+    produced = os.path.join(
+        out_dir, os.path.splitext(os.path.basename(src_path))[0] + ".pdf")
+    return produced if os.path.exists(produced) else None
+
+
+def make_office_preview(mid, src_path, filename):
+    """Convert one upload and record the result. Runs on a worker thread."""
+    produced = convert_to_pdf(src_path, UPLOAD_DIR)
+    conn = get_db()
+    try:
+        if produced:
+            target = f"{mid}_preview.pdf"
+            final = os.path.join(UPLOAD_DIR, target)
+            if produced != final:
+                os.replace(produced, final)
+            conn.execute("UPDATE materials SET preview_name=?, preview_status='ready' WHERE id=?",
+                         (target, mid))
+            # The conversion is the only way a deck or a spreadsheet becomes readable.
+            # Only fill an empty column: .docx already has a better reader of its own.
+            row = conn.execute(
+                "SELECT extracted_text FROM materials WHERE id=?", (mid,)).fetchone()
+            if row and not (row["extracted_text"] or "").strip():
+                text = extract_pdf_text(final)
+                if text and text.strip():
+                    conn.execute("UPDATE materials SET extracted_text=? WHERE id=?", (text, mid))
+        else:
+            conn.execute("UPDATE materials SET preview_status='failed' WHERE id=?", (mid,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def queue_office_preview(mid, src_path, filename):
+    """Start a conversion in the background if this file needs and can have one.
+
+    The upload response must not wait on LibreOffice: a large deck takes seconds, and
+    the student is already looking at the file list.
+    """
+    if not office_ext(filename) or not soffice_path():
+        return
+    conn = get_db()
+    conn.execute("UPDATE materials SET preview_status='pending' WHERE id=?", (mid,))
+    conn.commit()
+    conn.close()
+    threading.Thread(target=make_office_preview, args=(mid, src_path, filename),
+                     daemon=True).start()
+
+
+def backfill_office_text():
+    """Read already-converted Office files that never had their text extracted.
+
+    Separate from `backfill_extracted_text`, which runs at import before any of the
+    Office helpers are defined, and cheap by comparison: the PDFs already exist, so
+    this is pypdf only, no LibreOffice.
+    """
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, preview_name FROM materials"
+            " WHERE kind='file' AND preview_status='ready' AND preview_name IS NOT NULL"
+            " AND (extracted_text IS NULL OR extracted_text='')").fetchall()
+    except Exception:
+        conn.close()
+        return
+    for r in rows:
+        path = os.path.join(UPLOAD_DIR, r["preview_name"])
+        if not os.path.exists(path):
+            continue
+        text = extract_pdf_text(path)
+        if text and text.strip():
+            conn.execute("UPDATE materials SET extracted_text=? WHERE id=?", (text, r["id"]))
+    conn.commit()
+    conn.close()
+
+
+def backfill_office_previews():
+    """Convert Office files uploaded before previews existed, one at a time.
+
+    Deliberately serial and on one background thread: a library full of decks should
+    not start twenty LibreOffice processes at boot.
+    """
+    if not soffice_path():
+        return
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, stored_name, filename FROM materials"
+            " WHERE kind='file' AND stored_name IS NOT NULL"
+            " AND (preview_status IS NULL OR preview_status='')").fetchall()
+    except Exception:
+        conn.close()
+        return
+    conn.close()
+    todo = [(r["id"], r["stored_name"], r["filename"]) for r in rows
+            if office_ext(r["filename"] or r["stored_name"])]
+    if not todo:
+        return
+
+    def run():
+        for mid, stored, filename in todo:
+            path = os.path.join(UPLOAD_DIR, stored)
+            if os.path.exists(path):
+                make_office_preview(mid, path, filename)
+    threading.Thread(target=run, daemon=True).start()
+
+
+backfill_office_previews()
+backfill_office_text()
+
+
+# ---------------- file folders ----------------
+
+def serialize_file_folder(f):
+    return {
+        "id": f["id"],
+        "classId": f["class_id"],
+        "parentId": f["parent_id"],
+        "name": f["name"] or "",
+        "kind": f["kind"] or "custom",
+        "sortOrder": f["sort_order"] or 0,
+    }
+
+
+@app.route("/api/classes/<cid>/file-folders", methods=["POST"])
+def create_file_folder(cid):
+    """A new folder, optionally inside another one."""
+    data = request.get_json(force=True) or {}
+    conn = get_db()
+    if not conn.execute("SELECT 1 FROM classes WHERE id=?", (cid,)).fetchone():
+        conn.close()
+        abort(404)
+    parent = data.get("parentId") or None
+    if parent and not conn.execute(
+            "SELECT 1 FROM file_folders WHERE id=? AND class_id=?", (parent, cid)).fetchone():
+        conn.close()
+        return jsonify({"error": "parent folder is not in this class"}), 400
+    nxt = conn.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM file_folders WHERE class_id=?"
+        " AND parent_id IS ?", (cid, parent)).fetchone()["n"]
+    fid = str(uuid.uuid4())
+    conn.execute(
+        "INSERT INTO file_folders (id, class_id, parent_id, name, kind, sort_order, created_at)"
+        " VALUES (?,?,?,?,?,?,?)",
+        (fid, cid, parent, (data.get("name") or "New folder").strip() or "New folder",
+         "custom", data.get("sortOrder", nxt), datetime.utcnow().isoformat()))
+    conn.commit()
+    row = conn.execute("SELECT * FROM file_folders WHERE id=?", (fid,)).fetchone()
+    conn.close()
+    return jsonify(serialize_file_folder(row)), 201
+
+
+@app.route("/api/file-folders/<fid>", methods=["PUT"])
+def update_file_folder(fid):
+    """Rename a folder, or move it under a different parent."""
+    data = request.get_json(force=True) or {}
+    conn = get_db()
+    row = conn.execute("SELECT * FROM file_folders WHERE id=?", (fid,)).fetchone()
+    if not row:
+        conn.close()
+        abort(404)
+    fields, values = [], []
+    if "name" in data:
+        fields.append("name=?")
+        values.append((data["name"] or "").strip() or row["name"] or "Folder")
+    if "parentId" in data:
+        parent = data["parentId"] or None
+        # A folder cannot be dropped inside itself or inside its own child, which is
+        # the one drag that would cut a branch loose from the tree entirely.
+        if parent in folder_descendants(conn, fid):
+            conn.close()
+            return jsonify({"error": "a folder cannot be moved inside itself"}), 400
+        if parent and not conn.execute(
+                "SELECT 1 FROM file_folders WHERE id=? AND class_id=?", (parent, row["class_id"])).fetchone():
+            conn.close()
+            return jsonify({"error": "parent folder is not in this class"}), 400
+        fields.append("parent_id=?")
+        values.append(parent)
+    if "sortOrder" in data:
+        fields.append("sort_order=?")
+        values.append(data["sortOrder"] or 0)
+    if fields:
+        values.append(fid)
+        conn.execute(f"UPDATE file_folders SET {', '.join(fields)} WHERE id=?", values)
+        conn.commit()
+    out = conn.execute("SELECT * FROM file_folders WHERE id=?", (fid,)).fetchone()
+    conn.close()
+    return jsonify(serialize_file_folder(out))
+
+
+@app.route("/api/file-folders/<fid>", methods=["DELETE"])
+def delete_file_folder(fid):
+    """Delete a folder. The files in it are never deleted with it.
+
+    Everything inside, files and subfolders alike, moves up to the deleted folder's
+    own parent. Losing a folder should cost you an organising decision, not a file.
+    """
+    conn = get_db()
+    row = conn.execute("SELECT * FROM file_folders WHERE id=?", (fid,)).fetchone()
+    if not row:
+        conn.close()
+        abort(404)
+    branch = folder_descendants(conn, fid)
+    marks = ",".join("?" * len(branch))
+    conn.execute(f"UPDATE materials SET folder_id=? WHERE folder_id IN ({marks})",
+                 [row["parent_id"]] + branch)
+    conn.execute("UPDATE file_folders SET parent_id=? WHERE parent_id=?", (row["parent_id"], fid))
+    conn.execute("DELETE FROM file_folders WHERE id=?", (fid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+def default_folder_for_upload(conn, class_id, category):
+    """Where an uploaded file lands when nobody said.
+
+    The filename rules already guess a category, so the guess picks the folder of the
+    matching kind. A file the rules could not place stays at the top of the class
+    rather than being buried in a folder the student did not choose.
+    """
+    if not class_id:
+        return None
+    kind = CATEGORY_TO_FOLDER_KIND.get(category or "")
+    if not kind:
+        return None
+    return folder_id_for_kind(conn, class_id, kind, "Projects" if kind == "projects" else None)
+
+
 @app.route("/api/materials", methods=["POST"])
 def add_unfiled_material():
     """A file dropped in before it has been filed under a class."""
@@ -1179,8 +1495,17 @@ def add_material(cid):
             abort(404)
     now = datetime.utcnow().isoformat()
     mid = str(uuid.uuid4())
+    convert_after = None
     # a file can belong to one assignment as well as the class
     item_id = request.form.get("itemId") or (request.get_json(silent=True) or {}).get("itemId") or None
+
+    # Where it is filed. An explicit folder wins; otherwise the filename guess picks
+    # one. A folder belonging to another class is ignored rather than honoured.
+    asked_folder = (request.form.get("folderId")
+                    or (request.get_json(silent=True) or {}).get("folderId") or None)
+    if asked_folder and not conn.execute(
+            "SELECT 1 FROM file_folders WHERE id=? AND class_id IS ?", (asked_folder, cid)).fetchone():
+        asked_folder = None
 
     if "file" in request.files and request.files["file"].filename:
         f = request.files["file"]
@@ -1193,11 +1518,16 @@ def add_material(cid):
         category = request.form.get("category") or guess_file_category(original)
         title = request.form.get("title") or original
         text = extract_text(path, original)
+        folder = asked_folder or default_folder_for_upload(conn, cid, category)
         conn.execute(
-            """INSERT INTO materials (id, semester_id, class_id, item_id, category, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (mid, semester_for(conn, cid), cid, None, category, title, "file", None, original, stored, mimetype, size, text, now),
+            """INSERT INTO materials (id, semester_id, class_id, item_id, category, folder_id, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (mid, semester_for(conn, cid), cid, None, category, folder, title, "file", None, original, stored, mimetype, size, text, now),
         )
+        # Queued after this request's transaction is committed and closed, further
+        # down. Starting it here takes a second connection to a database this one is
+        # still writing to, and SQLite answers that with "database is locked".
+        convert_after = (path, original)
     else:
         data = request.get_json(silent=True) or request.form
         url = (data.get("url") or "").strip()
@@ -1206,10 +1536,11 @@ def add_material(cid):
             return jsonify({"error": "url or file required"}), 400
         title = data.get("title") or url
         category = data.get("category", "other")
+        folder = asked_folder or default_folder_for_upload(conn, cid, category)
         conn.execute(
-            """INSERT INTO materials (id, semester_id, class_id, item_id, category, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (mid, semester_for(conn, cid), cid, None, category, title, "link", url, None, None, None, None, None, now),
+            """INSERT INTO materials (id, semester_id, class_id, item_id, category, folder_id, title, kind, url, filename, stored_name, mimetype, size, extracted_text, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (mid, semester_for(conn, cid), cid, None, category, folder, title, "link", url, None, None, None, None, None, now),
         )
     if item_id and conn.execute("SELECT 1 FROM items WHERE id=?", (item_id,)).fetchone():
         conn.execute(
@@ -1218,6 +1549,8 @@ def add_material(cid):
             (str(uuid.uuid4()), item_id, mid, now))
     conn.commit()
     conn.close()
+    if convert_after:
+        queue_office_preview(mid, convert_after[0], convert_after[1])
     return jsonify({"id": mid}), 201
 
 
@@ -1256,6 +1589,22 @@ def update_material(mid):
     if "classId" in data:
         fields.append("class_id=?")
         values.append(data["classId"] or None)
+        # A folder belongs to one class, so moving between classes has to drop the
+        # old folder or the file would claim to sit in a folder that cannot show it.
+        # An explicit folderId in the same request is applied after this and wins.
+        fields.append("folder_id=?")
+        values.append(None)
+    if "folderId" in data:
+        folder = data["folderId"] or None
+        if folder:
+            fr = conn.execute("SELECT class_id FROM file_folders WHERE id=?", (folder,)).fetchone()
+            cur = conn.execute("SELECT class_id FROM materials WHERE id=?", (mid,)).fetchone()
+            target_class = data.get("classId", cur["class_id"] if cur else None) or None
+            if not fr or fr["class_id"] != target_class:
+                conn.close()
+                return jsonify({"error": "that folder is not in this file's class"}), 400
+        fields.append("folder_id=?")
+        values.append(folder)
     if fields:
         values.append(mid)
         conn.execute(f"UPDATE materials SET {', '.join(fields)} WHERE id=?", values)
@@ -1270,14 +1619,20 @@ def update_material(mid):
 @app.route("/api/materials/<mid>", methods=["DELETE"])
 def delete_material(mid):
     conn = get_db()
-    m = conn.execute("SELECT stored_name, kind FROM materials WHERE id=?", (mid,)).fetchone()
+    m = conn.execute("SELECT * FROM materials WHERE id=?", (mid,)).fetchone()
     conn.execute("DELETE FROM materials WHERE id=?", (mid,))
     conn.commit()
     conn.close()
-    if m and m["kind"] == "file" and m["stored_name"]:
-        path = os.path.join(UPLOAD_DIR, m["stored_name"])
-        if os.path.exists(path):
-            os.remove(path)
+    if m and m["kind"] == "file":
+        leftovers = [m["stored_name"]]
+        if "preview_name" in m.keys():
+            leftovers.append(m["preview_name"])
+        for name in leftovers:
+            if not name:
+                continue
+            path = os.path.join(UPLOAD_DIR, name)
+            if os.path.exists(path):
+                os.remove(path)
     return jsonify({"ok": True})
 
 
@@ -1336,6 +1691,20 @@ RUBRIC_PARSE_INSTRUCTION = (
     "number in \"points\" and say so in \"description\". If you can't find real grading "
     "criteria in the text, return {\"criteria\": [], \"totalPoints\": null}."
 )
+
+
+@app.route("/api/materials/<mid>/preview")
+def preview_material(mid):
+    """The PDF LibreOffice made from an Office upload, rendered inline."""
+    conn = get_db()
+    m = conn.execute("SELECT * FROM materials WHERE id=?", (mid,)).fetchone()
+    conn.close()
+    if not m or not ("preview_name" in m.keys()) or not m["preview_name"]:
+        abort(404)
+    if not os.path.exists(os.path.join(UPLOAD_DIR, m["preview_name"])):
+        abort(404)
+    return send_from_directory(UPLOAD_DIR, m["preview_name"], mimetype="application/pdf",
+                               as_attachment=False)
 
 
 @app.route("/api/materials/<mid>/rubric")

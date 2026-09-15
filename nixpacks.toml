@@ -1,0 +1,15 @@
+# Railway builds with Nixpacks. Everything here is additive: the "..." keeps the
+# Python toolchain Nixpacks detects on its own and appends to it.
+#
+# LibreOffice is here so Word, PowerPoint and Excel uploads can be converted to PDF
+# and previewed in the browser (see queue_office_preview in app.py). The three
+# component packages are installed rather than the full `libreoffice` metapackage:
+# that drops roughly 300 MB of Base, Draw and Math that nothing here converts.
+# fonts-liberation matters more than it looks, because without metric-compatible
+# substitutes for Arial, Times New Roman and Courier New, every converted document
+# reflows and the page count changes.
+#
+# If this ever needs to come out, the app keeps working: soffice_path() returns None,
+# nothing is queued, and Office files fall back to the download button.
+[phases.setup]
+aptPkgs = ["...", "libreoffice-writer", "libreoffice-impress", "libreoffice-calc", "fonts-liberation"]

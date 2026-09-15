@@ -280,23 +280,34 @@ not rediscovered a third time.
       hang a display name on, and the row level security policies are strictly
       owner-only. Sharing a class or a note with a friend is not a new join table, it
       is a policy rewrite on all 28 tables. Worth designing before it is promised.
-- [ ] **File folders.** Notes got a real folder tree (`note_folders.parent_id`); files
-      got a single flat `category` string guessed from the filename. Fine at today's
-      volume, inconsistent as it grows.
+- [x] ~~**File folders.**~~ Built 2026-09-14. `file_folders` is a real tree with
+      `parent_id`, matching `note_folders`, and `materials.folder_id` points into it.
+      Every class gets Lectures, Readings, Assignments, Rubrics, Exams, Syllabus and
+      Personal; the old flat `category` values were migrated to folders of the same
+      kind, and `category` is kept only as the filename guess that picks a folder on
+      upload.
 
 ## Bugs found and not yet fixed
 
-- [ ] **Syllabus import shares one file between two tables.** `do_import` points the
-      new `materials` row at the *same* stored file as the `syllabus_imports` row
-      rather than copying it. One file, two owners, so whichever side is deleted first
-      silently breaks the other. This is what orphaned the PHIL 110 and REM 388
-      syllabus rows, whose `syllabus_imports` status still reads `imported` while the
-      bytes are gone. **It will happen again** to the next syllabus imported and later
-      tidied up. Fix: copy the file at import time, or reference-count it.
-- [ ] **`extracted_text` is empty for every material.** All four rows have length 0, so
-      uploaded files are not searchable and Headstart cannot read them. The extraction
-      runs on upload and there is a startup backfill, so something is not firing. Worth
-      investigating before relying on file search.
+- [x] ~~**Syllabus import shares one file between two tables.**~~ Fixed 2026-09-14.
+      `do_import` now copies the bytes to the material's own `stored_name` and files
+      it in the class's Syllabus folder, so the import row and the file in Files own
+      separate copies and deleting either leaves the other intact. The two already
+      orphaned rows (PHIL 110, REM 388) are still orphaned: their bytes were gone
+      before the fix, so they need re-importing or deleting by hand.
+- [ ] **`extracted_text` is empty for every material.** Re-checked 2026-09-14 and the
+      earlier diagnosis was wrong. The four rows are two screenshots, which have no text
+      to extract, and the two orphaned syllabus PDFs, whose bytes are gone, so extraction
+      had nothing to read in any of the four cases. Extraction itself runs on upload
+      (`extract_text`) and on boot (`backfill_extracted_text`) and is probably fine, just
+      never exercised on a real document. Partly closed 2026-09-15: pypdf was run over a
+      LibreOffice-produced PDF and over a real `.docx` and returned correct text in both
+      cases, so the extraction code itself works. Still unverified is a real
+      publisher-produced lecture PDF uploaded through the upload route, which is the case
+      most likely to return empty text (scanned or image-only PDFs have no text layer at
+      all, and pypdf cannot OCR). The real gap is downstream: nothing in the UI searches
+      `extracted_text`. Files-page search matches title, filename and class code only, and
+      global search indexes file names only. Headstart does read it.
 - [ ] **Commit `7b5d88f` has a Python script as its commit message.** My heredoc
       nesting error: the message and the script were swapped. The code in it is correct.
       Fixing means `git commit --amend` plus a force-push, which rewrites pushed
@@ -343,6 +354,117 @@ not rediscovered a third time.
       login.**
 - [ ] **Invite friends**: add each email to the Supabase allowlist, one line of SQL.
 
+## Headstart: three questions Saif asked 2026-09-14, checked against the code
+
+### 1. Where generated Headstart output goes (today: not to Files)
+
+Nothing Headstart generates ever becomes a file. There is no `materials` row, no
+folder, no download. What actually happens:
+
+- **Five of the ten tools save a row on the assignment** (`headstarts` table, unique
+  per `item_id` + `kind`, written in `ai.py` `ai_run`): outline, explain, draft,
+  study plan, summarise. These show in the assignment card's Headstart tab.
+- **The other five are transient**: rubric breakdown, concepts, gaps, revise, refine.
+  `ai_run` returns the text and writes nothing. Close the panel and it is gone. This
+  is a bug, not a decision.
+- **The only ways to keep any of it** are the two buttons on the result bar: Copy, and
+  "Save as a note" (`hsSaveAsNote`, `index.html` around line 9034), which creates an
+  ordinary note in the class.
+
+- [ ] **needs Saif** — decide where generated work lives. Three options:
+      (a) notes only, and fix the five transient tools to auto-save onto the assignment;
+      (b) a real `Headstart` folder per class in the Files tree, each run written as a
+      file, which makes it searchable, previewable and downloadable alongside the
+      source material but puts generated text in a tree built for uploads;
+      (c) both: auto-save every run onto the assignment, plus a "Save as a file"
+      button next to Copy and "Save as a note".
+      Recommendation is (c). It is the most work, but it is the only one where
+      "where did that outline go" has an answer that does not depend on which of the
+      ten tools produced it.
+
+### 2. What Headstart can actually read
+
+It reads assignment descriptions, attached files, class files and notes, but with four
+limits worth knowing:
+
+- **The assignment description is read.** `items.notes` goes into the prompt as
+  "What the student recorded about it" (`assignment_brief`, `ai.py`). Typing what a
+  quiz covers onto the assignment does reach the model.
+- **Files attached to the assignment are read in full**, all of them, before anything
+  else (`item_files` join in `collect_sources`).
+- **Class-wide material is capped at the 5 newest files and 5 newest notes** when no
+  sources are picked by hand. Lecture slides from week 2 will not be read in auto mode
+  by week 10. The source picker (`/api/ai/context/<cid>`) lists every file, note,
+  folder and syllabus topic, so picking them explicitly lifts the cap.
+- **Each source is truncated to 6,000 characters**, 60,000 across the whole prompt
+  (`PER_SOURCE_CHARS`, `TOTAL_CONTEXT_CHARS`). A full lecture PDF contributes roughly
+  its first few pages, silently.
+- [x] ~~**PowerPoint contributes nothing.**~~ Fixed 2026-09-15. The PDF reader is now
+      `extract_pdf_text`, shared by uploads and by Office conversions, and
+      `make_office_preview` runs it over the converted PDF once LibreOffice finishes.
+      Every format in `OFFICE_EXTS` is now readable: `.pptx`, `.ppt`, `.odp`, `.xls`,
+      `.xlsx`, `.ods`, `.doc`, `.rtf`, `.odt`. Two details worth keeping in mind:
+      it only fills an **empty** `extracted_text`, so `.docx` keeps python-docx's much
+      better output (verified: 25,983 characters from the IAT 201 course map, unchanged
+      after a conversion ran over it), and `backfill_office_text()` at startup reads
+      decks that were converted before this existed, using the PDFs already on disk
+      rather than re-running LibreOffice.
+      Verified end to end on a real `.pptx`: `extract_text` returned `None` before the
+      change and the slide text afterwards, and the backfill refilled a cleared column.
+- [ ] **The rubric only reaches Headstart if it was linked from the class Files page.**
+      Already recorded under the assignments gaps above; repeated here because it is
+      the same class of problem: context that looks attached in the UI but is not in
+      the query.
+
+### 3. Chatting with it
+
+**There is no chat today.** `call_claude` sends a single user message with no history
+(`messages=[{"role": "user", ...}]`), and the frontend keeps no transcript. The only
+steering is the "Additional instructions" box, capped at 4,000 characters, and
+"Run again", which re-runs from scratch rather than continuing. So "make that shorter",
+"focus on chapter 3" or "why did you say that" are not possible.
+
+It is buildable, and the cost objection turns out not to hold once prompt caching is
+used. Costed on Sonnet 5 ($2/$10 per MTok, Vesta's configured default) with a full
+60,000-character context (about 15,000 tokens):
+
+- **Without caching**, every turn re-sends the whole course context: about $0.03 per
+  turn in input alone, rising as the transcript grows. A ten-turn conversation runs
+  $0.35 or more, which is a third of the $1.00 daily cap for one chat.
+- **With caching** (`cache_control` on the context prefix), the first turn pays a 1.25x
+  write and every later turn reads that prefix at 0.1x: roughly $0.0375 once, then
+  $0.003 per turn. The same ten-turn conversation costs about $0.10.
+
+Caching is what makes it affordable, and it fits Vesta's shape well, since the expensive
+part of the prompt (files, notes, rubric) is exactly the part that does not change
+between turns. Two details that matter: the cached prefix must be assembled
+byte-identically each turn or it silently misses, and the default 5-minute TTL refreshes
+on every read, so a continuous conversation stays warm while a 20-minute gap pays one
+fresh write. Verify with `usage.cache_read_input_tokens`, which Vesta does not currently
+record (`record_usage` stores input and output tokens only).
+
+- [ ] **needs Saif** — decide whether to build it. Recommended shape: keep the ten tool
+      buttons exactly as they are, and make a run open a **thread** rather than a dead
+      result pane, with the tool's output as the first assistant message and a reply box
+      under it. That keeps the one-click start (the tools are good precisely because you
+      do not have to know what to ask), adds the follow-up, and resolves the "where does
+      output go" problem above for free, because every run becomes a saved thread instead
+      of five saved kinds and five thrown away.
+- [ ] The work, honestly scoped: two new tables (`chat_threads`, `chat_messages`, with
+      `headstart_sources` reused per thread), a `/api/ai/chat` endpoint that assembles
+      cached-prefix + history, the reply UI, and **streaming**. Streaming is the hidden
+      cost: `call_claude` is non-streaming, and a chat that shows nothing for 30 seconds
+      reads as broken, so this means an SSE endpoint on Flask plus incremental rendering
+      on the frontend. It is the largest single piece of the job.
+- [ ] Cost-gate behaviour needs a rethink for chat. `confirm_over_usd` defaults to $0.05
+      and interrupts any call above it. Per-turn chat costs sit well under that, but the
+      first turn of a big context can trip it, and a modal in the middle of a
+      conversation is the wrong shape. Probably: confirm once when a thread opens, not
+      per turn.
+- [ ] Record `cache_read_input_tokens` and `cache_creation_input_tokens` in `ai_usage`.
+      Without them there is no way to tell whether caching is working, and a caching
+      regression is silent: requests keep succeeding and the bill is just higher.
+
 ## Decisions waiting on Saif
 
 - [ ] **Delete `cloud/`?** The Worker, R2 integration and four JavaScript shims are
@@ -375,6 +497,154 @@ not rediscovered a third time.
       fallback is ever used in production, more than one worker risks write locking.
 - [ ] **Session length is 30 days** (`SESSION_SECONDS` in `auth.py`). A removed Supabase
       account keeps working locally until its cookie expires.
+
+## Assignments: Saif's spec, checked against the code 2026-09-14
+
+He restated the requirement in nine points. Seven are built and were verified by reading
+the code, not by trusting the design notes.
+
+- All Assignments and By Class both exist (`asgTableHtml`, `asgByClassHtml`), with
+  collapsible per-class groups and Expand all / Collapse all.
+- All six filters exist (`asgMatchesFilter`): All, Today, This Week, Upcoming, Overdue,
+  Completed.
+- Due date, type, status, weight and grade are all columns in both views, and weight and
+  grade are editable inline (`inlineNumCell`).
+- One assignment experience everywhere: Dashboard, the Calendar month, week and list
+  views, the Assignments table, the class page's Assignments and Grades tabs, Grades →
+  By Assignment, and global search all fire `open-item-detail`, which is the single
+  `openItemDetailModal`.
+- Files attach through the assignment (upload, drag and drop, or Attach existing across
+  every class and the Inbox) and are the same rows as global Files: `item_files` is a
+  many-to-many, and the file's home stays `materials.class_id`.
+- Notes attach through the assignment (`notes.linked_item_id`) and stay ordinary notes
+  in the Notes workspace.
+- Headstart sessions belong to the assignment (`headstarts.item_id`, unique per kind),
+  and the assignment card has its own Headstart tab.
+
+### Waiting to ship (2026-09-15)
+
+The new / edit assignment card is built, reviewed by Saif on localhost and approved
+("it's perfect"). **It is not pushed.** He wants the whole working tree shipped in one
+commit, but only once the other session he has running in this repo is finished, so the
+push is his to trigger. What rides along when it goes:
+
+- the file-folders feature and Office-to-PDF previews from an earlier session, neither
+  of them committed
+- a schema migration (`file_folders`, `materials.folder_id`, `preview_name`,
+  `preview_status`)
+- `nixpacks.toml`, which installs LibreOffice into the Railway image
+
+That is a migration deploy, so it wants someone watching the Railway log: a failed
+migration is a failed deploy here, because the app raises at boot rather than serving a
+half-migrated database.
+
+### The gaps, in the order they are worth fixing
+
+- [ ] **Rubrics cannot be reached from an assignment.** The Rubric button only appears
+      on the class page's Files list, and only on a file whose category is `rubrics`
+      (`index.html` around the material row). Parsing writes `rubrics.material_id` with
+      `item_id` left null; the assignment is chosen afterwards from a dropdown inside
+      that modal. Consequence worth knowing: Headstart reads the rubric with
+      `SELECT * FROM rubrics WHERE item_id=?`, so "Break down the rubric" runs with no
+      rubric unless that class-page step was done. Saif's spec says rubrics attach
+      *through the assignment*, so this needs an affordance on the assignment card.
+- [x] ~~**A classless assignment cannot take a file.**~~ Fixed 2026-09-14.
+      `uploadFilesToItem` posts to `/api/materials` when the assignment has no class,
+      so the file lands in the Inbox and is still attached to the assignment.
+- [ ] **A classless assignment cannot start a note either.** The New note button is only
+      rendered when the assignment has a class. Attach existing still works.
+- [ ] **Two different note-to-assignment links exist, and the assignment card only reads
+      one.** From the note side, the Links menu writes `note_links`, which is a real
+      many-to-many: one note can name several assignments, files, lectures and events.
+      From the assignment side, the card's Notes tab reads only `notes.linked_item_id`,
+      a single column. So a note linked to two assignments through the Links menu shows
+      up on neither card. The card should read `note_links` as well, or the two should
+      become one mechanism.
+- [ ] **New note from the card does not open the note.** It creates an empty note and
+      re-renders the assignment card, so the next click is always Open.
+- [ ] **The assignment card's tabs are Details / Headstart / Notes.** Files live inside
+      Details rather than getting a tab of their own, which is worth revisiting now that
+      rubrics are meant to live there too.
+- [ ] **"+ Add assignment" is not disabled in an archived term.** Same rough edge as the
+      rest of the app: only Classes hides its create buttons, everything else fails with
+      the server's 423.
+
+## Files system: Saif's spec, checked against the code 2026-09-14
+
+He restated the Files requirement in sixteen points. Seven were already built and were
+verified by reading the code.
+
+Already built:
+- Auto-organization by class (`materials.class_id`, plus an Inbox for unfiled files),
+  with filename rules assigning a category on upload (`guess_file_category`).
+- Drag-and-drop uploading on the Files page (anywhere on the page, not just the
+  rectangle), class library sections, the assignment card, and syllabus import.
+  Multiple files at once works.
+- A drag-and-drop Files area in the assignment popup, with browse and "Attach existing"
+  reaching across every class and the Inbox.
+- One file, many locations, no duplication: `item_files` is a real many-to-many, the
+  file's home stays `materials.class_id`, and global Files reads the same rows.
+- Headstart file selection (`materialIds` in the source picker, recorded in
+  `headstart_sources`), reading `extracted_text`.
+- PDF and image preview inside the app (`openFilePreviewModal`, iframe and img).
+- Metadata: class, type, size, upload date, and related assignment ("Used in" chips
+  plus auto-suggested assignments).
+
+### Decisions taken 2026-09-14
+
+- **Nested folders**, not flat. A real `file_folders` tree with `parent_id`, the same
+  shape as `note_folders`, so files and notes finally behave the same way. Every class
+  gets a default set (Lectures, Readings, Assignments, Rubrics, Exams, Syllabus,
+  Personal) which can be renamed, nested, added to and deleted. The existing flat
+  `materials.category` values migrate to folders of the same name. Auto-filing on
+  upload is kept: the filename rules now pick a folder rather than a category.
+- **Dragging a file moves it.** Its home class and folder change; its assignment
+  attachments survive the move. No second class-membership table, so "where does this
+  file live" keeps exactly one answer.
+- **Search is metadata and filters only** for now: name, class, folder, type and upload
+  date, with visible filter controls. Content search is deferred, see below.
+- **LibreOffice for Office previews.** Word, PowerPoint and Excel convert to PDF once on
+  upload and the result is cached, so the cost is per file rather than per view. Saif
+  accepted the roughly 500 MB added to the Railway image and the per-conversion usage
+  cost after both were spelled out.
+
+### Built 2026-09-14
+
+- Nested folders per class, with a New folder button at every level, rename and
+  delete from a folder's own dialog. Deleting a folder moves its files and
+  subfolders up one level and never deletes a file.
+- Drag to move, everywhere a file or a folder is shown: file tiles, list rows and the
+  rows inside a class's Files tab are draggable, and class cards, folder cards,
+  breadcrumbs and the folder sections in a class all light up as drop targets. A
+  folder refuses to be dropped inside itself or its own child, on the client and
+  again on the server.
+- Uploads land in the folder you are standing in, or in the folder the filename
+  implies when you are not standing in one.
+- Filters that stay on screen: type (PDF, Documents, Slides, Sheets, Images, Links)
+  and age (today, past week, past month), as chips rather than a menu.
+- Search across every class, matching name, class, folder path and type, word by
+  word. The results strip says how many matched and carries the way out; there is
+  also an ✕ in the box, and Escape clears it.
+- Office previews: Word, PowerPoint and Excel convert to PDF in the background on
+  upload and render in the preview pane. The pane says "Converting…" while it runs,
+  falls back to Download if conversion fails, and a file's converted copy is deleted
+  with it. Old uploads are converted once at boot.
+- Files show their folder in the list view, in search results, in ⌘K and in the
+  preview pane, which is the last of Saif's metadata list.
+- Notes embed files from any class, not just their own, and an embedded file opens in
+  Vesta's preview rather than a new browser tab. Embedding also records a real
+  `note_links` row on the local backend, which it previously only did in the cloud
+  one, so the file shows under "What this note is about".
+
+### Deferred, on purpose
+
+- [ ] **Full content search.** Kept explicitly at Saif's request, 2026-09-14. A
+      server-side endpoint searching `materials.extracted_text` alongside name, class,
+      folder, type and date, so a file can be found by a phrase inside the PDF rather
+      than only by its name. Two things to do first: upload one real PDF and confirm
+      extraction actually produces text (see the corrected bug entry above), and decide
+      whether it needs an index, since a `LIKE` scan over `extracted_text` is fine at
+      today's volume and not at five semesters of readings.
 
 ## Done
 

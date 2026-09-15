@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import uuid
+from datetime import datetime
 
 DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(__file__), "data"))
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
@@ -87,6 +88,10 @@ CREATE TABLE IF NOT EXISTS materials (
     mimetype TEXT,
     size INTEGER,
     extracted_text TEXT,
+    -- Office files are converted to PDF once so they can be previewed in the browser.
+    -- preview_status is one of pending, ready or failed; null means never attempted.
+    preview_name TEXT,
+    preview_status TEXT,
     created_at TEXT
 );
 
@@ -108,6 +113,20 @@ CREATE TABLE IF NOT EXISTS note_folders (
     id TEXT PRIMARY KEY,
     class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     parent_id TEXT REFERENCES note_folders(id) ON DELETE CASCADE,
+    name TEXT,
+    kind TEXT DEFAULT 'custom',
+    sort_order INTEGER DEFAULT 0,
+    created_at TEXT
+);
+
+-- Files get the same folder tree notes have. Before this a file carried a single
+-- flat `category` string guessed from its filename, which could not be renamed,
+-- nested or added to. `kind` marks the folders created for every new class so they
+-- can be recognised later; a folder the user makes is 'custom'.
+CREATE TABLE IF NOT EXISTS file_folders (
+    id TEXT PRIMARY KEY,
+    class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    parent_id TEXT REFERENCES file_folders(id) ON DELETE CASCADE,
     name TEXT,
     kind TEXT DEFAULT 'custom',
     sort_order INTEGER DEFAULT 0,
@@ -606,6 +625,7 @@ def init_db():
     # Last, deliberately: drop_class_not_null rebuilds notes and materials from a
     # fixed column list, so it has to run before those tables grow a new column.
     migrate_semesters(conn)
+    migrate_file_folders(conn)
     conn.close()
 
 
@@ -785,6 +805,9 @@ CREATE TABLE {tmp} (
     mimetype TEXT,
     size INTEGER,
     extracted_text TEXT,
+    preview_name TEXT,
+    preview_status TEXT,
+    folder_id TEXT,
     created_at TEXT,
     item_id TEXT
 )
@@ -864,3 +887,131 @@ def semester_for(conn, class_id=None):
         if row and row["semester_id"]:
             return row["semester_id"]
     return active_semester_id(conn)
+
+
+# ---------------- file folders ----------------
+
+# The folders every class starts with. Saif's list, in the order they appear in the
+# sidebar. A class only gets "Projects" if it already has a file that was filed under
+# the old `projects` category, so nobody grows a folder they never asked for.
+DEFAULT_FILE_FOLDERS = (
+    ("lectures", "Lectures"),
+    ("readings", "Readings"),
+    ("assignments", "Assignments"),
+    ("rubrics", "Rubrics"),
+    ("exams", "Exams"),
+    ("syllabus", "Syllabus"),
+    ("personal", "Personal"),
+)
+
+# The flat category each default folder replaces. `other` is deliberately absent:
+# a file with no real category belongs at the top of its class, not in a bin called
+# Other that nobody opens.
+CATEGORY_TO_FOLDER_KIND = {
+    "slides": "lectures",
+    "readings": "readings",
+    "rubrics": "rubrics",
+    "exams": "exams",
+    "syllabus": "syllabus",
+    "personal": "personal",
+    "projects": "projects",
+}
+
+
+def ensure_default_file_folders(conn, class_id):
+    """Give a class its starting folders. Safe to call repeatedly.
+
+    Matching is on `kind`, not name, so a folder the student renamed is still
+    recognised and is not recreated under its original name.
+    """
+    have = {r["kind"] for r in conn.execute(
+        "SELECT kind FROM file_folders WHERE class_id=? AND parent_id IS NULL", (class_id,)).fetchall()}
+    now = datetime.utcnow().isoformat()
+    for order, (kind, name) in enumerate(DEFAULT_FILE_FOLDERS):
+        if kind in have:
+            continue
+        conn.execute(
+            "INSERT INTO file_folders (id, class_id, parent_id, name, kind, sort_order, created_at)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (str(uuid.uuid4()), class_id, None, name, kind, order, now))
+
+
+def folder_id_for_kind(conn, class_id, kind, name=None):
+    """The class's folder of this kind, created on demand if it is missing."""
+    row = conn.execute(
+        "SELECT id FROM file_folders WHERE class_id=? AND kind=? AND parent_id IS NULL",
+        (class_id, kind)).fetchone()
+    if row:
+        return row["id"]
+    fid = str(uuid.uuid4())
+    conn.execute(
+        "INSERT INTO file_folders (id, class_id, parent_id, name, kind, sort_order, created_at)"
+        " VALUES (?,?,?,?,?,?,?)",
+        (fid, class_id, None, name or kind.title(), kind, len(DEFAULT_FILE_FOLDERS), datetime.utcnow().isoformat()))
+    return fid
+
+
+def migrate_file_folders(conn):
+    """Turn `materials.category` into a real folder tree.
+
+    Runs on every start and only ever touches materials whose `folder_id` is still
+    null, so a file that has since been moved by hand stays where it was put. The old
+    `category` column is left alone: it still carries the filename guess made at upload
+    time, and dropping a column means rebuilding the table for no gain.
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS file_folders (
+            id TEXT PRIMARY KEY,
+            class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+            parent_id TEXT REFERENCES file_folders(id) ON DELETE CASCADE,
+            name TEXT,
+            kind TEXT DEFAULT 'custom',
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT
+        )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS file_folders_by_class ON file_folders(class_id)")
+
+    mcols = [r["name"] for r in conn.execute("PRAGMA table_info(materials)").fetchall()]
+    if "folder_id" not in mcols:
+        conn.execute("ALTER TABLE materials ADD COLUMN folder_id TEXT")
+    # Converted Office previews. Here rather than in the earlier migration for the
+    # same reason as folder_id: drop_class_not_null rebuilds materials from a fixed
+    # column list and runs before this.
+    if "preview_name" not in mcols:
+        conn.execute("ALTER TABLE materials ADD COLUMN preview_name TEXT")
+    if "preview_status" not in mcols:
+        conn.execute("ALTER TABLE materials ADD COLUMN preview_status TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS materials_by_folder ON materials(folder_id)")
+    conn.commit()
+
+    for c in conn.execute("SELECT id FROM classes").fetchall():
+        ensure_default_file_folders(conn, c["id"])
+    conn.commit()
+
+    # Backfill. One pass per category rather than per file: at any realistic library
+    # size this is a handful of statements instead of a few hundred.
+    rows = conn.execute(
+        "SELECT DISTINCT class_id, category FROM materials"
+        " WHERE folder_id IS NULL AND class_id IS NOT NULL AND category IS NOT NULL").fetchall()
+    for r in rows:
+        kind = CATEGORY_TO_FOLDER_KIND.get(r["category"])
+        if not kind:
+            continue
+        fid = folder_id_for_kind(conn, r["class_id"], kind,
+                                 "Projects" if kind == "projects" else None)
+        conn.execute(
+            "UPDATE materials SET folder_id=? WHERE folder_id IS NULL AND class_id=? AND category=?",
+            (fid, r["class_id"], r["category"]))
+    conn.commit()
+
+
+def folder_descendants(conn, folder_id):
+    """A folder and every folder beneath it, so a view can show a whole branch."""
+    out, frontier = [folder_id], [folder_id]
+    while frontier:
+        rows = conn.execute(
+            "SELECT id FROM file_folders WHERE parent_id IN ({})".format(
+                ",".join("?" * len(frontier))), frontier).fetchall()
+        frontier = [r["id"] for r in rows]
+        out.extend(frontier)
+    return out

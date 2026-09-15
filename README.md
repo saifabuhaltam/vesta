@@ -46,7 +46,7 @@ Every other feature works without this key — Headstart and rubric parsing just
 ## Deploying to Railway
 
 1. Code is already pushed to [github.com/saifabuhaltam/vesta](https://github.com/saifabuhaltam/vesta).
-2. In Railway, create a new project from that GitHub repo. Railway auto-detects it's a Python app (via `requirements.txt` and `Procfile`) and builds it with no extra config.
+2. In Railway, create a new project from that GitHub repo. Railway auto-detects it's a Python app (via `requirements.txt` and `Procfile`). `nixpacks.toml` adds LibreOffice to the build so Word, PowerPoint and Excel uploads can be converted to PDF and previewed in the browser; nothing else needs configuring.
 3. **Add a Volume** in the Railway service settings, mounted at `/data`. This is what makes uploads and the database survive restarts and redeploys — without it, every deploy wipes your data.
 4. Add an environment variable: `DATA_DIR=/data` (this tells the app where to put its database and uploaded files — see `db.py`).
 5. Add `ANTHROPIC_API_KEY` as another environment variable if you want Headstart to work (see above). Everything else runs fine without it.
@@ -69,3 +69,4 @@ git push
 - The dev server (`python app.py`) is for local testing only. Railway runs it through `gunicorn` (see `Procfile`), which is production-appropriate.
 - Single user, no login. Anyone with the URL can see and edit everything — fine for personal use, not for sharing the link publicly. Add authentication before doing that.
 - Max upload size is 25 MB per file (`app.py`, `MAX_CONTENT_LENGTH`) — raise it there if you need to.
+- **Office previews need LibreOffice.** Word, PowerPoint and Excel files are converted to PDF once, in the background, when they're uploaded, and that PDF is what the preview pane shows. On Railway this comes from `nixpacks.toml`. Locally it's optional: install LibreOffice (`brew install --cask libreoffice`) and Vesta finds it on its own, or set `SOFFICE_PATH` to the binary. Without it nothing breaks — those files just fall back to a Download button, and any that were uploaded meanwhile get converted the next time the app starts with LibreOffice available.
