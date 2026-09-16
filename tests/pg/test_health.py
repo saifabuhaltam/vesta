@@ -12,6 +12,7 @@ def test_health_reports_that_rls_is_actually_enforced():
         body = c.get("/health").get_json()
     assert body["database"] == "postgres"
     assert body["rlsEnforced"] is True
+    assert body["connectsAsSuperuser"] is False
     assert body["tables"] > 20
 
 

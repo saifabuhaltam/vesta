@@ -2575,16 +2575,24 @@ def health():
             out["tables"] = row["n"] if row else 0
             # Whether the isolation between accounts is real on THIS database.
             #
-            # Every policy in the schema is written for a connecting role that row
-            # level security actually applies to. A superuser, or a role holding
-            # BYPASSRLS, ignores policies entirely -- FORCE included -- and the whole
-            # scheme silently becomes decoration: every account would read every other
-            # account's rows. Managed Postgres hosts differ on what the default role
-            # gets, so this is not something to assume. One boolean, no role names.
+            # The role that matters is `authenticated`, not the one Vesta connects as.
+            # Every request calls `set role authenticated` before it touches a table,
+            # and Postgres evaluates row level security against the *current* role, so
+            # a superuser connection that has dropped to `authenticated` is still held
+            # to the policies. Measuring the connecting role instead reports a scary
+            # false negative on any host that hands out a superuser, which Railway does.
+            #
+            # The corollary is worth knowing: on such a host a query that never calls
+            # `become()` runs as that superuser and reads *every* account's rows. It
+            # fails open, not closed. `db.get_db()` outside a request context is the
+            # way that happens.
             role = conn.execute(
                 "select rolsuper or rolbypassrls as bypasses from pg_roles"
-                " where rolname = current_user").fetchone()
-            out["rlsEnforced"] = (not role["bypasses"]) if role else None
+                " where rolname = 'authenticated'").fetchone()
+            out["rlsEnforced"] = (not role["bypasses"]) if role else False
+            out["connectsAsSuperuser"] = bool(conn.execute(
+                "select rolsuper or rolbypassrls as su from pg_roles"
+                " where rolname = current_user").fetchone()["su"])
             conn.close()
         except Exception as e:
             out["ok"] = False

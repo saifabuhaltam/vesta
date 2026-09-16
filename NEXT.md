@@ -452,11 +452,22 @@ says so and offers it.
 
 ### Still open
 
-- [ ] **Is the live database's role actually subject to RLS?** Everything here assumes
-      the connecting role is neither a superuser nor `BYPASSRLS`. If Railway's role is
-      one of those, every policy in `pg_schema.sql` is decoration and all accounts share
-      one dataset. `/health` now answers this directly: check `rlsEnforced`. **Do this
-      before any friend gets a login.** It is the single highest-value check left.
+- [x] ~~**Is the live database's role actually subject to RLS?**~~ Answered
+      2026-09-15: **yes, accounts are isolated.** The live `/health` reports
+      `connectsAsSuperuser: true` -- Railway does hand out a superuser -- but that is
+      not the role that matters. Every request calls `set role authenticated` before
+      touching a table, and Postgres evaluates row level security against the current
+      role, so the policies still apply. Confirmed by experiment against a local
+      Postgres configured the same way: with a superuser connection, one account
+      inserted a class and the other read an empty table.
+
+      The corollary is the thing to remember. On a host like this, a query that never
+      calls `become()` runs as the superuser and reads **every** account's rows. It
+      fails open, not closed, which is the opposite of what the schema comments assume.
+      `db.get_db()` outside a request context is exactly how that happens -- which is
+      what the Office preview bug was, and why that class of bug is worse here than the
+      silent no-op it looked like. Treat any new `get_db()` call outside a request as a
+      security question, not a correctness one.
 - [ ] **The schema's grant block hides its own failure.** `grant authenticated to
       current_user` sits in a DO block with `exception when others then null`, and its
       comment claims "RLS still applies" if it fails. That is wrong: when the grant

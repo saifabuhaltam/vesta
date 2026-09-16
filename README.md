@@ -98,7 +98,10 @@ git push
   `SUPABASE_URL`, Vesta stays the single-user tool it began as: no login, no session.
   Deployed, every request needs a session and Postgres row level security keeps each
   account's data apart. Before sharing the URL, check `/health` reports
-  `rlsEnforced: true`. If it does not, the connecting database role bypasses row level
-  security and the accounts are not actually separated.
+  `rlsEnforced: true`. That reports whether the `authenticated` role is held to the
+  policies, which is the role every request actually runs as. `connectsAsSuperuser:
+  true` alongside it is normal on Railway and not a problem by itself, but it does mean
+  any query that runs outside a request context reads every account's rows rather than
+  none.
 - Max upload size is 25 MB per file (`app.py`, `MAX_CONTENT_LENGTH`) — raise it there if you need to.
 - **Office previews need LibreOffice.** Word, PowerPoint and Excel files are converted to PDF once, in the background, when they're uploaded, and that PDF is what the preview pane shows. On Railway this comes from `nixpacks.toml`. Locally it's optional: install LibreOffice (`brew install --cask libreoffice`) and Vesta finds it on its own, or set `SOFFICE_PATH` to the binary. Without it nothing breaks — those files just fall back to a Download button, and any that were uploaded meanwhile get converted the next time the app starts with LibreOffice available.
