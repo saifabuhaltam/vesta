@@ -40,7 +40,8 @@ def load_env_file(path):
 load_env_file(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 
-from db import (get_db, init_db, UPLOAD_DIR, SEMESTER_SCOPED,
+from db import (get_db, init_db, UPLOAD_DIR, SEMESTER_SCOPED, for_each_account,
+                current_user_id,
                 active_semester, active_semester_id, set_active_semester,
                 default_term_name, semester_for, SEMESTER_ORDER,
                 ensure_default_file_folders, folder_id_for_kind, folder_descendants,
@@ -64,6 +65,9 @@ app.register_blueprint(syllabus_bp)
 # calendar: SFU's published timetable now, connected calendars next
 from calendar_api import bp as calendar_bp  # noqa: E402
 app.register_blueprint(calendar_bp)
+# Per-account preferences: everything the Settings screen writes.
+from prefs import bp as prefs_bp  # noqa: E402
+app.register_blueprint(prefs_bp)
 # Accounts, and the gate in front of every /api route. Entirely a no-op locally,
 # where no Supabase is configured: Vesta stays the single-user tool it started as.
 import auth as vesta_auth  # noqa: E402
@@ -471,8 +475,16 @@ PLAIN_TEXT_EXTS = ("txt", "md", "markdown", "csv", "tsv", "html", "htm")
 
 
 def backfill_extracted_text():
-    """Read files uploaded before their type was readable, once, at startup."""
-    conn = get_db()
+    """Read files uploaded before their type was readable, once, at startup.
+
+    Run once per account. A single ownerless connection reads zero rows on Postgres,
+    because forced RLS compares `user_id` against a null `auth.uid()`.
+    """
+    for_each_account(_backfill_extracted_text_for)
+
+
+def _backfill_extracted_text_for(uid):
+    conn = get_db(user_id=uid)
     rows = conn.execute(
         "SELECT id, filename, stored_name FROM materials "
         "WHERE kind='file' AND (extracted_text IS NULL OR extracted_text='') AND stored_name IS NOT NULL"
@@ -1257,10 +1269,17 @@ def convert_to_pdf(src_path, out_dir, timeout=120):
     return produced if os.path.exists(produced) else None
 
 
-def make_office_preview(mid, src_path, filename):
-    """Convert one upload and record the result. Runs on a worker thread."""
+def make_office_preview(mid, src_path, filename, user_id=None):
+    """Convert one upload and record the result. Runs on a worker thread.
+
+    `user_id` is not optional in practice on Postgres, and passing it is the whole
+    point: a thread has no Flask request context, so `get_db()` cannot work out who
+    the row belongs to. Without it the connection stays on the owning role, forced RLS
+    grants it nothing, and every UPDATE below matches zero rows while reporting
+    success. The visible symptom was `preview_status` stuck on 'pending' forever.
+    """
     produced = convert_to_pdf(src_path, UPLOAD_DIR)
-    conn = get_db()
+    conn = get_db(user_id=user_id)
     try:
         if produced:
             target = f"{mid}_preview.pdf"
@@ -1292,11 +1311,13 @@ def queue_office_preview(mid, src_path, filename):
     """
     if not office_ext(filename) or not soffice_path():
         return
+    # Read while the request context still exists; the thread will not have one.
+    uid = current_user_id()
     conn = get_db()
     conn.execute("UPDATE materials SET preview_status='pending' WHERE id=?", (mid,))
     conn.commit()
     conn.close()
-    threading.Thread(target=make_office_preview, args=(mid, src_path, filename),
+    threading.Thread(target=make_office_preview, args=(mid, src_path, filename, uid),
                      daemon=True).start()
 
 
@@ -1306,8 +1327,14 @@ def backfill_office_text():
     Separate from `backfill_extracted_text`, which runs at import before any of the
     Office helpers are defined, and cheap by comparison: the PDFs already exist, so
     this is pypdf only, no LibreOffice.
+
+    Per account, for the same reason as `backfill_extracted_text`.
     """
-    conn = get_db()
+    for_each_account(_backfill_office_text_for)
+
+
+def _backfill_office_text_for(uid):
+    conn = get_db(user_id=uid)
     try:
         rows = conn.execute(
             "SELECT id, preview_name FROM materials"
@@ -1335,26 +1362,31 @@ def backfill_office_previews():
     """
     if not soffice_path():
         return
-    conn = get_db()
-    try:
-        rows = conn.execute(
-            "SELECT id, stored_name, filename FROM materials"
-            " WHERE kind='file' AND stored_name IS NOT NULL"
-            " AND (preview_status IS NULL OR preview_status='')").fetchall()
-    except Exception:
-        conn.close()
-        return
-    conn.close()
-    todo = [(r["id"], r["stored_name"], r["filename"]) for r in rows
-            if office_ext(r["filename"] or r["stored_name"])]
+    todo = []
+
+    def collect(uid):
+        conn = get_db(user_id=uid)
+        try:
+            rows = conn.execute(
+                "SELECT id, stored_name, filename FROM materials"
+                " WHERE kind='file' AND stored_name IS NOT NULL"
+                " AND (preview_status IS NULL OR preview_status='')").fetchall()
+        except Exception:
+            return
+        finally:
+            conn.close()
+        todo.extend((uid, r["id"], r["stored_name"], r["filename"]) for r in rows
+                    if office_ext(r["filename"] or r["stored_name"]))
+
+    for_each_account(collect)
     if not todo:
         return
 
     def run():
-        for mid, stored, filename in todo:
+        for uid, mid, stored, filename in todo:
             path = os.path.join(UPLOAD_DIR, stored)
             if os.path.exists(path):
-                make_office_preview(mid, path, filename)
+                make_office_preview(mid, path, filename, uid)
     threading.Thread(target=run, daemon=True).start()
 
 
@@ -2520,6 +2552,8 @@ def health():
     # error page. Neither value is secret: the client id and the callback URL both
     # travel in the address bar during any sign-in, which is precisely why they have to
     # match what is registered. The client *secret* is never reported.
+    # Whether the sign-in screen's "Invite only" is telling the truth.
+    out["inviteOnly"] = bool(vesta_auth.allowlist())
     try:
         import calendar_api as _cal
         out["google"] = {
@@ -2539,6 +2573,18 @@ def health():
                 " on ns.oid = c.relnamespace where ns.nspname='public' and c.relkind='r'"
             ).fetchone()
             out["tables"] = row["n"] if row else 0
+            # Whether the isolation between accounts is real on THIS database.
+            #
+            # Every policy in the schema is written for a connecting role that row
+            # level security actually applies to. A superuser, or a role holding
+            # BYPASSRLS, ignores policies entirely -- FORCE included -- and the whole
+            # scheme silently becomes decoration: every account would read every other
+            # account's rows. Managed Postgres hosts differ on what the default role
+            # gets, so this is not something to assume. One boolean, no role names.
+            role = conn.execute(
+                "select rolsuper or rolbypassrls as bypasses from pg_roles"
+                " where rolname = current_user").fetchone()
+            out["rlsEnforced"] = (not role["bypasses"]) if role else None
             conn.close()
         except Exception as e:
             out["ok"] = False

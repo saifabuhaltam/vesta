@@ -52,6 +52,33 @@ Every other feature works without this key — Headstart and rubric parsing just
 5. Add `ANTHROPIC_API_KEY` as another environment variable if you want Headstart to work (see above). Everything else runs fine without it.
 6. Deploy. Railway gives you a public URL immediately; add a custom domain later if you want one.
 
+## Environment variables
+
+| Variable | What it does |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | Headstart and rubric parsing. Everything else works without it. |
+| `DATA_DIR` | Where the database and uploads live. `/data` on Railway, to match the volume. |
+| `DATABASE_URL` | Set it and Vesta uses Postgres instead of SQLite, with accounts and RLS. |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Turn accounts on. Supabase issues tokens; Flask holds the session. |
+| `SECRET_KEY` | Signs the session cookie. Required whenever accounts are on. |
+| `INVITE_EMAILS` | Comma-separated allowlist. **Unset means anyone can sign up.** |
+| `AI_GLOBAL_DAILY_CAP_USD` | Ceiling on AI spend across *all* accounts. The per-account cap is user-editable and is not a spend control. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google Calendar sync. |
+
+## Tests
+
+```bash
+.venv/bin/python -m pip install pgserver "psycopg[binary]" pytest esprima
+.venv/bin/python -m pytest tests/test_auth.py    # accounts, against SQLite
+.venv/bin/python -m pytest tests/pg              # isolation, against a real Postgres
+```
+
+Run the two separately. `db.py` picks its database at import time, so one process
+cannot host both. `tests/pg` downloads nothing and needs no installed Postgres:
+`pgserver` brings its own, and runs it as a non-superuser role on purpose, because as a
+superuser, row level security is bypassed and every isolation test would pass
+regardless of whether the policies worked.
+
 ## Pushing future changes to GitHub
 
 The `origin` remote is already set to the repo above, so after this initial push, future updates are just:
@@ -67,6 +94,11 @@ git push
 
 - **AI syllabus parsing isn't built yet.** The groundwork is there — PDF and DOCX text gets extracted on upload and stored (`materials.extracted_text` in the database) — but turning that into "paste or upload a syllabus and get assignments/dates/grading weights auto-filled" needs an Anthropic API key of your own (a small per-use cost) and a review step before anything gets written to your calendar, so a bad extraction can't silently create a wrong deadline.
 - The dev server (`python app.py`) is for local testing only. Railway runs it through `gunicorn` (see `Procfile`), which is production-appropriate.
-- Single user, no login. Anyone with the URL can see and edit everything — fine for personal use, not for sharing the link publicly. Add authentication before doing that.
+- **Accounts are on where Supabase is configured, and only there.** Run locally with no
+  `SUPABASE_URL`, Vesta stays the single-user tool it began as: no login, no session.
+  Deployed, every request needs a session and Postgres row level security keeps each
+  account's data apart. Before sharing the URL, check `/health` reports
+  `rlsEnforced: true`. If it does not, the connecting database role bypasses row level
+  security and the accounts are not actually separated.
 - Max upload size is 25 MB per file (`app.py`, `MAX_CONTENT_LENGTH`) — raise it there if you need to.
 - **Office previews need LibreOffice.** Word, PowerPoint and Excel files are converted to PDF once, in the background, when they're uploaded, and that PDF is what the preview pane shows. On Railway this comes from `nixpacks.toml`. Locally it's optional: install LibreOffice (`brew install --cask libreoffice`) and Vesta finds it on its own, or set `SOFFICE_PATH` to the binary. Without it nothing breaks — those files just fall back to a Download button, and any that were uploaded meanwhile get converted the next time the app starts with LibreOffice available.

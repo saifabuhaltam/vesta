@@ -44,7 +44,7 @@ SESSION_SECONDS = 60 * 60 * 24 * 30
 # Paths that must work before anyone is signed in.
 OPEN_PATHS = {"/api/auth/login", "/api/auth/signup", "/api/auth/reset",
               "/api/auth/logout", "/api/auth/me", "/api/auth/google/start",
-              "/api/auth/session", "/health"}
+              "/api/auth/session", "/api/auth/password", "/health"}
 
 bp = Blueprint("auth", __name__)
 
@@ -55,6 +55,27 @@ def enabled():
     The JWT secret is deliberately not required. See `identify`.
     """
     return bool(SUPABASE_URL and SUPABASE_ANON_KEY)
+
+
+def allowlist():
+    """Emails permitted to reach an account, from `INVITE_EMAILS`.
+
+    An environment variable rather than a table, because adding a friend is then a
+    Railway dashboard edit rather than a psql session, and this list is expected to
+    hold single figures.
+
+    Unset means open, deliberately. The alternative locks Saif out of his own app the
+    first time the variable is missing on a deploy, which is a far worse failure than
+    the one it prevents. `/api/auth/me` reports which mode is in force so the sign-in
+    screen can stop claiming to be invite-only when it is not.
+    """
+    raw = (os.environ.get("INVITE_EMAILS") or "").strip()
+    return {e.strip().lower() for e in raw.replace("\n", ",").split(",") if e.strip()}
+
+
+def invited(email):
+    allow = allowlist()
+    return True if not allow else (email or "").strip().lower() in allow
 
 
 class AuthError(Exception):
@@ -190,7 +211,15 @@ def identify(access_token):
 
 
 def _session_from_token(access_token):
+    """Every way in ends here: password sign-in, signup, and Google.
+
+    Which is why the invite check lives here and not in `signup`. Signing in with
+    Google never touches the signup route at all, so a check there would leave the
+    front door open while looking closed.
+    """
     user_id, email = identify(access_token)
+    if not invited(email):
+        raise AuthError("That email has not been invited to Vesta.", 403)
     ensure_account_row(user_id, email)
     session.permanent = True
     session["user_id"] = user_id
@@ -303,6 +332,107 @@ def session_from_browser():
         return jsonify({"error": e.message}), e.status
 
 
+def _supabase_update_user(access_token, payload):
+    """PUT /auth/v1/user as the holder of that token. Supabase's own password write."""
+    import httpx
+    try:
+        r = httpx.put(f"{SUPABASE_URL}/auth/v1/user",
+                      json=payload,
+                      headers={"apikey": SUPABASE_ANON_KEY,
+                               "Authorization": f"Bearer {access_token}",
+                               "Content-Type": "application/json"},
+                      timeout=20)
+    except Exception as e:
+        raise AuthError(f"Could not reach the sign-in service: {e}", 502)
+    if r.status_code >= 400:
+        body = {}
+        try:
+            body = r.json()
+        except Exception:
+            pass
+        raise AuthError(body.get("msg") or body.get("message") or "That change was refused.",
+                        400 if r.status_code < 500 else 502)
+    return r.json() if r.content else {}
+
+
+@bp.route("/api/auth/password", methods=["POST"])
+def change_password():
+    """Set a new password, authorised one of two ways.
+
+    Signed in, it costs the current password. Vesta's own session is a cookie that
+    lasts 30 days, so a borrowed laptop should not be enough to take an account over;
+    and since Flask throws the Supabase token away at sign-in, re-authenticating is
+    also the only way to obtain a token allowed to make the change. The safer choice
+    and the cheaper one are the same choice here.
+
+    Arriving from a reset email, the recovery token in the link *is* the proof, which
+    is what makes this the one route that has to work with no session at all.
+    """
+    if not enabled():
+        return jsonify({"error": "This copy of Vesta has no accounts."}), 400
+    data = request.get_json(force=True) or {}
+    new_password = data.get("newPassword") or ""
+    if len(new_password) < 8:
+        return jsonify({"error": "Use a password of at least 8 characters."}), 400
+
+    recovery = (data.get("recoveryToken") or "").strip()
+    try:
+        if recovery:
+            _supabase_update_user(recovery, {"password": new_password})
+            # Straight into the app: they have just proved they hold the mailbox, and
+            # making them retype the password they set one second ago is pure friction.
+            user = _session_from_token(recovery)
+            return jsonify({"user": user, "signedIn": True})
+
+        uid, email = session.get("user_id"), session.get("email")
+        if not uid:
+            return jsonify({"error": "Sign in to change your password.",
+                            "signedOut": True}), 401
+        current = data.get("currentPassword") or ""
+        if not current:
+            return jsonify({"error": "Give your current password."}), 400
+        body = _supabase("token?grant_type=password",
+                         {"email": email, "password": current})
+        token = body.get("access_token") or ""
+        if not token:
+            raise AuthError("That current password was not accepted.")
+        _supabase_update_user(token, {"password": new_password})
+    except AuthError as e:
+        return jsonify({"error": e.message}), e.status
+    return jsonify({"ok": True})
+
+
+DISPLAY_NAME_KEY = "display_name"
+
+
+@bp.route("/api/auth/profile", methods=["GET", "POST"])
+def profile():
+    """The display name, kept in `app_settings` beside every other per-user setting.
+
+    Not on `auth.users`: that table is a shadow of Supabase's, holding only what the
+    token carries, and giving it columns the token knows nothing about invites the two
+    to disagree. `app_settings` is already keyed per user and already covered by row
+    level security, so this needs no schema change at all.
+    """
+    if not enabled():
+        return jsonify({"accounts": False, "displayName": ""})
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"error": "Sign in to use Vesta.", "signedOut": True}), 401
+    import db
+    conn = db.get_db()
+    try:
+        if request.method == "POST":
+            name = ((request.get_json(force=True) or {}).get("displayName") or "").strip()
+            if len(name) > 80:
+                return jsonify({"error": "Keep the name under 80 characters."}), 400
+            db.set_setting(conn, DISPLAY_NAME_KEY, name)
+        return jsonify({"displayName": db.get_setting(conn, DISPLAY_NAME_KEY),
+                        "email": session.get("email") or ""})
+    finally:
+        conn.close()
+
+
 @bp.route("/api/auth/logout", methods=["POST"])
 def logout():
     session.clear()
@@ -314,9 +444,11 @@ def me():
     if not enabled():
         return jsonify({"accounts": False, "user": None})
     uid = session.get("user_id")
+    invite_only = bool(allowlist())
     if not uid:
-        return jsonify({"accounts": True, "user": None})
-    return jsonify({"accounts": True, "user": {"id": uid, "email": session.get("email") or ""}})
+        return jsonify({"accounts": True, "user": None, "inviteOnly": invite_only})
+    return jsonify({"accounts": True, "inviteOnly": invite_only,
+                    "user": {"id": uid, "email": session.get("email") or ""}})
 
 
 # ---------------------------------------------------------------------------

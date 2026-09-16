@@ -341,6 +341,46 @@ def get_db(user_id=None):
     return conn
 
 
+def all_user_ids():
+    """Every account, for maintenance jobs that have to run once per user.
+
+    Empty on SQLite, where there is one user and no accounts table. On Postgres this
+    is the only way a job outside a request can reach any rows at all: forced RLS plus
+    policies granted `to authenticated` mean an ownerless connection matches
+    `user_id = auth.uid()` against NULL and sees nothing. `auth.users` itself carries
+    no `user_id` and never had `apply_owner_rls` applied to it, so the owning role can
+    read it, which is what makes the per-user loop possible.
+    """
+    if not DATABASE_URL:
+        return []
+    conn = get_db(user_id=None)
+    try:
+        conn.as_owner()
+        # str(), because psycopg returns a uuid column as a UUID object while every
+        # other user id in the app is a string off the session. Letting the two types
+        # mix means a comparison that is false for reasons nobody would look for.
+        return [str(r["id"]) for r in conn.execute("select id from auth.users").fetchall()]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+
+def for_each_account(fn):
+    """Run `fn(user_id)` once per account, or once with None on SQLite.
+
+    Boot-time backfills used to call `get_db()` with no request context, which on
+    Postgres silently matched zero rows: the job reported success having read and
+    written nothing. Anything that maintains stored rows outside a request has to go
+    through here instead.
+    """
+    if not DATABASE_URL:
+        fn(None)
+        return
+    for uid in all_user_ids():
+        fn(uid)
+
+
 PG_SCHEMA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                               "cloud", "migrate", "pg_schema.sql")
 PG_MIGRATIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -872,6 +912,25 @@ def set_active_semester(conn, sid):
                         (sid, ACTIVE_KEY)).rowcount:
         conn.execute("INSERT INTO app_settings (key, value) VALUES (?,?)",
                      (ACTIVE_KEY, sid))
+    conn.commit()
+
+
+def get_setting(conn, key, default=""):
+    """One value out of app_settings. Scoped to the signed-in user by RLS."""
+    row = conn.execute("SELECT value FROM app_settings WHERE key=?", (key,)).fetchone()
+    return (row["value"] if row else None) or default
+
+
+def set_setting(conn, key, value):
+    """Update-then-insert, the one spelling that works on both databases.
+
+    `app_settings` is keyed (user_id, key) on Postgres and (key) on SQLite, so there
+    is no ON CONFLICT target that is correct in both places. See `set_active_semester`,
+    which does the same dance for the same reason.
+    """
+    if not conn.execute("UPDATE app_settings SET value=? WHERE key=?",
+                        (value, key)).rowcount:
+        conn.execute("INSERT INTO app_settings (key, value) VALUES (?,?)", (key, value))
     conn.commit()
 
 

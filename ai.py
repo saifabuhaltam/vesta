@@ -18,6 +18,7 @@ for the student to accept, edit or throw away.
 """
 import json
 import os
+import time
 import re
 import sqlite3
 import uuid
@@ -48,6 +49,21 @@ DEFAULT_SETTINGS = {
 
 # Rough but stable: English prose runs about four characters per token.
 CHARS_PER_TOKEN = 4
+
+# The ceiling across every account, in dollars a day. Unset means no global limit.
+#
+# This is an environment variable and not a setting, because `daily_cap_usd` lives in
+# `app_settings`, which is per user and writable from the app: anyone can raise their
+# own ceiling through PUT /api/ai/settings. That makes the per-account cap a courtesy
+# to yourself, not a spend control. Every call is billed to one Anthropic key, so the
+# only number that protects the person paying is one the people spending cannot edit.
+GLOBAL_CAP_USD = float(os.environ.get("AI_GLOBAL_DAILY_CAP_USD") or 0) or None
+
+# Totalling every account costs one connection per account, so the answer is held for
+# a minute. The cost of that staleness is bounded: at worst, a minute of concurrent
+# spending crosses the line together before any of them are refused.
+GLOBAL_CACHE_SECONDS = 60
+_global_spend = {"day": None, "usd": 0.0, "at": 0.0}
 
 
 def settings(conn):
@@ -117,7 +133,37 @@ def spent_today(conn, cfg):
     }
 
 
+def spent_today_everyone(cfg):
+    """Today's spend across every account, or None where there are no accounts.
+
+    Row level security is the reason this cannot be one `sum()`: `ai_usage` is filtered
+    to the signed-in user, and an ownerless connection matches nothing at all, so the
+    total has to be gathered one account at a time.
+    """
+    import db
+    if not db.DATABASE_URL:
+        return None
+    day = datetime.utcnow().strftime("%Y-%m-%d")
+    now = time.time()
+    if _global_spend["day"] == day and (now - _global_spend["at"]) < GLOBAL_CACHE_SECONDS:
+        return _global_spend["usd"]
+    total = 0.0
+    for uid in db.all_user_ids():
+        conn = db.get_db(user_id=uid)
+        try:
+            total += spent_today(conn, cfg)["usd"]
+        except Exception:
+            continue
+        finally:
+            conn.close()
+    _global_spend.update(day=day, usd=round(total, 4), at=now)
+    return _global_spend["usd"]
+
+
 def record_usage(conn, kind, model, in_tokens, out_tokens):
+    # A spend just happened, so the cached global total is now wrong. Cheaper to
+    # invalidate than to hold a number that lets the next call through wrongly.
+    _global_spend["at"] = 0.0
     conn.execute(
         "INSERT INTO ai_usage (id, kind, model, input_tokens, output_tokens, day, created_at) "
         "VALUES (?,?,?,?,?,?,?)",
@@ -153,6 +199,15 @@ def call_claude(conn, kind, prompt, max_tokens=4000, confirmed=False):
             "reason": "daily_cap",
             "spentToday": used["usd"],
             "dailyCap": cfg["daily_cap_usd"],
+        })
+
+    everyone = spent_today_everyone(cfg)
+    if GLOBAL_CAP_USD and everyone is not None and everyone >= GLOBAL_CAP_USD:
+        raise AiRefused({
+            "error": "Vesta has reached today's AI limit across all accounts.",
+            "reason": "global_cap",
+            "spentTodayEveryone": everyone,
+            "globalCap": GLOBAL_CAP_USD,
         })
 
     if not confirmed and cfg["confirm_over_usd"] and est > cfg["confirm_over_usd"]:

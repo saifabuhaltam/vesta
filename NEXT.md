@@ -354,6 +354,126 @@ not rediscovered a third time.
       login.**
 - [ ] **Invite friends**: add each email to the Supabase allowlist, one line of SQL.
 
+## Accounts and multi-user: spec checked against the code 2026-09-15
+
+Saif's spec was sign up, log in, log out, reset password, manage profile, plus fully
+separate data per account. The isolation half is real and thorough; the account
+*management* half is mostly unbuilt on the deployment that actually runs.
+
+**The isolation is genuinely done.** Every one of the 28 app tables in
+`cloud/migrate/pg_schema.sql` carries `user_id uuid not null default auth.uid()`
+referencing `auth.users` with `on delete cascade`, plus enabled *and forced* row level
+security and four owner-only policies. `pgshim.Connection.become()` sets
+`request.jwt.claims` and drops the connection to the `authenticated` role for the life
+of the request, so the database filters every read and stamps every insert without a
+single one of the app's ~262 queries mentioning a user. Classes, notes, files,
+assignments, calendar, grades, headstart history and settings are all covered, and so
+are the tables the spec did not name: subtasks, quizzes, flashcards, rubrics,
+note_versions, sync_links, calendar_accounts, ai_usage. Uploaded bytes share one
+directory but are only reachable through `/api/materials/<id>/download`, which looks
+the row up through RLS first, so a guessed id returns 404.
+
+### Built 2026-09-15, in the order Saif approved
+
+All of this is local and uncommitted; nothing has been pushed.
+
+- [x] **The background-thread RLS bug.** `make_office_preview` now takes the account it
+      belongs to, captured in `queue_office_preview` while a request context still
+      exists. `db.for_each_account` runs the three boot backfills once per account for
+      the same reason. Proven both ways in `tests/pg`: without the owner the UPDATE
+      matches zero rows and the file stays 'pending'; with it, the row changes.
+- [x] **The account screen, behind the avatar.** The initial in the top right now opens
+      an Account modal rather than Settings: display name, who you are signed in as,
+      current/new/confirm password fields, and Sign out, all visible at once. Backed by
+      real Flask routes, so none of it depends on the dead `BE` shim any more.
+- [x] **Changing a password costs the current one.** `POST /api/auth/password`
+      re-authenticates against Supabase to get a token it is allowed to write with,
+      which is both the safer design and the only one available: Flask does not keep
+      the Supabase token after sign-in.
+- [x] **Reset actually resets.** `consumeAuthFragment` now reads `type=recovery` and
+      shows a Set-a-new-password screen holding the token, instead of signing the
+      person in with the password they just said they could not remember. Same endpoint
+      as above, authorised by the recovery token instead of the old password.
+- [x] **The invite gate is enforced in Flask**, in `_session_from_token`, which every
+      way in funnels through -- including Google, which never touches `/api/auth/signup`
+      at all. Reads `INVITE_EMAILS`. Unset means open, on purpose: the alternative locks
+      Saif out of his own app on a deploy where the variable is missing. `/api/auth/me`
+      and `/health` both report which mode is on, and the sign-in screen only claims
+      "Invite only" when it is true.
+- [x] **A global AI cap.** `AI_GLOBAL_DAILY_CAP_USD` bounds spend across every account.
+      The per-account `daily_cap_usd` was never a spend control: it lives in
+      `app_settings` and anyone can raise their own through `PUT /api/ai/settings`.
+- [x] **`cloud/` removed** except `cloud/migrate/`, which is load-bearing -- `db.py`
+      reads `pg_schema.sql` and `pg_migrations.sql` from it at boot.
+
+### Proven, not assumed
+
+`tests/pg` runs a real Postgres as a NOSUPERUSER role with no BYPASSRLS, which is the
+only configuration in which any of this means anything: as a superuser every policy is
+bypassed, FORCE included, and the suite would pass while isolated nothing. 48 tests
+across both suites. The isolation claims in the audit above are now measured rather
+than read off the schema.
+
+### Settings, rebuilt 2026-09-15
+
+Eleven sections down the side of the modal instead of one scrolling column, and the
+preferences behind them moved off `localStorage` onto the account. That last part was
+the real gap: settings were per *browser*, so signing in on a phone gave you defaults
+you had never chosen, and clearing site data wiped them. They live in `app_settings`
+now under one JSON blob, which needed no schema change and no new policy because that
+table is already per user and already covered by row level security.
+
+Sections: Account & Profile, Semester, Calendar & Integrations, Notifications,
+Grades & Grading Scale, Notes & Editor, Files, Focus, Headstart & AI, Appearance,
+Data & Export. The avatar opens the screen on Account, which is what makes it the
+profile control; there is only one implementation of the password fields.
+
+New behaviour that did not exist before:
+
+- **Notifications.** There were none at all. Browser notifications now fire when a
+  focus block ends and when work is due within a window you set. Off by default: a
+  permission prompt on first load, for something nobody asked for, is the fastest way
+  to be denied permission forever.
+- **A default grading scale.** `DEFAULT_GRADE_SCALE` was hard-coded; it is editable
+  now, and a class with its own scale still keeps it.
+- **`GET /api/export`** returns every row this account owns as one JSON file, across
+  29 tables. No user filtering appears in those queries and none is needed: RLS has
+  already narrowed each table to the caller.
+- Files default layout, Headstart layout, and a sidebar-starts-collapsed default.
+
+Settings write on change rather than behind a Save button, so closing the window
+cannot lose four changes at once. `PUT /api/prefs` merges and clamps: an unknown key
+is dropped and a focus block of 99999 minutes is stored as 120, so a hand-written
+request cannot break the timer permanently.
+
+Deliberately not built: **deleting account data.** Saif ruled account deletion out on
+2026-09-15, and wiping every row is the same thing by another name. The Data section
+says so and offers it.
+
+### Still open
+
+- [ ] **Is the live database's role actually subject to RLS?** Everything here assumes
+      the connecting role is neither a superuser nor `BYPASSRLS`. If Railway's role is
+      one of those, every policy in `pg_schema.sql` is decoration and all accounts share
+      one dataset. `/health` now answers this directly: check `rlsEnforced`. **Do this
+      before any friend gets a login.** It is the single highest-value check left.
+- [ ] **The schema's grant block hides its own failure.** `grant authenticated to
+      current_user` sits in a DO block with `exception when others then null`, and its
+      comment claims "RLS still applies" if it fails. That is wrong: when the grant
+      fails, every connection dies at `set role authenticated` and nothing works at all.
+      Found the hard way -- a second test run hit exactly this, because `authenticated`
+      is cluster-wide and outlived the role that created it. Worth failing loudly.
+- [ ] **Three gitignored files under `cloud/` could not be deleted** and are still on
+      disk: `cloud/app/config.js`, `cloud/dist/`, and `cloud/setup/secrets.local.txt`.
+      The last one is a secrets file and wants a look before it goes. A copy of the
+      whole removed stack is archived outside the repo.
+- [ ] **The account and reset screens have not been opened in a browser.** The
+      JavaScript parses and the routes behind it are tested, but no one has clicked
+      them. There is no node and no browser in this environment.
+- [ ] **Session length is still 30 days**, so removing someone from `INVITE_EMAILS`
+      does not sign them out until their cookie expires. The list is checked at sign-in,
+      not per request.
+
 ## Headstart: three questions Saif asked 2026-09-14, checked against the code
 
 ### 1. Where generated Headstart output goes (today: not to Files)

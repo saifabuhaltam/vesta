@@ -2014,6 +2014,39 @@
     padding:10px 0 4px; border-bottom:1px solid var(--border); margin-bottom:6px; }
   .gpa-cume .gc-val{ font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; }
   .gpa-cume .gc-lbl{ font-size:12px; color:var(--text-muted); font-weight:600; }
+  /* ---- Settings: sections down the side, one pane at a time ---- */
+  .settings-modal{ max-width:920px; width:min(92vw,920px); }
+  .settings-body{ display:flex; min-height:420px; max-height:68vh; }
+  .set-nav{ flex:0 0 210px; border-right:1px solid var(--border); padding:12px 8px;
+            overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
+  .set-nav-btn{ text-align:left; padding:9px 11px; border-radius:9px; border:none;
+                background:transparent; cursor:pointer; font:inherit; font-size:13px;
+                color:var(--text); white-space:nowrap; }
+  .set-nav-btn:hover{ background:var(--surface-2); }
+  .set-nav-btn.active{ background:var(--accent-soft); color:var(--accent); font-weight:600; }
+  .set-pane{ flex:1 1 auto; padding:14px 18px 20px; overflow-y:auto; }
+  .set-pane h3{ margin:0 0 4px; font-size:16px; }
+  .set-pane .set-intro{ color:var(--text-muted); font-size:12px; margin:0 0 12px; }
+  .set-row{ display:flex; align-items:center; justify-content:space-between; gap:18px;
+            padding:11px 0; border-bottom:1px solid var(--border); }
+  .set-row:last-child{ border-bottom:none; }
+  .set-label{ font-weight:600; font-size:13px; }
+  .set-help{ font-size:12px; color:var(--text-muted); margin-top:2px; max-width:46ch; }
+  .set-control{ flex:0 0 auto; display:flex; align-items:center; gap:8px; }
+  .set-control input[type=number]{ width:84px; }
+  .set-control input[type=text], .set-control input[type=password]{ width:220px; }
+  .set-adv{ margin-top:16px; border-top:1px solid var(--border); padding-top:10px; }
+  .set-adv summary{ cursor:pointer; font-size:12px; color:var(--text-muted); }
+  .set-scale-row{ display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+  .set-scale-row input[type=number]{ width:80px; }
+  .set-scale-row input[type=text]{ width:70px; }
+  .nt-body{ font-size:var(--editor-font-size, 16px); }
+  @media (max-width:720px){
+    .settings-body{ flex-direction:column; max-height:78vh; }
+    .set-nav{ flex:0 0 auto; flex-direction:row; overflow-x:auto;
+              border-right:none; border-bottom:1px solid var(--border); }
+    .set-row{ flex-direction:column; align-items:flex-start; gap:8px; }
+  }
 </style>
 </head>
 <body>
@@ -2547,7 +2580,18 @@
   // falls through to the local Flask server exactly as before, which is what
   // lets this one file serve both during the migration.
   var BE = (typeof window !== 'undefined' && window.VESTA_BACKEND) || null;
-  var cloudProfile = null;
+  // The signed-in person's profile, from /api/auth/profile. Empty locally, where
+  // there are no accounts at all.
+  var vestaProfile = { displayName:'', email:'' };
+  var accountMsg = null;      // {kind:'ok'|'err', text:'...'} shown in the account screen
+  var accountBusy = false;
+
+  function loadProfile(){
+    return apiGet('/api/auth/profile').then(function(p){
+      vestaProfile = { displayName:(p && p.displayName) || '', email:(p && p.email) || '' };
+      return vestaProfile;
+    }).catch(function(){ return vestaProfile; });
+  }
   function route(name, args, local){
     if(BE && typeof BE[name] === 'function') return BE[name].apply(BE, args);
     return local();
@@ -2809,12 +2853,149 @@
   }
   function setTheme(theme){
     try{ localStorage.setItem(THEME_KEY, theme); }catch(e){}
+    if(PREFS && PREFS.theme !== theme) savePrefs({ theme: theme });
     applyTheme(theme);
     document.querySelectorAll('.seg-btn[data-action="set-theme"]').forEach(function(b){
       b.classList.toggle('active', b.dataset.themeChoice===theme);
     });
   }
   function initTheme(){ applyTheme(currentTheme()); }
+
+  // ---------------- preferences ----------------
+  // Settings used to live in localStorage, which made them per browser rather than per
+  // person: signing in on a phone gave you defaults you had never chosen. They live on
+  // the account now, and localStorage keeps only the job it is actually good at --
+  // holding the last known theme so the first paint is not the wrong colour.
+  var PREFS = null;
+  var PREFS_MIGRATED_KEY = 'vesta_prefs_migrated';
+
+  function loadPrefs(){
+    return apiGet('/api/prefs').then(function(p){
+      PREFS = p;
+      applyPrefs();
+      return p;
+    }).catch(function(){ return null; });
+  }
+
+  function savePrefs(patch){
+    // Applied before the round trip: a toggle that waits for the network to move reads
+    // as broken, and the server's answer overwrites this a moment later anyway.
+    PREFS = Object.assign({}, PREFS || {}, patch);
+    applyPrefs();
+    return apiPut('/api/prefs', patch).then(function(p){
+      PREFS = p;
+      applyPrefs();
+      return p;
+    }).catch(function(err){ reportError(err); return PREFS; });
+  }
+
+  // Live settings: these describe how the app should look right now, so they apply the
+  // moment they change.
+  function applyPrefs(){
+    if(!PREFS) return;
+    applyTheme(PREFS.theme);
+    calDetail = PREFS.calendarDetail;
+    if(PREFS.defaultGradeScale && PREFS.defaultGradeScale.length){
+      DEFAULT_GRADE_SCALE = PREFS.defaultGradeScale;
+    }
+    applyEditorPrefs();
+  }
+
+  // Opening settings: these say where a view *starts*, so they are read once. Applying
+  // them on every save would throw the user out of the layout they just switched to,
+  // three sections away in the same Settings window.
+  function applyStartupPrefs(){
+    if(!PREFS) return;
+    calView = PREFS.calendarDefaultView;
+    filesLayout = PREFS.filesDefaultLayout;
+    hsView = PREFS.headstartView;
+  }
+
+  function applyEditorPrefs(){
+    var sizes = { small:'14px', medium:'16px', large:'18px' };
+    document.documentElement.style.setProperty(
+      '--editor-font-size', sizes[PREFS.editorFontSize] || sizes.medium);
+    var body = document.getElementById('nt-body');
+    if(body) body.spellcheck = !!PREFS.editorSpellcheck;
+  }
+
+  /**
+   * One browser notification, if the user asked for them and the browser agreed.
+   *
+   * Silent about failure on purpose: notifications are a courtesy, and a student
+   * mid-essay should never get an error dialog because a permission changed.
+   */
+  function vestaNotify(title, body, tag){
+    try{
+      if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+      new Notification(title, { body: body || '', tag: tag || undefined });
+    }catch(e){}
+  }
+
+  var DUE_NOTIFIED_KEY = 'vesta_due_notified';
+
+  /**
+   * Tell the student about work coming due, at most once a day per assignment.
+   *
+   * The seen-list is per browser rather than per account on purpose: it is about what
+   * this screen has already shown you, not about the assignment, and syncing it would
+   * mean a notification on the laptop suppresses the one on the phone.
+   */
+  function notifyDueSoon(){
+    if(!PREFS || !PREFS.notifyDueSoon) return;
+    if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    var today = todayIso();
+    var seen = {};
+    try{ seen = JSON.parse(localStorage.getItem(DUE_NOTIFIED_KEY) || '{}') || {}; }catch(e){}
+    var horizon = Date.now() + (Number(PREFS.notifyDueSoonHours) || 24) * 3600 * 1000;
+    var due = (items || []).filter(function(it){
+      if(!it.dueDate || it.status === 'done') return false;
+      if(seen[it.id] === today) return false;
+      var when = parseISODate(it.dueDate).getTime();
+      return when >= Date.now() - 86400000 && when <= horizon;
+    });
+    due.slice(0, 5).forEach(function(it){
+      var cls = classById(it.classId);
+      vestaNotify('Due soon: ' + it.title,
+                  (cls ? cls.code + ' · ' : '') + 'Due ' + it.dueDate, 'due-' + it.id);
+      seen[it.id] = today;
+    });
+    try{ localStorage.setItem(DUE_NOTIFIED_KEY, JSON.stringify(seen)); }catch(e){}
+  }
+
+  function applySidebarPref(){
+    if(!PREFS) return;
+    var stored = null;
+    try{ stored = localStorage.getItem(SIDEBAR_KEY); }catch(e){}
+    if(stored !== null) return;         // this device has already been told otherwise
+    setSidebarCollapsed(window.innerWidth < 1100 ? true : !!PREFS.sidebarCollapsed);
+  }
+
+  /**
+   * Carry whatever this browser already had up to the account, once.
+   *
+   * Without this, everyone's first sign-in after the change silently resets their
+   * theme and focus timer to the defaults, which looks exactly like data loss.
+   */
+  function migratePrefs(){
+    var done = false;
+    try{ done = localStorage.getItem(PREFS_MIGRATED_KEY) === '1'; }catch(e){}
+    if(done || !PREFS) return Promise.resolve();
+    var patch = {};
+    try{
+      var th = localStorage.getItem(THEME_KEY);
+      if(th === 'light' || th === 'dark') patch.theme = th;
+      var cd = localStorage.getItem(CAL_DETAIL_KEY);
+      if(cd === 'simple' || cd === 'detailed') patch.calendarDetail = cd;
+      var hv = localStorage.getItem(HS_VIEW_KEY);
+      if(hv === 'list' || hv === 'cards') patch.headstartView = hv;
+      var raw = localStorage.getItem(FOCUS_SETTINGS_KEY);
+      if(raw) patch.focus = JSON.parse(raw);
+    }catch(e){}
+    try{ localStorage.setItem(PREFS_MIGRATED_KEY, '1'); }catch(e){}
+    if(!Object.keys(patch).length) return Promise.resolve();
+    return savePrefs(patch);
+  }
 
   // ---------------- init ----------------
   // ---- sidebar ----
@@ -2852,7 +3033,9 @@
   var AUTH_COPY = {
     login:  { title:'Sign in to Vesta',   button:'Sign in',        path:'/api/auth/login' },
     signup: { title:'Create your account', button:'Create account', path:'/api/auth/signup' },
-    reset:  { title:'Reset your password', button:'Send reset link', path:'/api/auth/reset' }
+    reset:  { title:'Reset your password', button:'Send reset link', path:'/api/auth/reset' },
+    // Reached only by following a reset email, never by choosing it.
+    newpassword: { title:'Set a new password', button:'Save password', path:'/api/auth/password' }
   };
 
   function authMe(){
@@ -2875,39 +3058,47 @@
     document.body.classList.add('signed-out');
 
     var m = AUTH_COPY[authState.mode] || AUTH_COPY.login;
+    var isNew = authState.mode === 'newpassword';
     var wantsPassword = authState.mode !== 'reset';
+    var wantsEmail = !isNew;          // the recovery link already says who this is
     var subs = {
       login:  'Your term, in one place.',
       signup: 'You will need an email that has been invited.',
-      reset:  'We will email you a link to set a new password.'
+      reset:  'We will email you a link to set a new password.',
+      newpassword: 'Choose a new password for ' + (authState.email || 'your account') + '.'
     };
     root.innerHTML = '<div class="auth-screen"><div class="auth-inner">'
       + '<div class="auth-brand"><img src="/vesta-mark.png" alt=""><span>Vesta</span></div>'
       + '<div class="auth-card">'
       + '<h1>'+m.title.replace(' to Vesta','')+'</h1>'
       + '<p class="auth-sub">'+subs[authState.mode]+'</p>'
-      + '<label class="auth-field">Email'
-      + '<input type="email" id="auth-email" autocomplete="username" spellcheck="false"'
-      + ' value="'+escapeHtml(authState.email||'')+'" placeholder="you@example.com"></label>'
-      + (wantsPassword ? '<label class="auth-field">Password'
+      + (wantsEmail ? '<label class="auth-field">Email'
+          + '<input type="email" id="auth-email" autocomplete="username" spellcheck="false"'
+          + ' value="'+escapeHtml(authState.email||'')+'" placeholder="you@example.com"></label>' : '')
+      + (wantsPassword ? '<label class="auth-field">'+(isNew ? 'New password' : 'Password')
           + '<input type="password" id="auth-password" autocomplete="'
-          + (authState.mode==='signup' ? 'new-password' : 'current-password')
-          + '" placeholder="'+(authState.mode==='signup' ? 'At least 8 characters' : '')+'"></label>' : '')
+          + (authState.mode==='login' ? 'current-password' : 'new-password')
+          + '" placeholder="'+(authState.mode==='login' ? '' : 'At least 8 characters')+'"></label>' : '')
+      + (isNew ? '<label class="auth-field">Confirm new password'
+          + '<input type="password" id="auth-password2" autocomplete="new-password"></label>' : '')
       + (authState.notice ? '<div class="auth-note">'+escapeHtml(authState.notice)+'</div>' : '')
       + (authState.error ? '<div class="auth-error">'+escapeHtml(authState.error)+'</div>' : '')
       + '<button type="button" class="btn primary auth-primary" data-action="auth-submit"'
       + (authState.busy?' disabled':'')+'>'+(authState.busy ? 'Working…' : m.button)+'</button>'
-      + (authState.mode === 'reset' ? '' :
+      + (authState.mode === 'reset' || isNew ? '' :
           '<div class="auth-or"><span>or</span></div>'
           + '<button type="button" class="btn auth-google" data-action="auth-google">'
           + 'Continue with Google</button>')
       + '<div class="auth-links">'
-      + (authState.mode!=='login'  ? '<button type="button" data-action="auth-mode" data-mode="login">Sign in</button>' : '')
-      + (authState.mode!=='signup' ? '<button type="button" data-action="auth-mode" data-mode="signup">Create an account</button>' : '')
-      + (authState.mode!=='reset'  ? '<button type="button" data-action="auth-mode" data-mode="reset">Forgot your password?</button>' : '')
+      + (isNew ? '' :
+          (authState.mode!=='login'  ? '<button type="button" data-action="auth-mode" data-mode="login">Sign in</button>' : '')
+          + (authState.mode!=='signup' ? '<button type="button" data-action="auth-mode" data-mode="signup">Create an account</button>' : '')
+          + (authState.mode!=='reset'  ? '<button type="button" data-action="auth-mode" data-mode="reset">Forgot your password?</button>' : ''))
       + '</div>'
       + '</div>'
-      + '<p class="auth-foot">Invite only · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>'
+      // Only claim to be invite-only when the server says a list is actually in force.
+      + '<p class="auth-foot">'+(authState.inviteOnly ? 'Invite only · ' : '')
+        + '<a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>'
       + '</div></div>';
     // Enter submits from either field. A sign-in form that only responds to the mouse
     // is the kind of thing you notice every single morning.
@@ -2926,12 +3117,56 @@
     if(root) root.remove();
   }
 
+  function signedIn(user){
+    authState.user = user;
+    hideLogin();
+    // The avatar shows an initial taken from the profile and the whole app is themed
+    // from the preferences, so fetch both before the first render rather than letting
+    // the letter and the colours change under the user a moment later.
+    Promise.all([loadProfile(), loadPrefs()]).then(function(){
+      applyStartupPrefs();
+      applySidebarPref();
+      render();
+      return migratePrefs();
+    });
+    loadState().then(function(){ notifyDueSoon(); }).catch(function(){});
+  }
+
   function authSubmit(){
     var emailEl = document.getElementById('auth-email');
     var passEl = document.getElementById('auth-password');
-    authState.email = emailEl ? emailEl.value.trim() : '';
+    var pass2El = document.getElementById('auth-password2');
+    // In new-password mode there is no email field, and the address is already known
+    // from the recovery token. Reading a missing element would erase it.
+    if(emailEl) authState.email = emailEl.value.trim();
     var password = passEl ? passEl.value : '';
     authState.error = null; authState.notice = null;
+
+    if(authState.mode === 'newpassword'){
+      if(password.length < 8){ authState.error = 'Use a password of at least 8 characters.'; showLogin(); return; }
+      if(password !== (pass2El ? pass2El.value : '')){
+        authState.error = 'Those two passwords do not match.'; showLogin(); return;
+      }
+      authState.busy = true; showLogin();
+      apiPostRaw('/api/auth/password',
+                 { recoveryToken: authState.recoveryToken || '', newPassword: password })
+        .then(function(r){
+          authState.busy = false;
+          if(!r.ok){ authState.error = r.body.error || 'That password could not be set.'; showLogin(); return; }
+          authState.recoveryToken = null;
+          if(r.body.user){ signedIn(r.body.user); return; }
+          authState.mode = 'login';
+          authState.notice = 'Password set. Sign in with it.';
+          showLogin();
+        })
+        .catch(function(){
+          authState.busy = false;
+          authState.error = 'Could not reach Vesta.';
+          showLogin();
+        });
+      return;
+    }
+
     if(!authState.email){ authState.error = 'Give your email.'; showLogin(); return; }
     if(authState.mode !== 'reset' && !password){ authState.error = 'Give your password.'; showLogin(); return; }
     authState.busy = true; showLogin();
@@ -2941,9 +3176,7 @@
         authState.busy = false;
         if(!r.ok){ authState.error = r.body.error || 'That did not work.'; showLogin(); return; }
         if(r.body.user){                     // signed in
-          authState.user = r.body.user;
-          hideLogin();
-          loadState();
+          signedIn(r.body.user);
           return;
         }
         // signup awaiting confirmation, or a reset link sent
@@ -2990,6 +3223,16 @@
       if(i > 0) p[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' '));
     });
     history.replaceState(null, '', window.location.pathname + window.location.search);
+    // A reset email comes back here too, carrying type=recovery. Treating it like any
+    // other token would sign the person in with the password they have just told us
+    // they cannot remember, and leave them no way to set a new one. Hold the token
+    // instead and ask for the new password.
+    if(p.type === 'recovery' && p.access_token){
+      authState.mode = 'newpassword';
+      authState.recoveryToken = p.access_token;
+      authState.email = p.email || authState.email || '';
+      return Promise.resolve(false);
+    }
     if(p.error || !p.access_token){
       authState.error = p.error_description || p.error || 'That Google sign-in did not complete.';
       return Promise.resolve(false);
@@ -3007,28 +3250,27 @@
     initSidebar();
     initTheme();
     paintIcons();
-    // In the cloud the database refuses every query without a session, so wait for
-    // sign-in before asking for anything. Locally BE is null and this is a no-op.
-    if(BE && BE.requireAuth){
-      return BE.requireAuth().then(function(){
-        // The profile drives the avatar initial and the Account panel. A failure
-        // here must not stop the app loading.
-        BE.auth.getProfile().then(function(p){ cloudProfile = p; render(); }).catch(function(){});
-        loadState();
-        startLiveSync();
-      });
-    }
     // A Google sign-in lands back here with the token in the fragment, so deal with
     // that before asking the server who is signed in.
     return consumeAuthFragment().then(function(justSignedIn){
-      if(justSignedIn){ hideLogin(); loadState(); return; }
+      if(justSignedIn){ signedIn(authState.user); return; }
       // Ask the server whether this copy has accounts at all. One request, and it
       // decides between the app and a sign-in screen.
       return authMe().then(function(a){
         authState.accounts = !!a.accounts;
+        authState.inviteOnly = !!(a && a.inviteOnly);
         authState.user = (a && a.user) || null;
         if(authState.accounts && !authState.user){ showLogin(); return; }
-        loadState();
+        Promise.all([
+          authState.accounts ? loadProfile() : Promise.resolve(null),
+          loadPrefs()
+        ]).then(function(){
+          applyStartupPrefs();
+          applySidebarPref();
+          render();
+          return migratePrefs();
+        });
+        return loadState().then(function(){ notifyDueSoon(); });
       });
     }).catch(function(){ loadState(); });
   }
@@ -3067,17 +3309,18 @@
     restoreInlineFocus();
   }
 
+  function accountEmail(){
+    return (authState.user && authState.user.email) || vestaProfile.email || '';
+  }
   function accountLabel(){
-    if(!BE || !BE.auth) return 'Settings';
-    var u = BE.auth.getUser();
-    return u && u.email ? u.email : 'Settings';
+    if(!authState.accounts) return 'Settings';
+    var name = vestaProfile.displayName;
+    var email = accountEmail();
+    if(name && email) return name + ' · ' + email;
+    return name || email || 'Account';
   }
   function accountInitial(){
-    var name = cloudProfile && cloudProfile.display_name;
-    if(!name && BE && BE.auth){
-      var u = BE.auth.getUser();
-      name = u && u.email ? u.email : '';
-    }
+    var name = vestaProfile.displayName || accountEmail();
     return (name || 'S').trim().charAt(0).toUpperCase() || 'S';
   }
 
@@ -3098,7 +3341,8 @@
     var header = document.getElementById('view-header');
     var dateLabel = new Date().toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric', year:'numeric'});
     var headerRight = '<div class="header-right"><span class="header-date">'+dateLabel+'</span>'
-      + '<div class="avatar" data-action="open-settings" title="'+escapeHtml(accountLabel())+'">'
+      + '<div class="avatar" data-action="'+(authState.accounts ? 'open-account' : 'open-settings')+'"'
+        + ' title="'+escapeHtml(accountLabel())+'">'
         + escapeHtml(accountInitial())+'</div></div>';
 
     if(activeTab==='class'){
@@ -8250,47 +8494,294 @@
     }).catch(function(){ loadGoogleStatus(); });
   }
 
-  function openSettingsModal(){
-    var theme = currentTheme();
+  // ---------------- Settings ----------------
+  // One section at a time down the left, rather than one scrolling page. The old
+  // Settings was Appearance, Google and Terms stacked in a single column, which was
+  // fine at three sections and would not have survived eleven.
+  var SETTINGS_SECTIONS = [
+    { id:'account',       label:'Account & Profile' },
+    { id:'semester',      label:'Semester' },
+    { id:'calendar',      label:'Calendar & Integrations' },
+    { id:'notifications', label:'Notifications' },
+    { id:'grades',        label:'Grades & Grading Scale' },
+    { id:'notes',         label:'Notes & Editor' },
+    { id:'files',         label:'Files' },
+    { id:'focus',         label:'Focus' },
+    { id:'ai',            label:'Headstart & AI' },
+    { id:'appearance',    label:'Appearance' },
+    { id:'data',          label:'Data & Export' }
+  ];
+  var settingsSection = 'account';
+
+  // -- small builders, so every row in every section looks and behaves the same ----
+  function setRow(label, help, control){
+    return '<div class="set-row"><div><div class="set-label">'+escapeHtml(label)+'</div>'
+      + (help ? '<div class="set-help">'+escapeHtml(help)+'</div>' : '')
+      + '</div><div class="set-control">'+control+'</div></div>';
+  }
+  function prefValue(key){
+    if(!PREFS) return null;
+    if(key.indexOf('focus.') === 0) return (PREFS.focus||{})[key.slice(6)];
+    return PREFS[key];
+  }
+  function prefSeg(key, options){
+    var cur = prefValue(key);
+    return '<div class="seg" style="width:fit-content;">' + options.map(function(o){
+      return '<button type="button" class="seg-btn'+(cur===o.value?' active':'')+'"'
+        + ' data-action="set-pref" data-key="'+key+'" data-value="'+escapeHtml(String(o.value))+'">'
+        + escapeHtml(o.label)+'</button>';
+    }).join('') + '</div>';
+  }
+  function prefCheck(key){
+    return '<input type="checkbox" data-pref="'+key+'"'+(prefValue(key)?' checked':'')+'>';
+  }
+  function prefNumber(key, min, max){
+    return '<input type="number" data-pref="'+key+'" min="'+min+'" max="'+max+'" value="'
+      + escapeHtml(String(prefValue(key) == null ? '' : prefValue(key)))+'">';
+  }
+  function prefSelect(key, options){
+    var cur = prefValue(key);
+    return '<select data-pref="'+key+'">' + options.map(function(o){
+      return '<option value="'+escapeHtml(String(o.value))+'"'+(cur===o.value?' selected':'')+'>'
+        + escapeHtml(o.label)+'</option>';
+    }).join('') + '</select>';
+  }
+
+  function openSettingsModal(section){
+    if(section) settingsSection = section;
+    var nav = SETTINGS_SECTIONS.map(function(s){
+      return '<button type="button" class="set-nav-btn'+(s.id===settingsSection?' active':'')+'"'
+        + ' data-action="settings-section" data-section="'+s.id+'">'+escapeHtml(s.label)+'</button>';
+    }).join('');
     var html = '<div class="overlay" data-action="modal-backdrop">'
-      + '<div class="modal" data-action="modal-stop">'
+      + '<div class="modal settings-modal" data-action="modal-stop">'
       + '<div class="modal-head"><h2>Settings</h2></div>'
-      + '<div class="modal-body">'
-      + '<div class="detail-section">'
-      + '<div class="file-cat-title">Appearance</div>'
-      + '<div class="seg" style="width:fit-content;">'
-      + '<button type="button" class="seg-btn'+(theme==='light'?' active':'')+'" data-action="set-theme" data-theme-choice="light">Light</button>'
-      + '<button type="button" class="seg-btn'+(theme==='dark'?' active':'')+'" data-action="set-theme" data-theme-choice="dark">Dark</button>'
+      + '<div class="settings-body">'
+      + '<nav class="set-nav">'+nav+'</nav>'
+      + '<div class="set-pane">'+settingsSectionHtml(settingsSection)+'</div>'
       + '</div>'
-      + '</div>'
-      + accountSectionHtml()
-      + googleSectionHtml()
-      + termsSectionHtml()
-      + '</div>'
-      + '<div class="modal-foot"><span></span><div class="right"><button class="btn" data-action="modal-close">Close</button></div></div>'
+      + '<div class="modal-foot"><span></span><div class="right">'
+      + '<button class="btn" data-action="modal-close">Close</button></div></div>'
       + '</div></div>';
-    document.getElementById('modal-root').innerHTML = html;
+    var root = document.getElementById('modal-root');
+    root.innerHTML = html;
+    wireSettingsInputs(root);
+    paintIcons(root);
   }
 
   /**
-   * Who is signed in, and the way out. Only shown in the cloud: on the local
-   * server there is no account, so an Account panel would be a lie.
+   * Inputs save themselves on change.
+   *
+   * A Settings screen with a Save button invites you to change four things and lose
+   * all four by closing the window, so there is no Save button and no draft state:
+   * every control writes when you leave it.
    */
-  function accountSectionHtml(){
-    if(!BE || !BE.auth) return '';
-    var user = BE.auth.getUser();
-    if(!user) return '';
-    var name = cloudProfile && cloudProfile.display_name ? cloudProfile.display_name : '';
-    return '<div class="detail-section">'
-      + '<div class="file-cat-title">Account</div>'
-      + '<label class="field">Display name'
-      + '<input type="text" id="f-profile-name" placeholder="Your name" value="'+escapeHtml(name)+'"></label>'
-      + '<div class="hint" style="margin-top:6px;">Signed in as '+escapeHtml(user.email||'')+'</div>'
-      + '<div style="display:flex;gap:8px;margin-top:12px;">'
-      + '<button type="button" class="btn" data-action="save-profile">Save name</button>'
-      + '<button type="button" class="btn" data-action="change-password">Change password</button>'
-      + '<button type="button" class="btn danger" data-action="sign-out">Sign out</button>'
-      + '</div></div>';
+  function wireSettingsInputs(root){
+    root.querySelectorAll('[data-pref]').forEach(function(el){
+      el.addEventListener('change', function(){
+        var key = el.dataset.pref;
+        var val = el.type === 'checkbox' ? el.checked
+                : el.type === 'number' ? Number(el.value)
+                : el.value;
+        if(key.indexOf('focus.') === 0){
+          var f = Object.assign({}, (PREFS && PREFS.focus) || {});
+          f[key.slice(6)] = val;
+          savePrefs({ focus:f }).then(function(){ openSettingsModal(); });
+        } else {
+          var patch = {}; patch[key] = val;
+          savePrefs(patch).then(function(){ openSettingsModal(); });
+        }
+      });
+    });
+  }
+
+  function loadAiSettingsInto(){
+    return apiGet('/api/ai/settings').then(function(r){
+      hsSettings = r;
+      hsUsage = r.usage || hsUsage;
+      if(settingsSection === 'ai') openSettingsModal();
+      return r;
+    }).catch(function(){ return null; });
+  }
+
+  function settingsSectionHtml(id){
+    var fn = {
+      account: secAccount, semester: secSemester, calendar: secCalendar,
+      notifications: secNotifications, grades: secGrades, notes: secNotes,
+      files: secFiles, focus: secFocus, ai: secAi, appearance: secAppearance,
+      data: secData
+    }[id] || secAccount;
+    return fn();
+  }
+
+  function secHead(title, intro){
+    return '<h3>'+escapeHtml(title)+'</h3><p class="set-intro">'+escapeHtml(intro)+'</p>';
+  }
+
+  // -- Account & Profile ----------------------------------------------------------
+  function secAccount(){
+    var head = secHead('Account & Profile', 'Who you are signed in as, and the way out.');
+    if(!authState.accounts){
+      return head + '<div class="hint">This copy of Vesta runs without accounts, so there '
+        + 'is no profile to manage. Accounts switch on where the app is deployed with '
+        + 'Supabase configured.</div>';
+    }
+    var msg = accountMsg
+      ? '<div class="'+(accountMsg.kind==='err'?'auth-error':'auth-note')+'" style="margin-bottom:10px;">'
+        + escapeHtml(accountMsg.text)+'</div>' : '';
+    return head + msg
+      + setRow('Signed in as', null, '<span class="hint">'+escapeHtml(accountEmail())+'</span>')
+      + setRow('Display name', 'Shown on your avatar.',
+          '<input type="text" id="f-profile-name" maxlength="80" value="'
+          + escapeHtml(vestaProfile.displayName||'')+'">'
+          + '<button type="button" class="btn" data-action="save-profile"'
+          + (accountBusy?' disabled':'')+'>Save</button>')
+      + '<div class="set-adv" style="border-top:1px solid var(--border);padding-top:12px;">'
+      + '<div class="set-label" style="margin-bottom:6px;">Change password</div>'
+      + setRow('Current password', null, '<input type="password" id="f-pw-current" autocomplete="current-password">')
+      + setRow('New password', 'At least 8 characters.', '<input type="password" id="f-pw-new" autocomplete="new-password">')
+      + setRow('Confirm new password', null, '<input type="password" id="f-pw-confirm" autocomplete="new-password">')
+      + setRow('', null, '<button type="button" class="btn" data-action="submit-password"'
+          + (accountBusy?' disabled':'')+'>'+(accountBusy?'Working…':'Change password')+'</button>')
+      + '</div>'
+      + setRow('Session', 'Signs you out on this device.',
+          '<button type="button" class="btn danger" data-action="sign-out">Sign out</button>');
+  }
+
+  // -- Semester -------------------------------------------------------------------
+  function secSemester(){
+    return secHead('Semester', 'The open term is the one Vesta shows everywhere. Opening another switches the whole app to it.')
+      + termsSectionHtml();
+  }
+
+  // -- Calendar & Integrations ----------------------------------------------------
+  function secCalendar(){
+    return secHead('Calendar & Integrations', 'How the calendar opens, and what it reads from.')
+      + setRow('Default view', 'Which view the calendar opens on.',
+          prefSeg('calendarDefaultView', [
+            {value:'month', label:'Month'}, {value:'week', label:'Week'}, {value:'list', label:'List'}]))
+      + setRow('Detail', 'Simple shows titles only. Detailed adds times and class colours.',
+          prefSeg('calendarDetail', [
+            {value:'simple', label:'Simple'}, {value:'detailed', label:'Detailed'}]))
+      + googleSectionHtml();
+  }
+
+  // -- Notifications --------------------------------------------------------------
+  function secNotifications(){
+    var perm = (typeof Notification === 'undefined') ? 'unsupported' : Notification.permission;
+    var permRow = perm === 'granted'
+      ? '<span class="hint">Allowed in this browser.</span>'
+      : perm === 'denied'
+        ? '<span class="hint">Blocked in this browser. Allow notifications for this site in your browser settings.</span>'
+        : perm === 'unsupported'
+          ? '<span class="hint">This browser does not support notifications.</span>'
+          : '<button type="button" class="btn" data-action="ask-notify-permission">Allow notifications</button>';
+    return secHead('Notifications', 'Browser notifications only. Vesta sends no email.')
+      + setRow('Browser permission', 'Needed before either setting below can do anything.', permRow)
+      + setRow('Focus session ends', 'Tell me when a focus or break block finishes.', prefCheck('notifyFocusDone'))
+      + setRow('Work due soon', 'One notification per assignment, at most once a day.', prefCheck('notifyDueSoon'))
+      + setRow('How soon is "soon"', 'Hours ahead to look.', prefNumber('notifyDueSoonHours', 1, 168));
+  }
+
+  // -- Grades ---------------------------------------------------------------------
+  function secGrades(){
+    var scale = (PREFS && PREFS.defaultGradeScale) || [];
+    var rows = scale.map(function(r, i){
+      return '<div class="set-scale-row">'
+        + '<input type="number" min="0" max="100" value="'+escapeHtml(String(r.min))+'" data-scale-min="'+i+'">'
+        + '<span class="hint">% and above =</span>'
+        + '<input type="text" maxlength="4" value="'+escapeHtml(r.letter)+'" data-scale-letter="'+i+'">'
+        + '<button type="button" class="btn" data-action="scale-remove" data-idx="'+i+'">Remove</button>'
+        + '</div>';
+    }).join('');
+    return secHead('Grades & Grading Scale',
+        'The scale new classes start from. A class with its own scale keeps it.')
+      + rows
+      + '<div style="display:flex;gap:8px;margin-top:10px;">'
+      + '<button type="button" class="btn" data-action="scale-add">Add a row</button>'
+      + '<button type="button" class="btn primary" data-action="scale-save">Save scale</button>'
+      + '<button type="button" class="btn" data-action="scale-reset">Reset to default</button>'
+      + '</div>';
+  }
+
+  // -- Notes & Editor -------------------------------------------------------------
+  function secNotes(){
+    return secHead('Notes & Editor', 'How the note editor behaves.')
+      + setRow('Text size', 'Applies to the note editor only.',
+          prefSeg('editorFontSize', [
+            {value:'small', label:'Small'}, {value:'medium', label:'Medium'}, {value:'large', label:'Large'}]))
+      + setRow('Spell check', 'Underline misspelled words while writing.', prefCheck('editorSpellcheck'));
+  }
+
+  // -- Files ----------------------------------------------------------------------
+  function secFiles(){
+    return secHead('Files', 'How the Files view opens.')
+      + setRow('Default layout', null,
+          prefSeg('filesDefaultLayout', [{value:'grid', label:'Grid'}, {value:'list', label:'List'}]));
+  }
+
+  // -- Focus ----------------------------------------------------------------------
+  function secFocus(){
+    return secHead('Focus', 'Defaults for the Lock In timer. Changing these does not touch a session already running.')
+      + setRow('Focus block', 'Minutes.', prefNumber('focus.work', 5, 120))
+      + setRow('Short break', 'Minutes.', prefNumber('focus.shortBreak', 1, 30))
+      + setRow('Long break', 'Minutes.', prefNumber('focus.longBreak', 5, 60))
+      + setRow('Focus blocks before a long break', null, prefNumber('focus.sessionsBeforeLong', 2, 8))
+      + setRow('Start breaks automatically', null, prefCheck('focus.autoStartBreaks'))
+      + setRow('Start the next focus block automatically', null, prefCheck('focus.autoStartFocus'))
+      + setRow('Sound at the end of a block', null, prefCheck('focus.alarmOn'))
+      + setRow('Which sound', null, prefSelect('focus.alarmSound', [
+          {value:'chime', label:'Chime'}, {value:'bell', label:'Bell'}, {value:'digital', label:'Digital'}]));
+  }
+
+  // -- Headstart & AI -------------------------------------------------------------
+  function secAi(){
+    var head = secHead('Headstart & AI', 'What Headstart may spend, and how it looks.');
+    var view = setRow('Headstart layout', null,
+      prefSeg('headstartView', [{value:'cards', label:'Cards'}, {value:'list', label:'List'}]));
+    if(!hsSettings) return head + view + '<div class="hint">Loading AI settings…</div>';
+    var usage = hsUsage ? ('$'+Number(hsUsage.usd||0).toFixed(2)+' spent today') : '';
+    return head + view
+      + setRow('Spent today', 'Across this account only.', '<span class="hint">'+escapeHtml(usage)+'</span>')
+      + setRow('Daily limit', 'Dollars a day, for this account.',
+          '<input type="number" min="0" step="0.5" id="ai-daily-cap" value="'
+          + escapeHtml(String(hsSettings.daily_cap_usd))+'">')
+      + setRow('Ask before spending more than', 'Dollars, for a single generation.',
+          '<input type="number" min="0" step="0.01" id="ai-confirm-over" value="'
+          + escapeHtml(String(hsSettings.confirm_over_usd))+'">')
+      + '<details class="set-adv"><summary>Advanced</summary>'
+      + setRow('Model', 'Only change this if you know what it costs.',
+          '<select id="ai-model">' + ['claude-opus-5','claude-sonnet-5','claude-haiku-4-5'].map(function(m){
+            return '<option value="'+m+'"'+(hsSettings.model===m?' selected':'')+'>'+m+'</option>';
+          }).join('') + '</select>')
+      + setRow('Input price', 'Dollars per million tokens.',
+          '<input type="number" min="0" step="0.5" id="ai-in-price" value="'+escapeHtml(String(hsSettings.input_per_m))+'">')
+      + setRow('Output price', 'Dollars per million tokens.',
+          '<input type="number" min="0" step="0.5" id="ai-out-price" value="'+escapeHtml(String(hsSettings.output_per_m))+'">')
+      + '</details>'
+      + '<div style="margin-top:12px;"><button type="button" class="btn primary" data-action="ai-save">Save AI settings</button></div>';
+  }
+
+  // -- Appearance -----------------------------------------------------------------
+  function secAppearance(){
+    var theme = PREFS ? PREFS.theme : currentTheme();
+    return secHead('Appearance', 'How Vesta looks on every device you sign in on.')
+      + setRow('Theme', null,
+          '<div class="seg" style="width:fit-content;">'
+          + '<button type="button" class="seg-btn'+(theme==='light'?' active':'')+'" data-action="set-theme" data-theme-choice="light">Light</button>'
+          + '<button type="button" class="seg-btn'+(theme==='dark'?' active':'')+'" data-action="set-theme" data-theme-choice="dark">Dark</button>'
+          + '</div>')
+      + setRow('Start with the sidebar collapsed', 'Narrow windows collapse it regardless.',
+          prefCheck('sidebarCollapsed'));
+  }
+
+  // -- Data & Export --------------------------------------------------------------
+  function secData(){
+    return secHead('Data & Export', 'Everything Vesta holds for this account.')
+      + setRow('Export everything', 'One JSON file: classes, assignments, notes, files metadata, grades, calendar, Headstart history and settings.',
+          '<button type="button" class="btn" data-action="export-data">Download my data</button>')
+      + '<div class="set-adv"><div class="set-help">Deleting your data is not built. '
+      + 'Say the word and it gets added, with a confirmation step.</div></div>';
   }
 
   // ---- assignment card ---------------------------------------------------
@@ -9504,6 +9995,9 @@
   var FOCUS_COUNTS_KEY = 'vesta-focus-counts';
 
   function loadFocusSettings(){
+    // The account is the source of truth; localStorage is the fallback for a local
+    // install and for the moment before /api/prefs has answered.
+    if(PREFS && PREFS.focus) return clampFocusSettings(Object.assign({}, FOCUS_DEFAULTS, PREFS.focus));
     try{
       var raw = localStorage.getItem(FOCUS_SETTINGS_KEY);
       if(raw) return clampFocusSettings(Object.assign({}, FOCUS_DEFAULTS, JSON.parse(raw)));
@@ -9512,6 +10006,7 @@
   }
   function saveFocusSettings(s){
     try{ localStorage.setItem(FOCUS_SETTINGS_KEY, JSON.stringify(s)); } catch(e){}
+    if(PREFS) savePrefs({ focus: s });
   }
   function clampFocusSettings(s){
     return {
@@ -9936,6 +10431,11 @@
     var fs = focusState;
     bumpFocusCount(fs.phase);
     var wasWork = fs.phase === 'work';
+    if(PREFS && PREFS.notifyFocusDone){
+      vestaNotify(wasWork ? 'Focus block done' : 'Break over',
+                  wasWork ? 'Time for a break.' : 'Back to it.',
+                  'vesta-focus');
+    }
     if(wasWork){
       flushFocusTime();
       if(fs.sessionNumber >= focusSettings.sessionsBeforeLong){ fs.phase = 'long_break'; }
@@ -11421,26 +11921,59 @@
     if(action==='add-schedule-row'){ editingSchedule.push({day:1, start:'', end:'', location:''}); renderScheduleRows(); return; }
     if(action==='remove-schedule-row'){ editingSchedule.splice(Number(t.dataset.idx),1); renderScheduleRows(); return; }
     if(action==='sign-out'){
-      if(BE && BE.signOutAndLock) BE.signOutAndLock();
+      apiPostRaw('/api/auth/logout', {}).then(function(){
+        // A full reload rather than tearing the app down by hand: it guarantees no
+        // fragment of the previous account's data is left on screen.
+        window.location.reload();
+      }).catch(function(){ window.location.reload(); });
       return;
     }
     if(action==='save-profile'){
       var nameEl = document.getElementById('f-profile-name');
-      if(!nameEl || !BE || !BE.auth) return;
-      BE.auth.updateProfile({ displayName: nameEl.value.trim() }).then(function(p){
-        cloudProfile = p;
-        render();
-        nameEl.blur();
-      }).catch(reportError);
+      if(!nameEl || accountBusy) return;
+      accountBusy = true; accountMsg = null; openSettingsModal();
+      apiPostRaw('/api/auth/profile', { displayName: nameEl.value.trim() })
+        .then(function(r){
+          accountBusy = false;
+          if(!r.ok){ accountMsg = {kind:'err', text:(r.body.error||'That name was not saved.')}; }
+          else {
+            vestaProfile.displayName = r.body.displayName || '';
+            accountMsg = {kind:'ok', text:'Name saved.'};
+            render();
+          }
+          openSettingsModal();
+        })
+        .catch(function(){
+          accountBusy = false;
+          accountMsg = {kind:'err', text:'Could not reach Vesta.'};
+          openSettingsModal();
+        });
       return;
     }
-    if(action==='change-password'){
-      var pw = window.prompt('New password (at least six characters):');
-      if(!pw) return;
-      if(pw.length < 6){ reportError(new Error('Use at least six characters.')); return; }
-      BE.auth.updatePassword(pw)
-        .then(function(){ window.alert('Password changed.'); })
-        .catch(reportError);
+    if(action==='submit-password'){
+      if(accountBusy) return;
+      var curEl = document.getElementById('f-pw-current');
+      var newEl = document.getElementById('f-pw-new');
+      var confEl = document.getElementById('f-pw-confirm');
+      var cur = curEl ? curEl.value : '';
+      var nw = newEl ? newEl.value : '';
+      var conf = confEl ? confEl.value : '';
+      if(!cur){ accountMsg = {kind:'err', text:'Give your current password.'}; openSettingsModal(); return; }
+      if(nw.length < 8){ accountMsg = {kind:'err', text:'Use a new password of at least 8 characters.'}; openSettingsModal(); return; }
+      if(nw !== conf){ accountMsg = {kind:'err', text:'Those two new passwords do not match.'}; openSettingsModal(); return; }
+      accountBusy = true; accountMsg = null; openSettingsModal();
+      apiPostRaw('/api/auth/password', { currentPassword: cur, newPassword: nw })
+        .then(function(r){
+          accountBusy = false;
+          accountMsg = r.ok ? {kind:'ok', text:'Password changed.'}
+                            : {kind:'err', text:(r.body.error||'That change was refused.')};
+          openSettingsModal();
+        })
+        .catch(function(){
+          accountBusy = false;
+          accountMsg = {kind:'err', text:'Could not reach Vesta.'};
+          openSettingsModal();
+        });
       return;
     }
     if(action==='save-class'){ saveClassFromForm(t.dataset.id||null); return; }
@@ -11509,7 +12042,99 @@
       renderView();
       return;
     }
-    if(action==='open-settings'){ termList = null; openSettingsModal(); loadGoogleStatus(); loadTermList(); return; }
+    if(action==='open-settings'){
+      termList = null; accountMsg = null; accountBusy = false;
+      openSettingsModal(settingsSection);
+      loadGoogleStatus(); loadTermList();
+      return;
+    }
+    if(action==='open-account'){
+      accountMsg = null; accountBusy = false;
+      openSettingsModal('account');
+      // Refresh from the server in case the name was changed on another device.
+      loadProfile().then(function(){
+        if(settingsSection === 'account' && document.getElementById('f-profile-name')) openSettingsModal();
+      });
+      return;
+    }
+    if(action==='settings-section'){
+      settingsSection = t.dataset.section;
+      openSettingsModal();
+      // Each section fetches what only it needs, the first time it is opened.
+      if(settingsSection === 'semester' && termList === null) loadTermList();
+      if(settingsSection === 'calendar') loadGoogleStatus();
+      if(settingsSection === 'ai' && !hsSettings) loadAiSettingsInto();
+      return;
+    }
+    if(action==='set-pref'){
+      var pkey = t.dataset.key, pval = t.dataset.value;
+      if(pkey.indexOf('focus.') === 0){
+        var pf = Object.assign({}, (PREFS && PREFS.focus) || {});
+        pf[pkey.slice(6)] = pval;
+        savePrefs({ focus:pf }).then(function(){ openSettingsModal(); });
+      } else {
+        var ppatch = {}; ppatch[pkey] = pval;
+        savePrefs(ppatch).then(function(){ openSettingsModal(); renderView(); });
+      }
+      return;
+    }
+    if(action==='ask-notify-permission'){
+      if(typeof Notification !== 'undefined' && Notification.requestPermission){
+        Notification.requestPermission().then(function(){ openSettingsModal(); });
+      }
+      return;
+    }
+    if(action==='scale-add'){
+      var sc = (PREFS.defaultGradeScale||[]).slice();
+      sc.push({min:0, letter:'A'});
+      savePrefs({ defaultGradeScale: sc }).then(function(){ openSettingsModal(); });
+      return;
+    }
+    if(action==='scale-remove'){
+      var sc2 = (PREFS.defaultGradeScale||[]).slice();
+      sc2.splice(Number(t.dataset.idx), 1);
+      savePrefs({ defaultGradeScale: sc2.length ? sc2 : null }).then(function(){ openSettingsModal(); });
+      return;
+    }
+    if(action==='scale-save'){
+      var rows = [];
+      document.querySelectorAll('[data-scale-min]').forEach(function(el){
+        var i = el.dataset.scaleMin;
+        var letterEl = document.querySelector('[data-scale-letter="'+i+'"]');
+        rows.push({ min: Number(el.value), letter: letterEl ? letterEl.value : '' });
+      });
+      savePrefs({ defaultGradeScale: rows }).then(function(){
+        openSettingsModal(); renderView();
+      });
+      return;
+    }
+    if(action==='scale-reset'){
+      savePrefs({ defaultGradeScale: [] }).then(function(){ openSettingsModal(); renderView(); });
+      return;
+    }
+    if(action==='ai-save'){
+      var patchAi = {
+        daily_cap_usd: Number((document.getElementById('ai-daily-cap')||{}).value),
+        confirm_over_usd: Number((document.getElementById('ai-confirm-over')||{}).value)
+      };
+      var modelEl = document.getElementById('ai-model');
+      if(modelEl) patchAi.model = modelEl.value;
+      var inEl = document.getElementById('ai-in-price');
+      if(inEl) patchAi.input_per_m = Number(inEl.value);
+      var outEl = document.getElementById('ai-out-price');
+      if(outEl) patchAi.output_per_m = Number(outEl.value);
+      apiPut('/api/ai/settings', patchAi).then(function(r){
+        hsSettings = r; hsUsage = r.usage || hsUsage;
+        openSettingsModal();
+      }).catch(reportError);
+      return;
+    }
+    if(action==='export-data'){
+      // A plain navigation, so the browser handles the download and the session
+      // cookie rides along. fetch() would need a blob dance for no benefit.
+      window.location.href = '/api/export';
+      return;
+    }
     if(action==='google-connect'){ googleConnect(); return; }
     if(action==='google-sync'){ googleSync(); return; }
     if(action==='toggle-feed'){ toggleFeed(t.dataset.cal, t.checked); return; }
@@ -11564,12 +12189,14 @@
     if(action==='cal-detail'){
       calDetail = t.dataset.v;
       try { localStorage.setItem(CAL_DETAIL_KEY, calDetail); } catch(err){}
+      if(PREFS && PREFS.calendarDetail !== calDetail) savePrefs({ calendarDetail: calDetail });
       renderView(); paintIcons();
       return;
     }
     if(action==='hs-view'){
       hsView = t.dataset.v;
       try { localStorage.setItem(HS_VIEW_KEY, hsView); } catch(err){}
+      if(PREFS && PREFS.headstartView !== hsView) savePrefs({ headstartView: hsView });
       renderView(); paintIcons();
       return;
     }
