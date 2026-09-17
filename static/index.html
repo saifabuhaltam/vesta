@@ -1760,8 +1760,23 @@
      turns are accent-tinted and sit right, Vesta's are a plain surface and sit left. */
   .th-modal{ max-width:760px; }
   .th-body{ max-height:70vh; display:flex; flex-direction:column; gap:0; padding-bottom:0; }
-  .th-srcbar{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; padding:10px 12px;
+  .th-srcbar{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; padding:8px 12px;
     background:var(--surface-2); border-radius:var(--r-md); margin-bottom:12px; font-size:12px; }
+  /* The list of sources is reference material, not the conversation, so it stays one
+     line until asked for. Hover opens it; click pins it open, which is what makes it
+     reachable on a touchscreen and from the keyboard. */
+  .th-srcbar .th-srcfull{ display:none; width:100%; }
+  .th-srcbar:hover .th-srcfull,
+  .th-srcbar:focus-within .th-srcfull,
+  .th-srcbar.th-open .th-srcfull{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .th-srcbar:hover .th-srcsummary,
+  .th-srcbar:focus-within .th-srcsummary,
+  .th-srcbar.th-open .th-srcsummary{ display:none; }
+  .th-srcsummary{ flex:1; min-width:0; color:var(--text-faint); overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .th-srctoggle{ border:none; background:transparent; color:var(--text-faint); cursor:pointer;
+    font:inherit; font-size:11px; padding:2px 6px; border-radius:6px; }
+  .th-srctoggle:hover{ color:var(--text); background:var(--surface); }
   .th-srclabel{ font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-faint); }
   .th-srclist{ display:flex; gap:6px; flex-wrap:wrap; flex:1; min-width:0; }
   .th-srclist.th-none{ color:var(--text-faint); }
@@ -10363,24 +10378,33 @@
     // saying why the others went missing.
     var pinned = (TH.data && TH.data.pinned) || [];
     var unreadable = pinned.filter(function(s){ return !s.readable; }).length;
-    return '<div class="th-srcbar">'
+    var summary = pinned.length
+      ? pinned.length + ' source' + (pinned.length===1?'':'s')
+        + (unreadable ? ' · ' + unreadable + ' unreadable' : '')
+      : 'Nothing pinned yet';
+    return '<div class="th-srcbar'+(TH.srcOpen?' th-open':'')+'">'
       + '<span class="th-srclabel">Reads</span>'
+      + '<span class="th-srcsummary">'+escapeHtml(summary)+'</span>'
+      + '<span class="th-srcfull">'
       + (pinned.length
-          ? '<span class="th-srclist">'+pinned.map(function(s){
+          ? pinned.map(function(s){
               return '<span class="th-src'+(s.readable?'':' th-src-dim')+'"'
                 + (s.readable ? '' : ' title="No text could be read out of this one, so it is not sent."')
                 + '>'+escapeHtml(s.title||'Source')+'</span>';
-            }).join('')+'</span>'
-          : '<span class="th-srclist th-none">Nothing pinned yet. It will answer from the '
+            }).join('')
+          : '<span class="th-none">Nothing pinned yet. It will answer from the '
             + 'conversation alone until you attach something.</span>')
-      + '<button type="button" class="btn ghost" data-action="th-pick">Change</button>'
       + (unreadable
-          ? '<div class="th-srcwarn">'
+          ? '<span class="th-srcwarn">'
             + (unreadable===1
                 ? 'One of these has no text Vesta can read, so it is not being sent.'
                 : unreadable+' of these have no text Vesta can read, so they are not being sent.')
-            + ' Scanned PDFs and images have no text layer.</div>'
+            + ' Scanned PDFs and images have no text layer.</span>'
           : '')
+      + '</span>'
+      + '<button type="button" class="th-srctoggle" data-action="th-src-open">'
+      + (TH.srcOpen ? 'Hide' : 'Show') + '</button>'
+      + '<button type="button" class="btn ghost" data-action="th-pick">Change</button>'
       + '</div>';
   }
 
@@ -12903,6 +12927,7 @@
     if(action==='th-send'){ threadSend(null, t.dataset.confirmed === '1'); return; }
     if(action==='th-tool'){ threadSend(t.dataset.tool, false); return; }
     if(action==='th-dismiss'){ TH.confirm = null; renderThread(); return; }
+    if(action==='th-src-open'){ TH.srcOpen = !TH.srcOpen; renderThread(); return; }
     if(action==='th-pick'){ TH.picking = true; renderThread(); return; }
     if(action==='th-pick-done'){
       var sel = threadSelectionFromChecks();
