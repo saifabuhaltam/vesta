@@ -379,7 +379,8 @@ def serialize_item(conn, row):
         "SELECT * FROM subtasks WHERE item_id=?", (row["id"],)
     ).fetchall()
     headstarts = conn.execute(
-        "SELECT kind, status FROM headstarts WHERE item_id=?", (row["id"],)
+        "SELECT id, kind, status, updated_at FROM headstarts WHERE item_id=? ORDER BY updated_at DESC",
+        (row["id"],)
     ).fetchall()
     rubric_row = conn.execute(
         "SELECT * FROM rubrics WHERE item_id=?", (row["id"],)
@@ -405,7 +406,12 @@ def serialize_item(conn, row):
         "subtasks": [
             {"id": s["id"], "title": s["title"], "done": bool(s["done"])} for s in subtasks
         ],
-        "headstarts": [{"kind": h["kind"], "status": h["status"]} for h in headstarts],
+        # id and updatedAt travel with the summary so the interface can open a saved
+        # result; the text itself does not, because every item's every generation on
+        # every state load would be a large payload for something rarely opened.
+        # `GET /api/items/<id>/headstarts` fetches the content when one is clicked.
+        "headstarts": [{"id": h["id"], "kind": h["kind"], "status": h["status"],
+                        "updatedAt": h["updated_at"]} for h in headstarts],
         "rubric": serialize_rubric(rubric_row),
     }
 

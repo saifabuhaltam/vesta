@@ -9093,9 +9093,9 @@
     var hs = it.headstarts || [];
     var rows = hs.map(function(h){
       return '<button type="button" class="hs-saved" style="width:100%;margin-bottom:6px;" '
-        + 'data-action="hs-open-item" data-id="'+it.id+'">'
+        + 'data-action="hs-open-saved" data-id="'+it.id+'" data-hs="'+(h.id||'')+'">'
         + '<b>'+escapeHtml(HEADSTART_LABELS[h.kind] || h.kind)+'</b>'
-        + '<span class="hs-saved-sub">saved earlier</span></button>';
+        + '<span class="hs-saved-sub">'+escapeHtml(h.updatedAt ? 'saved '+relTimeAgo(h.updatedAt) : 'saved earlier')+'</span></button>';
     }).join('');
     return '<div class="ac-card">'
       + '<div class="ac-card-head"><h3>Headstart</h3>'
@@ -9557,6 +9557,42 @@
     var el = document.getElementById('hs-textwrap');
     if(el) el.innerHTML = hsTextHtml();
   }
+  /** Open a saved generation. Its text is not in `state`, so fetch the row for it. */
+  function hsShowSaved(hsId){
+    if(!HW || !hsId) return;
+    var it = hsWorkItem();
+    if(!it) return;
+    HW.confirm = null;
+    HW.sources = null;
+    HW.busy = true;
+    hsPaintOutput();
+    fetchHeadstarts(it.id).then(function(rows){
+      var found = (rows || []).find(function(h){ return h.id === hsId; });
+      HW.busy = false;
+      if(!found || !found.content){
+        reportError(new Error('That saved result could not be loaded.'));
+        hsPaintOutput();
+        return;
+      }
+      HW.result = found.content;
+      HW.savedId = found.id;
+      if(HW.tool !== toolKeyForKind(found.kind)) HW.tool = toolKeyForKind(found.kind) || HW.tool;
+      hsPaintTools();
+      hsPaintOutput();
+    }).catch(function(err){
+      HW.busy = false;
+      hsPaintOutput();
+      reportError(err);
+    });
+  }
+
+  /** The tool that produced a saved kind, so reopening one selects the right tool. */
+  function toolKeyForKind(kind){
+    var map = { essay_outline:'outline', explain:'explain', draft:'draft',
+                study_outline:'study_plan', synthesis:'summarize' };
+    return map[kind] || null;
+  }
+
   function hsPaintOutput(){
     var el = document.getElementById('hs-outwrap');
     if(el){ el.innerHTML = hsOutputHtml(); paintIcons(); }
@@ -9896,6 +9932,13 @@
   function renderQuiz(){
     if(!QZ) return;
     var q = QZ.quiz;
+    // The modal is rebuilt wholesale, so remember where the reader was and what they
+    // were typing in. Without this, answering question 8 throws you back to question 1.
+    var prevBody = document.querySelector('#modal-root .modal-body');
+    var keepScroll = prevBody ? prevBody.scrollTop : 0;
+    var active = document.activeElement;
+    var keepFocus = (active && active.dataset && active.dataset.action === 'qz-write')
+      ? { id: active.dataset.id, start: active.selectionStart, end: active.selectionEnd } : null;
     var answered = q.questions.filter(function(x){
       var a = QZ.answers[x.id];
       return a !== undefined && a !== null && String(a).trim() !== '';
@@ -9940,6 +9983,33 @@
       + (QZ.score != null ? '<button class="btn" data-action="qz-retake" data-id="'+q.id+'">Take it again</button>' : '')
       + '<button class="btn" data-action="modal-close">Close</button></div></div>'
       + '</div></div>';
+
+    var body = document.querySelector('#modal-root .modal-body');
+    if(body && keepScroll){
+      // Read a layout property first: a freshly written element that has not been
+      // laid out yet reports no scrollable height, and the assignment below would
+      // then clamp to 0 instead of landing where the reader was.
+      void body.scrollHeight;
+      body.scrollTop = keepScroll;
+    }
+    if(keepFocus){
+      var back = document.querySelector('[data-action="qz-write"][data-id="'+keepFocus.id+'"]');
+      if(back){
+        back.focus();
+        try{ back.setSelectionRange(keepFocus.start, keepFocus.end); }catch(e){}
+      }
+    }
+  }
+
+  /** The answered counter, updated without rebuilding the quiz under the reader. */
+  function qzPaintProgress(){
+    if(!QZ) return;
+    var answered = QZ.quiz.questions.filter(function(x){
+      var a = QZ.answers[x.id];
+      return a !== undefined && a !== null && String(a).trim() !== '';
+    }).length;
+    var el = document.querySelector('#modal-root .qz-head .qz-progress');
+    if(el) el.textContent = answered + ' of ' + QZ.quiz.questions.length + ' answered';
   }
 
   function qzSubmit(){
@@ -11083,6 +11153,11 @@
   });
 
   document.addEventListener('input', function(e){
+    if(QZ && e.target && e.target.dataset && e.target.dataset.action === 'qz-write'){
+      QZ.answers[e.target.dataset.id] = e.target.value;
+      qzPaintProgress();   // not a full render: that would take the caret with it
+      return;
+    }
     if(editingCats && e.target.dataset && e.target.dataset.catField){
       var cr = editingCats.rows[Number(e.target.dataset.idx)];
       if(cr) cr[e.target.dataset.catField] = e.target.value;
@@ -12425,6 +12500,14 @@
       renderView(); paintIcons();
       return;
     }
+    if(action==='hs-open-saved'){
+      // Open the workspace for this assignment, then show the result that was clicked.
+      hsBackItemId = document.querySelector('.ac-modal') ? t.dataset.id : null;
+      var wantHs = t.dataset.hs;
+      openHeadstartWorkspace({ itemId:t.dataset.id });
+      if(wantHs) hsShowSaved(wantHs);
+      return;
+    }
     if(action==='hs-open-item'){
       // opened from inside an assignment card, so offer a way back to it
       hsBackItemId = document.querySelector('.ac-modal') ? t.dataset.id : null;
@@ -12454,12 +12537,7 @@
       return;
     }
     if(action==='hs-to-note'){ hsSaveAsNote(); return; }
-    if(action==='hs-view-saved'){
-      var it2 = hsWorkItem();
-      var found = ((it2 && it2.headstarts) || []).find(function(h){ return h.id===t.dataset.id; });
-      if(found){ HW.result = found.content; HW.sources = null; HW.confirm = null; hsPaintOutput(); }
-      return;
-    }
+    if(action==='hs-view-saved'){ hsShowSaved(t.dataset.id); return; }
     if(action==='hs-open-settings'){ openAiSettings(); return; }
     if(action==='ai-save-settings'){ saveAiSettings(); return; }
 

@@ -220,6 +220,29 @@ def test_a_blank_or_whitespace_list_means_open(client, supa, monkeypatch):
     assert sign_in(client, supa, "anyone@example.com").status_code == 200
 
 
+def test_an_uninvited_signup_never_reaches_supabase(client, supa, monkeypatch):
+    """Refused before anything is created, not after.
+
+    The gate in _session_from_token runs only once a token comes back. With email
+    confirmation on there is no token, so an uninvited stranger used to be told to check
+    their inbox, having had a real Supabase account made for them.
+    """
+    monkeypatch.setenv("INVITE_EMAILS", "saif@example.com")
+    r = client.post("/api/auth/signup",
+                    json={"email": "stranger@example.com", "password": "longenough1"})
+    assert r.status_code == 403
+    assert supa.calls == []                      # Supabase was never called
+    assert "stranger@example.com" not in supa.users
+
+
+def test_an_invited_signup_still_goes_through(client, supa, monkeypatch):
+    monkeypatch.setenv("INVITE_EMAILS", "saif@example.com")
+    r = client.post("/api/auth/signup",
+                    json={"email": "saif@example.com", "password": "longenough1"})
+    assert r.status_code == 200
+    assert "saif@example.com" in supa.users
+
+
 def test_me_says_invite_only_when_a_list_is_set(client, monkeypatch):
     monkeypatch.setenv("INVITE_EMAILS", "saif@example.com")
     assert client.get("/api/auth/me").get_json()["inviteOnly"] is True

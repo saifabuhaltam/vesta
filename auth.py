@@ -258,8 +258,7 @@ def login():
 
 @bp.route("/api/auth/signup", methods=["POST"])
 def signup():
-    """Signup is gated by Supabase's own allowlist, so a refusal here is expected and
-    the message Supabase gives is the one worth showing."""
+    """Create an account, if that email has been invited."""
     if not enabled():
         return jsonify({"error": "This copy of Vesta has no accounts."}), 400
     data = request.get_json(force=True) or {}
@@ -267,6 +266,14 @@ def signup():
     password = data.get("password") or ""
     if not email or len(password) < 8:
         return jsonify({"error": "Give your email and a password of at least 8 characters."}), 400
+    # Checked here, before Supabase is touched at all. `_session_from_token` checks it
+    # too and remains the real backstop, since Google never reaches this route -- but
+    # relying on that alone meant an uninvited signup created a genuine Supabase user
+    # and only then got refused. With email confirmation on it was worse: no token comes
+    # back, so the gate never ran and the stranger was cheerfully told to go and check
+    # their inbox, then refused days later at sign-in.
+    if not invited(email):
+        return jsonify({"error": "That email has not been invited to Vesta."}), 403
     try:
         body = _supabase("signup", {"email": email, "password": password})
     except AuthError as e:
