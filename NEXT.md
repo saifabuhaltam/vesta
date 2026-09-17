@@ -352,7 +352,12 @@ not rediscovered a third time.
       against a local Postgres, but confirming the deployed database matches needs the
       dashboard and clicking confirmation emails. **Do this before any friend gets a
       login.**
-- [ ] **Invite friends**: add each email to the Supabase allowlist, one line of SQL.
+- [x] ~~**Invite friends**~~ Done 2026-09-17. The allowlist is `INVITE_EMAILS` in
+      Railway, not SQL in Supabase. Live and verified: `inviteOnly: true`,
+      `invitedCount: 3`, and an uninvited signup returns 403 having created nothing.
+      `AI_GLOBAL_DAILY_CAP_USD` is set to 5, which matters more than the invite list --
+      the per-account cap lives in `app_settings` and every user can raise their own.
+      `/health` reports all three so the configuration can be checked from outside.
 
 ## Accounts and multi-user: spec checked against the code 2026-09-15
 
@@ -449,6 +454,22 @@ request cannot break the timer permanently.
 Deliberately not built: **deleting account data.** Saif ruled account deletion out on
 2026-09-15, and wiping every row is the same thing by another name. The Data section
 says so and offers it.
+
+### Verified against the live site 2026-09-17
+
+- Uninvited signup: 403, "That email has not been invited to Vesta.", Supabase never
+  called. The check used to sit only in `_session_from_token`, which runs after Supabase
+  has already made the user -- and never at all when email confirmation is on, so a
+  stranger got as far as "check your inbox" before being refused at sign-in later.
+- `/api/state`, `/api/prefs`, `/api/export` and `/api/auth/profile` all 401 signed out.
+- Password reset returns the identical answer for an address with an account and one
+  without, so it cannot be used to find out who has one.
+- `rlsEnforced: true` with `connectsAsSuperuser: true`, which is the expected shape on
+  Railway. See the note above on why the second one is not a problem and what it does
+  mean for any query outside a request context.
+
+Still unverified in a browser: the Settings panes, the account screen, and the
+set-a-new-password screen. No browser in the environment that built them.
 
 ### Still open
 
@@ -701,6 +722,54 @@ advancing, number keys, the next card starting face down) and the dialogs (field
 Escape closes, the modal underneath survives, a confirm opens over a modal, cancel is
 non-destructive, a genuinely failed request raises an error dialog carrying the server's
 message, Enter dismisses it). Screenshots `51-` to `56-` in `reference/headstart-screens/`.
+
+### Three bugs Saif reported 2026-09-17, all fixed
+
+**Saved generated work would not open.** Reported as "the saved generated stuff doesn't
+actually open", and it was worse than it looked: neither route worked.
+
+- `/api/state` serialised each item's headstarts as `{kind, status}` only. No `id`. So
+  `hsEarlierHtml` rendered `data-id="undefined"`, and `hs-view-saved` looked that up
+  against rows that had no `id` at all, found nothing, and returned silently. Nothing
+  logged, nothing flashed; the click simply did nothing.
+- The assignment card's saved rows were worse still: they carried
+  `data-action="hs-open-item"`, which opens the generic workspace for that assignment.
+  Even with a working id they would never have opened the result that was clicked.
+- Fixed on both sides. `serialize_item` now selects `id, kind, status, updated_at` and
+  sends `id` and `updatedAt`, ordered newest first. The text deliberately does **not**
+  travel in `/api/state` — every item's every generation on every state load is a lot of
+  payload for something rarely opened — so the new `hsShowSaved(id)` fetches the row from
+  the existing `GET /api/items/<id>/headstarts`, shows a working state while it loads,
+  and reports a real error if the row has gone. The card rows now use `hs-open-saved`,
+  which opens the workspace *on* that result and selects the tool that produced it
+  (`toolKeyForKind`). They also say "saved yesterday" rather than "saved earlier", since
+  `updatedAt` is now available.
+
+**Answering a quiz threw you back to the top.** `renderQuiz` rebuilds `#modal-root`
+wholesale on every answer, so `.modal-body` lost its scroll position each time. By
+question 8 you were scrolling back down after every click. `renderQuiz` now remembers
+`scrollTop` before the rebuild and restores it after, reading a layout property first so
+the assignment is not clamped to 0 on an element that has not been laid out yet. Measured
+at 0px drift across five consecutive answers.
+
+**Written answers were silently discarded.** Found while fixing the scroll. The textarea
+for short-answer and concept questions carried `data-action="qz-write"`, and *nothing in
+the codebase read it* — one occurrence in the whole file, in the render. `QZ.answers` was
+therefore never set for those questions and `qzSubmit` posted an empty value for every
+one. You could type a full answer, submit, and be marked as having left it blank. The
+global `input` listener now stores the text as it is typed. It deliberately does not
+re-render, which would take the caret with it; the answered counter is updated on its own
+through `qzPaintProgress`.
+
+Verified with Playwright, 10 checks: both saved results open from both routes and show
+their text, the quiz holds its scroll position, typing updates the counter, the caret
+stays put, and a typed answer survives submission and marking. Screenshots `64-` to `66-`.
+
+**A note on the testing itself.** Two earlier runs of this suite reported the scroll fix
+as working and then as broken, and both were wrong: clicking a choice that is scrolled out
+of view makes the browser scroll to it before the click lands, so the test was moving the
+page and then blaming the app. Any future test that clicks inside a scrolling container
+has to pick an element already on screen. `verify.py` now does.
 
 ## Decisions waiting on Saif
 
