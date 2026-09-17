@@ -70,7 +70,18 @@ def allowlist():
     screen can stop claiming to be invite-only when it is not.
     """
     raw = (os.environ.get("INVITE_EMAILS") or "").strip()
-    return {e.strip().lower() for e in raw.replace("\n", ",").split(",") if e.strip()}
+    # Forgiving on purpose. This value is typed into a dashboard by hand, and the two
+    # ways it goes wrong -- wrapping it in quotes, or separating with semicolons --
+    # both used to produce a list that matched nothing, which locks the owner out of
+    # his own app at the next sign-in rather than failing where anyone would see it.
+    for sep in (";", "\n", "\r", " "):
+        raw = raw.replace(sep, ",")
+    out = set()
+    for part in raw.split(","):
+        cleaned = part.strip().strip('"').strip("'").strip()
+        if cleaned:
+            out.add(cleaned.lower())
+    return out
 
 
 def invited(email):

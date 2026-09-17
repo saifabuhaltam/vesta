@@ -596,6 +596,112 @@ record (`record_usage` stores input and output tokens only).
       Without them there is no way to tell whether caching is working, and a caching
       regression is silent: requests keep succeeding and the bill is just higher.
 
+## Headstart screens: reviewed against real screenshots 2026-09-16
+
+Every Headstart surface was opened in a real browser against a seeded database and
+photographed. Screenshots and the harness that produced them are in
+`reference/headstart-screens/` (gitignored, like the rest of the design material):
+`seed_demo_data.py` fills a throwaway database with three classes, six assignments, a
+quiz, a practice test and two decks, and `shoot.py` drives Chrome through the screens.
+Run the app with `SUPABASE_URL=` and `SUPABASE_ANON_KEY=` empty and accounts switch off,
+which is what makes local screenshotting possible at all.
+
+**There are no Headstart mockups.** `vesta mockups/` covers overview, classes,
+assignments, calendar, files, grades, notes and the assignment card, plus pomodoro
+inspiration. Nothing for Headstart, the quiz maker, the practice test or the decks, so
+none of these screens has a reference to be checked against. They were designed directly
+in code. Worth knowing before asking whether they "match the mockups": there is nothing
+to match.
+
+Note also that the screenshot workflow described in the ARIA project's `DESIGN.md` has
+never worked on this machine. It points at `C:/Users/nateh/AppData/...` for Puppeteer and
+a `serve.mjs` that does not exist in this repo, and node is not installed. It is a
+Windows setup that was copied in from somewhere else.
+
+### What is good
+
+The workspace (`31-workspace-opened.png`) is the strongest screen in the app. Tools are
+grouped by intent (Understand it / Plan it / Work on it), each carries a one-line
+description of what it does, and the cost estimate sits next to the Run button before
+anything is spent. The card review loop, the quiz player and the three makers are all
+visually consistent with the rest of Vesta.
+
+### Bugs and design problems found
+
+- [ ] **Run is enabled when there is nothing to read, and says so.** In the workspace the
+      button reads `Run` with `About $0.030 · reads 0 sources` beside it, and the panel
+      above says "Nothing selected yet." The interface has already computed that it has no
+      input and still offers to spend money on it. Same shape in the quiz maker
+      (`11-maker-quiz.png`): "This class has no files or notes yet" sits directly above a
+      fully enabled **Build it**. Since the quiz prompt says "Base every question on the
+      material provided. Do not invent facts that are not in it", a run with no sources
+      either refuses or invents, and is billed either way. Disable the primary action at
+      zero sources and say why.
+- [ ] **A practice test cannot be started from the Headstart tab.** The per-class row
+      there renders only `hs-new-cards` and `hs-new-quiz` (`index.html` around line 4296).
+      All three appear on an assignment's own Headstart tab (around line 8959). So of the
+      three generators, the hub offers two.
+- [ ] **An assignment's Headstart tab says "Nothing generated for this assignment yet"
+      while a practice test for it exists.** `itemCardHeadstartHtml` reads `it.headstarts`
+      only, so quizzes and decks carrying that `item_id` are invisible there, even though
+      the Headstart tab lists them by name one screen away
+      (`41-assignment-headstart-tab.png`). This is the "where did my generated work go"
+      problem from 2026-09-14 showing up in a second place.
+- [ ] **The deck screen is a wall of red.** Every card row carries a red **Delete** at the
+      same weight as **Edit**, plus **Delete deck** below (`04-saved-deck.png`). Four cards
+      means five destructive controls on one small modal; a realistic 40-card deck means
+      41. Destructive actions should not be the most repeated visual element on a study
+      screen.
+- [x] ~~**Flashcard review is mouse-only.**~~ Fixed 2026-09-16 at Saif's request.
+      `fcHandleKey` runs ahead of the global `keydown` handler and owns the review loop:
+      space, enter, right or down reveals the card; left and right then move a visible
+      selection across the four grades; space or enter commits it; 1-4 pick one directly.
+      Up and down are swallowed while reviewing so a held arrow does not scroll the modal
+      underneath. The handler ignores everything when the target is an input, a textarea
+      or a contenteditable, so typing into a card is unaffected.
+- [x] ~~**"Easy" is styled as the primary action on the grading row.**~~ Fixed in the same
+      pass. The grade row is now generated from `FC_GRADES`, the same list the keyboard
+      reads, so the buttons and the shortcuts cannot drift apart. Nothing is primary-styled
+      any more; the armed choice is outlined instead, and it defaults to **Good**
+      (`FC_DEFAULT_PICK`) rather than Easy. Each button carries its number badge, so the
+      shortcuts are visible rather than hidden knowledge.
+
+### Browser dialogs replaced with Vesta's own, 2026-09-16
+
+Saif asked for the error popups to look like the rest of the app rather than like the
+browser. Every native dialog is gone: `grep` for `window.alert(`, `window.confirm(` and
+`window.prompt(` in `static/index.html` now returns nothing.
+
+- **A layer of its own.** Dialogs render into a new `#dialog-root` that sits above
+  `#modal-root` at a higher `z-index`. This is not cosmetic: modals render by replacing
+  `#modal-root`'s `innerHTML` wholesale, so an error raised from inside a modal would have
+  deleted the modal that raised it. A confirmation or an error now appears over an open
+  modal and leaves it intact, which is verified by a test.
+- **`reportError` kept its signature**, so all 112 call sites are untouched. It just draws
+  a Vesta panel now instead of calling `alert`.
+- **`confirmAction` and the prompts had to become asynchronous**, because a styled dialog
+  cannot block the thread the way `confirm` and `prompt` did. All 16 confirm sites were
+  rewritten from `if(confirmAction(...)){ ... }` to `.then(function(ok){ if(!ok) return; ... })`,
+  and the 8 prompt sites to `askForText` / `askForFields`.
+- **`askForFields` shows several inputs in one dialog.** Adding a flashcard used to be two
+  prompts in a row, and inserting a table two more; each is now a single dialog with both
+  fields, which is also why the prompt conversion did not just become a chain of popups.
+- **Keyboard:** Escape cancels, Enter confirms, and while a dialog is open no other key
+  reaches the page. An error or notice treats Escape as acknowledgement; a confirm or an
+  input treats it as cancel.
+- **One at a time.** Opening a second dialog resolves the first as a cancel rather than
+  stacking, so a burst of failed requests cannot bury the screen.
+- **Not done:** `notify` is used for the three former information alerts (saved to notes,
+  copied, no class yet). A toast would suit those better than a dialog that must be
+  dismissed, but that is a new component and was not part of what Saif asked for.
+
+Tested with Playwright against a seeded database: 18 checks covering the keyboard review
+loop end to end (flip, arrow selection, clamping at both edges, enter committing and
+advancing, number keys, the next card starting face down) and the dialogs (fields render,
+Escape closes, the modal underneath survives, a confirm opens over a modal, cancel is
+non-destructive, a genuinely failed request raises an error dialog carrying the server's
+message, Enter dismisses it). Screenshots `51-` to `56-` in `reference/headstart-screens/`.
+
 ## Decisions waiting on Saif
 
 - [ ] **Delete `cloud/`?** The Worker, R2 integration and four JavaScript shims are

@@ -189,6 +189,37 @@ def test_google_sign_in_is_gated_by_the_same_list(client, supa, monkeypatch):
     assert client.get("/api/state").status_code == 401
 
 
+@pytest.mark.parametrize("raw", [
+    "saif@example.com",
+    '"saif@example.com"',
+    "'saif@example.com'",
+    "saif@example.com;joe@example.com",
+    "saif@example.com joe@example.com",
+    " SAIF@Example.com \n joe@example.com ",
+    "saif@example.com,joe@example.com,",
+])
+def test_the_list_survives_however_it_was_typed(client, supa, monkeypatch, raw):
+    """This value is pasted into a dashboard by hand.
+
+    Quotes and semicolons used to produce a list matching nothing, which does not fail
+    loudly -- it locks the owner out of his own app at his next sign-in.
+    """
+    monkeypatch.setenv("INVITE_EMAILS", raw)
+    assert sign_in(client, supa, "saif@example.com").status_code == 200
+
+
+@pytest.mark.parametrize("raw", ['"saif@example.com"', "saif@example.com;joe@example.com"])
+def test_a_stranger_is_still_refused_however_it_was_typed(client, supa, monkeypatch, raw):
+    monkeypatch.setenv("INVITE_EMAILS", raw)
+    assert sign_in(client, supa, "stranger@example.com").status_code == 403
+
+
+def test_a_blank_or_whitespace_list_means_open(client, supa, monkeypatch):
+    """Not a lockout: an empty variable has to behave exactly like an unset one."""
+    monkeypatch.setenv("INVITE_EMAILS", "   ,  , ")
+    assert sign_in(client, supa, "anyone@example.com").status_code == 200
+
+
 def test_me_says_invite_only_when_a_list_is_set(client, monkeypatch):
     monkeypatch.setenv("INVITE_EMAILS", "saif@example.com")
     assert client.get("/api/auth/me").get_json()["inviteOnly"] is True

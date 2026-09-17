@@ -361,6 +361,24 @@
   .cal-chip.lecture{ background:var(--surface-2); color:var(--text-muted); }
 
   /* ---------- Modal ---------- */
+  .dlg-overlay{ position:fixed; inset:0; background:rgba(18,18,24,.5); backdrop-filter:blur(2px);
+    display:flex; align-items:center; justify-content:center; padding:24px 16px; overflow:auto; z-index:400; }
+  .dlg{ background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    width:100%; max-width:400px; box-shadow:var(--shadow-pop); overflow:hidden; }
+  .dlg-body{ padding:22px 22px 18px; display:flex; gap:14px; align-items:flex-start; }
+  .dlg-icon{ width:34px; height:34px; border-radius:11px; flex:0 0 34px; display:flex;
+    align-items:center; justify-content:center; }
+  .dlg-icon svg{ width:18px; height:18px; }
+  .dlg-error .dlg-icon{ background:var(--danger-soft); color:var(--danger); }
+  .dlg-confirm .dlg-icon{ background:var(--danger-soft); color:var(--danger); }
+  .dlg-notice .dlg-icon, .dlg-input .dlg-icon{ background:var(--accent-soft); color:var(--accent-solid); }
+  .dlg-text{ min-width:0; flex:1; }
+  .dlg-text h3{ font-size:15px; font-weight:650; margin:0 0 4px; }
+  .dlg-text p{ font-size:13px; color:var(--text-faint); line-height:1.55; margin:0; overflow-wrap:anywhere; }
+  .dlg-fields{ display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+  .dlg-field{ width:100%; }
+  .dlg-foot{ padding:0 22px 20px; display:flex; justify-content:flex-end; gap:8px; }
+  @media (max-width:520px){ .dlg-foot{ flex-direction:column-reverse; } .dlg-foot .btn{ width:100%; } }
   .overlay{ position:fixed; inset:0; background:rgba(18,18,24,.5); backdrop-filter:blur(2px); display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; z-index:200; }
   .modal{ background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card); width:100%; max-width:480px; box-shadow:var(--shadow-pop); }
   .modal-head{ padding:20px 22px 0; }
@@ -691,6 +709,12 @@
   .fc-back{ font-size:14.5px; line-height:1.6; border-top:1px solid var(--border);
     padding-top:14px; width:100%; color:var(--text-muted); }
   .fc-grade{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+  /* which grade the keyboard would commit; shown so the arrow keys are not invisible */
+  .fc-grade .btn{ display:inline-flex; align-items:center; gap:7px; }
+  .fc-grade .fc-key{ font-size:10px; line-height:1; padding:2px 4px; border-radius:4px;
+    background:var(--border); color:var(--text-faint); font-variant-numeric:tabular-nums; }
+  .fc-grade .fc-picked{ border-color:var(--accent-solid); box-shadow:0 0 0 2px var(--accent-soft); }
+  .fc-grade .fc-picked .fc-key{ background:var(--accent-solid); color:#fff; }
   .fc-grade .btn{ min-width:96px; }
   .fc-hint{ font-size:11.5px; color:var(--text-faint); }
   .fc-list{ display:flex; flex-direction:column; gap:8px; }
@@ -2089,6 +2113,7 @@
 </div>
 <div id="modal-root"></div>
 <input type="file" id="item-file-input" multiple style="display:none;">
+<div id="dialog-root"></div>
 <div id="search-root"></div>
 <div id="focus-root"></div>
 
@@ -2167,7 +2192,9 @@
     link: '<path d="M10.4 13.6a3.9 3.9 0 0 0 5.5 0l2.7-2.7a3.9 3.9 0 0 0-5.5-5.5l-1.5 1.5"/>'
         + '<path d="M13.6 10.4a3.9 3.9 0 0 0-5.5 0l-2.7 2.7a3.9 3.9 0 0 0 5.5 5.5l1.5-1.5"/>',
     upload: '<path d="M12 16V4.6"/><path d="m7.6 9 4.4-4.4L16.4 9"/><path d="M4.5 15.5V19a1.5 1.5 0 0 0 1.5 1.5h12A1.5 1.5 0 0 0 19.5 19v-3.5"/>',
-    chart: '<path d="M3.2 20.4h17.6"/><path d="M6.6 20.4v-5.8M11.6 20.4V6.6M16.6 20.4v-8.8"/>'
+    chart: '<path d="M3.2 20.4h17.6"/><path d="M6.6 20.4v-5.8M11.6 20.4V6.6M16.6 20.4v-8.8"/>',
+    alert: '<path d="M12 4.2 2.8 20h18.4L12 4.2Z"/><path d="M12 10v4.2"/><path d="M12 17.4h.01"/>',
+    info: '<circle cx="12" cy="12" r="8.8"/><path d="M12 11.2v5"/><path d="M12 7.9h.01"/>'
   };
   function iconSvg(name){
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
@@ -2556,8 +2583,114 @@
     for(var i=0;i<sorted.length;i++){ if(pct >= Number(sorted[i].min)) return sorted[i].letter; }
     return sorted.length ? sorted[sorted.length-1].letter : '';
   }
-  function reportError(err){ window.alert(err && err.message ? err.message : 'Something went wrong.'); }
-  function confirmAction(title, msg){ return window.confirm(title+'\n\n'+msg); }
+  // ---------------- Dialogs ----------------
+  // Vesta's own alert, confirm and prompt. They live on `dialog-root` rather than
+  // `modal-root` because a modal renders by replacing that root's innerHTML wholesale:
+  // an error raised from inside a modal would otherwise delete the modal that raised it.
+  // Each returns a promise, so every caller is asynchronous — unlike the browser
+  // dialogs these replace, which blocked the thread and could be read inline.
+  var DLG = null;
+
+  function closeDialog(value){
+    var d = DLG;
+    DLG = null;
+    document.getElementById('dialog-root').innerHTML = '';
+    if(d && d.resolve) d.resolve(value);
+  }
+
+  function openDialog(opts){
+    // One dialog at a time. A second one resolves the first as a cancel rather than
+    // stacking, so a burst of failed requests cannot bury the screen.
+    if(DLG) closeDialog(DLG.kind === 'confirm' || DLG.kind === 'input' ? null : undefined);
+    return new Promise(function(resolve){
+      var fields = opts.fields || (opts.kind === 'input'
+        ? [{ id:'value', label:opts.label||'', value:opts.value||'', placeholder:opts.placeholder||'' }]
+        : []);
+      DLG = { resolve: resolve, kind: opts.kind, fields: fields };
+      var icon = opts.kind === 'error' ? 'alert' : opts.kind === 'confirm' ? 'trash' : 'info';
+      var cancelLabel = opts.cancelLabel || 'Cancel';
+      var confirmLabel = opts.confirmLabel || 'OK';
+      document.getElementById('dialog-root').innerHTML =
+        '<div class="dlg-overlay" data-action="dlg-backdrop"><div class="dlg dlg-'+opts.kind+'" data-action="dlg-stop">'
+        + '<div class="dlg-body">'
+        + '<div class="dlg-icon">'+iconSvg(icon)+'</div>'
+        + '<div class="dlg-text"><h3>'+escapeHtml(opts.title||'')+'</h3>'
+        + (opts.message ? '<p>'+escapeHtml(opts.message)+'</p>' : '')
+        + (fields.length
+            ? '<div class="dlg-fields">' + fields.map(function(f, i){
+                return '<label class="field">'+escapeHtml(f.label||'')
+                  + '<input type="text" class="dlg-field" data-dlg-field="'+escapeHtml(f.id)+'"'
+                  + (i === 0 ? ' id="dlg-input"' : '')
+                  + ' value="'+escapeHtml(f.value == null ? '' : String(f.value))+'"'
+                  + ' placeholder="'+escapeHtml(f.placeholder||'')+'"></label>';
+              }).join('') + '</div>'
+            : '')
+        + '</div></div>'
+        + '<div class="dlg-foot">'
+        + (opts.kind === 'error' || opts.kind === 'notice'
+            ? '<button type="button" class="btn primary" data-action="dlg-ok">'+escapeHtml(confirmLabel)+'</button>'
+            : '<button type="button" class="btn" data-action="dlg-cancel">'+escapeHtml(cancelLabel)+'</button>'
+              + '<button type="button" class="btn '+(opts.danger?'danger':'primary')+'" data-action="dlg-ok">'
+              + escapeHtml(confirmLabel)+'</button>')
+        + '</div></div></div>';
+      paintIcons();
+      var field = document.getElementById('dlg-input');
+      if(field){ field.focus(); field.select(); }
+      else {
+        var ok = document.querySelector('#dialog-root [data-action="dlg-ok"]');
+        if(ok) ok.focus();
+      }
+    });
+  }
+
+  function dialogOpen(){ return !!DLG; }
+
+  /** What a dialog's OK means: the typed values if it has fields, otherwise plain assent. */
+  function dialogValue(){
+    if(!DLG || !DLG.fields.length) return true;
+    var out = {};
+    document.querySelectorAll('#dialog-root [data-dlg-field]').forEach(function(el){
+      out[el.getAttribute('data-dlg-field')] = el.value;
+    });
+    return out;
+  }
+
+  /** Report a failure. Fire and forget, so the 100-plus existing callers are unchanged. */
+  function reportError(err){
+    openDialog({ kind:'error', title:'Something went wrong',
+                 message: (err && err.message) ? err.message : 'Something went wrong.',
+                 confirmLabel:'Close' });
+  }
+
+  /** Tell the user something succeeded. Replaces the bare window.alert calls. */
+  function notify(title, msg){
+    return openDialog({ kind:'notice', title:title, message:msg||'', confirmLabel:'Got it' });
+  }
+
+  /** Ask before something destructive. Resolves true only if they confirm. */
+  function confirmAction(title, msg, confirmLabel){
+    return openDialog({ kind:'confirm', title:title, message:msg||'',
+                        confirmLabel: confirmLabel || 'Delete', danger:true })
+      .then(function(v){ return v === true; });
+  }
+
+  /** Ask for one line of text. Resolves the string, or null if they cancel. */
+  function askForText(title, opts){
+    opts = opts || {};
+    return openDialog({ kind:'input', title:title, message:opts.message||'',
+                        label:opts.label||'', value:opts.value||'',
+                        placeholder:opts.placeholder||'',
+                        confirmLabel:opts.confirmLabel||'Save' })
+      .then(function(v){ return v && typeof v === 'object' ? v.value : null; });
+  }
+
+  /** Several lines of text in one dialog, rather than a chain of them. */
+  function askForFields(title, fields, opts){
+    opts = opts || {};
+    return openDialog({ kind:'input', title:title, message:opts.message||'',
+                        fields:fields, confirmLabel:opts.confirmLabel||'Save' })
+      .then(function(v){ return v && typeof v === 'object' ? v : null; });
+  }
 
   // ---------------- API layer ----------------
   function checkOk(r){
@@ -5757,39 +5890,52 @@
     }
     if(kind === 'link'){
       var sel = String(window.getSelection());
-      var url = window.prompt('Link to which address?', 'https://');
-      if(!url) return;
-      url = rteSafeUrl(url);
-      if(!url){ reportError(new Error('That link is not a web address.')); return; }
-      editor.focus();
-      if(sel){ try{ document.execCommand('createLink', false, url); }catch(e){} rteChanged(editor); }
-      else { rteInsert(editor, '<a href="'+escapeHtml(url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(url)+'</a>&nbsp;'); }
+      askForText('Insert a link', { label:'Address', value:'https://', confirmLabel:'Insert' })
+        .then(function(url){
+          if(!url) return;
+          url = rteSafeUrl(url);
+          if(!url){ reportError(new Error('That link is not a web address.')); return; }
+          editor.focus();
+          if(sel){ try{ document.execCommand('createLink', false, url); }catch(e){} rteChanged(editor); }
+          else { rteInsert(editor, '<a href="'+escapeHtml(url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(url)+'</a>&nbsp;'); }
+        });
       return;
     }
     if(kind === 'image'){
-      var src = window.prompt('Image address (https://…)');
-      if(!src) return;
-      src = rteSafeUrl(src, true);
-      if(!src){ reportError(new Error('That is not an image address I can load.')); return; }
-      rteInsert(editor, '<img src="'+escapeHtml(src)+'" alt=""><p><br></p>');
+      askForText('Insert an image', { label:'Image address', placeholder:'https://…', confirmLabel:'Insert' })
+        .then(function(src){
+          if(!src) return;
+          src = rteSafeUrl(src, true);
+          if(!src){ reportError(new Error('That is not an image address I can load.')); return; }
+          rteInsert(editor, '<img src="'+escapeHtml(src)+'" alt=""><p><br></p>');
+        });
       return;
     }
     if(kind === 'table'){
-      var cols = Math.max(1, Math.min(8, Number(window.prompt('How many columns?', '3')) || 3));
-      var rows = Math.max(1, Math.min(20, Number(window.prompt('How many rows, not counting the header?', '3')) || 3));
-      var head = '<tr>' + new Array(cols+1).join('<th>Heading</th>') + '</tr>';
-      var body = '';
-      for(var r=0;r<rows;r++){ body += '<tr>' + new Array(cols+1).join('<td><br></td>') + '</tr>'; }
-      rteInsert(editor, '<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table><p><br></p>');
+      askForFields('Insert a table', [
+        { id:'cols', label:'Columns', value:'3' },
+        { id:'rows', label:'Rows, not counting the header', value:'3' }
+      ], { confirmLabel:'Insert' }).then(function(v){
+        if(!v) return;
+        var cols = Math.max(1, Math.min(8, Number(v.cols) || 3));
+        var rows = Math.max(1, Math.min(20, Number(v.rows) || 3));
+        var head = '<tr>' + new Array(cols+1).join('<th>Heading</th>') + '</tr>';
+        var body = '';
+        for(var r=0;r<rows;r++){ body += '<tr>' + new Array(cols+1).join('<td><br></td>') + '</tr>'; }
+        rteInsert(editor, '<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table><p><br></p>');
+      });
       return;
     }
     if(kind === 'math'){
-      var tex = window.prompt('Equation, in LaTeX. For example  E = mc^2  or  \\frac{a}{b}');
-      if(!tex) return;
-      var block = tex.length > 24;
-      rteInsert(editor, '<span class="rte-math raw'+(block?' block':'')+'" contenteditable="false"'
-        + ' data-tex="'+escapeHtml(tex)+'">'+escapeHtml(tex)+'</span>'+(block?'<p><br></p>':'&nbsp;'));
-      renderMathIn(editor);
+      askForText('Insert an equation', { label:'LaTeX',
+        placeholder:'E = mc^2', message:'For example  E = mc^2  or  \\frac{a}{b}',
+        confirmLabel:'Insert' }).then(function(tex){
+        if(!tex) return;
+        var block = tex.length > 24;
+        rteInsert(editor, '<span class="rte-math raw'+(block?' block':'')+'" contenteditable="false"'
+          + ' data-tex="'+escapeHtml(tex)+'">'+escapeHtml(tex)+'</span>'+(block?'<p><br></p>':'&nbsp;'));
+        renderMathIn(editor);
+      });
       return;
     }
     if(kind === 'embed'){
@@ -9527,7 +9673,7 @@
     var it = hsWorkItem();
     var title = (HS_TOOLS[HW.tool].label) + (it ? ' — ' + (it.title||'') : '');
     addNote(HW.classId, { title: title, text: mdLite(HW.result) }).then(function(){
-      window.alert('Saved to Notes under ' + title + '.');
+      notify('Saved to Notes', 'Filed under “' + title + '”.');
     }).catch(reportError);
   }
 
@@ -9834,7 +9980,7 @@
     });
     if(!due.length) due = FC.deck.cards.filter(function(c){ return !c.suspended; });
     FC.queue = due;
-    FC.at = 0; FC.flipped = false; FC.done = 0;
+    FC.at = 0; FC.flipped = false; FC.done = 0; FC.pick = FC_DEFAULT_PICK;
     FC.mode = due.length ? 'review' : 'list';
     renderDeck();
   }
@@ -9855,12 +10001,17 @@
       + '</div>'
       + (FC.flipped
           ? '<div class="fc-grade">'
-            + '<button type="button" class="btn ghost danger" data-action="fc-grade" data-g="1">Missed it</button>'
-            + '<button type="button" class="btn" data-action="fc-grade" data-g="3">Hard</button>'
-            + '<button type="button" class="btn" data-action="fc-grade" data-g="4">Good</button>'
-            + '<button type="button" class="btn primary" data-action="fc-grade" data-g="5">Easy</button>'
+            + FC_GRADES.map(function(gr, i){
+                var picked = (typeof FC.pick === 'number' ? FC.pick : FC_DEFAULT_PICK) === i;
+                return '<button type="button" class="btn'
+                  + (gr.g === 1 ? ' ghost danger' : '')
+                  + (picked ? ' fc-picked' : '')
+                  + '" data-action="fc-grade" data-g="'+gr.g+'">'
+                  + escapeHtml(gr.label) + '<span class="fc-key">'+(i+1)+'</span></button>';
+              }).join('')
             + '</div>'
-          : '<div class="fc-hint">Click the card to see the answer.</div>')
+            + '<div class="fc-hint">Arrow keys choose, space or enter confirms, 1-4 pick directly.</div>'
+          : '<div class="fc-hint">Click the card, or press space, to see the answer.</div>')
       + '</div>';
   }
 
@@ -9911,6 +10062,63 @@
       + '</div></div>';
   }
 
+  // The four grade buttons, left to right, so the arrow keys and the number keys
+  // agree with what is on screen.
+  var FC_GRADES = [
+    { g:1, label:'Missed it' },
+    { g:3, label:'Hard' },
+    { g:4, label:'Good' },
+    { g:5, label:'Easy' }
+  ];
+  var FC_DEFAULT_PICK = 2;   // Good: the honest default, not the flattering one
+
+  /** Keyboard for the review loop. Returns true when the key was ours. */
+  function fcHandleKey(e){
+    if(!FC || FC.mode !== 'review') return false;
+    if(e.metaKey || e.ctrlKey || e.altKey) return false;
+    // never steal a key from something the user is typing into
+    var el = e.target;
+    if(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return false;
+    if(!FC.queue[FC.at]) return false;
+
+    var key = e.key;
+
+    if(!FC.flipped){
+      // Face down there is only one thing to do, so every obvious key does it.
+      if(key === ' ' || key === 'Spacebar' || key === 'Enter' || key === 'ArrowRight' || key === 'ArrowDown'){
+        e.preventDefault();
+        FC.flipped = true;
+        FC.pick = FC_DEFAULT_PICK;
+        renderDeck();
+        return true;
+      }
+      return false;
+    }
+
+    if(key === 'ArrowLeft' || key === 'ArrowRight'){
+      e.preventDefault();
+      if(typeof FC.pick !== 'number') FC.pick = FC_DEFAULT_PICK;
+      FC.pick = Math.max(0, Math.min(FC_GRADES.length - 1, FC.pick + (key === 'ArrowRight' ? 1 : -1)));
+      renderDeck();
+      return true;
+    }
+    if(key === ' ' || key === 'Spacebar' || key === 'Enter'){
+      e.preventDefault();
+      fcGrade(FC_GRADES[typeof FC.pick === 'number' ? FC.pick : FC_DEFAULT_PICK].g);
+      return true;
+    }
+    if(key >= '1' && key <= '4'){
+      e.preventDefault();
+      fcGrade(FC_GRADES[Number(key) - 1].g);
+      return true;
+    }
+    if(key === 'ArrowUp' || key === 'ArrowDown'){
+      e.preventDefault();   // stop the modal scrolling under a held arrow
+      return true;
+    }
+    return false;
+  }
+
   function fcGrade(g){
     var card = FC.queue[FC.at];
     if(!card) return;
@@ -9921,6 +10129,7 @@
       FC.done++;
       FC.at++;
       FC.flipped = false;
+      FC.pick = FC_DEFAULT_PICK;
       renderDeck();
       if(FC.at >= FC.queue.length) hsLoadSide();
     }).catch(reportError);
@@ -10727,11 +10936,13 @@
 
   function deleteTerm(id){
     var t = semesters.filter(function(x){ return x.id===id; })[0];
-    if(!confirmAction('Delete '+termLabel(t)+'?', 'It has nothing in it, so nothing is lost.')) return;
-    apiDelete('/api/semesters/'+id)
-      .then(function(){ return loadState(); })
-      .then(function(){ return loadTermList(); })
-      .catch(reportError);
+    confirmAction('Delete '+termLabel(t)+'?', 'It has nothing in it, so nothing is lost.').then(function(ok){
+      if(!ok) return;
+      apiDelete('/api/semesters/'+id)
+        .then(function(){ return loadState(); })
+        .then(function(){ return loadTermList(); })
+        .catch(reportError);
+    });
   }
 
   // ---------------- events ----------------
@@ -11440,7 +11651,8 @@
     if(action==='open-add-class'){ openClassModal(null); return; }
     if(action==='open-edit-class'){ openClassModal(classById(t.dataset.id)); return; }
     if(action==='delete-class'){
-      if(confirmAction('Delete this class?', 'This also removes its to-dos. This can\'t be undone.')){ deleteClass(t.dataset.id).catch(reportError); }
+      confirmAction('Delete this class?', 'This also removes its to-dos. This can\'t be undone.')
+        .then(function(ok){ if(ok) deleteClass(t.dataset.id).catch(reportError); });
       return;
     }
     if(action==='open-add-item'){ openItemModal(null, t.dataset.date||null, t.dataset.classid||null); return; }
@@ -11554,7 +11766,7 @@
       var cn = allNotes().find(function(x){ return x.id===t.dataset.id; });
       if(cn && navigator.clipboard){
         navigator.clipboard.writeText(noteDisplayTitle(cn) + '\n\n' + stripHtml(cn.text||''))
-          .then(function(){ window.alert('Copied.'); })
+          .then(function(){ notify('Copied', 'The text is on your clipboard.'); })
           .catch(function(){ reportError(new Error('The browser would not let me copy that.')); });
       }
       return;
@@ -11696,16 +11908,16 @@
     if(action==='note-trash-open'){ openNoteTrashModal(); return; }
     if(action==='note-restore'){ restoreNote(t.dataset.id).then(openNoteTrashModal).catch(reportError); return; }
     if(action==='note-purge'){
-      if(confirmAction('Delete this note for good?', 'This one cannot be undone.')){
-        purgeNote(t.dataset.id).then(openNoteTrashModal).catch(reportError);
-      }
+      confirmAction('Delete this note for good?', 'This one cannot be undone.').then(function(ok){
+        if(ok) purgeNote(t.dataset.id).then(openNoteTrashModal).catch(reportError);
+      });
       return;
     }
     if(action==='note-folder-delete'){
       e.stopPropagation();
-      if(confirmAction('Delete this folder?', 'Notes inside it move back to Unfiled.')){
-        deleteNoteFolder(t.dataset.id).catch(reportError);
-      }
+      confirmAction('Delete this folder?', 'Notes inside it move back to Unfiled.').then(function(ok){
+        if(ok) deleteNoteFolder(t.dataset.id).catch(reportError);
+      });
       return;
     }
     if(action==='note-new'){
@@ -11735,37 +11947,39 @@
     if(action==='files-type'){ filesType = t.dataset.type; renderView(); paintIcons(); return; }
     if(action==='files-when'){ filesWhen = t.dataset.when; renderView(); paintIcons(); return; }
     if(action==='file-folder-new'){
-      var nfName = window.prompt('Name this folder');
-      if(nfName === null) return;
-      nfName = nfName.trim();
-      if(!nfName) return;
-      addFileFolder(t.dataset.class, nfName, { parentId: t.dataset.parent || null })
-        .then(function(){ renderView(); paintIcons(); }).catch(reportError);
+      var nfClass = t.dataset.class, nfParent = t.dataset.parent || null;
+      askForText('New folder', { label:'Name', confirmLabel:'Create' }).then(function(nfName){
+        if(!nfName || !nfName.trim()) return;
+        addFileFolder(nfClass, nfName.trim(), { parentId: nfParent })
+          .then(function(){ renderView(); paintIcons(); }).catch(reportError);
+      });
       return;
     }
     if(action==='file-folder-menu'){ openFileFolderModal(t.dataset.id); return; }
     if(action==='file-folder-rename'){
       var rf = fileFolderById(t.dataset.id);
       if(!rf) return;
-      var rn = window.prompt('Rename folder', rf.name || '');
-      if(rn === null) return;
-      rn = rn.trim();
-      if(!rn) return;
-      updateFileFolder(rf.id, { name: rn }).then(function(){ closeModal(); renderView(); paintIcons(); }).catch(reportError);
+      askForText('Rename folder', { label:'Name', value:rf.name || '' }).then(function(rn){
+        if(!rn || !rn.trim()) return;
+        updateFileFolder(rf.id, { name: rn.trim() })
+          .then(function(){ closeModal(); renderView(); paintIcons(); }).catch(reportError);
+      });
       return;
     }
     if(action==='file-folder-delete'){
       var df = fileFolderById(t.dataset.id);
       if(!df) return;
       var dn = fileFolderCount(df.id);
-      if(!confirmAction('Delete “'+(df.name||'this folder')+'”?',
-                        dn ? dn+' file'+(dn===1?'':'s')+' and any subfolders move up one level. Nothing is deleted.'
-                           : 'It is empty, so nothing moves.')) return;
-      // Whatever view was open may have just been deleted out from under us.
-      if(filesSubfolder && fileFolderDescendants(df.id).indexOf(filesSubfolder) >= 0){
-        filesSubfolder = df.parentId || null;
-      }
-      deleteFileFolder(df.id).then(function(){ closeModal(); renderView(); paintIcons(); }).catch(reportError);
+      confirmAction('Delete “'+(df.name||'this folder')+'”?',
+                    dn ? dn+' file'+(dn===1?'':'s')+' and any subfolders move up one level. Nothing is deleted.'
+                       : 'It is empty, so nothing moves.').then(function(ok){
+        if(!ok) return;
+        // Whatever view was open may have just been deleted out from under us.
+        if(filesSubfolder && fileFolderDescendants(df.id).indexOf(filesSubfolder) >= 0){
+          filesSubfolder = df.parentId || null;
+        }
+        deleteFileFolder(df.id).then(function(){ closeModal(); renderView(); paintIcons(); }).catch(reportError);
+      });
       return;
     }
     if(action==='toggle-star'){
@@ -11775,13 +11989,14 @@
     }
     if(action==='files-upload-prompt'){
       var target = filesDropClassId();
-      if(!target){ window.alert('Add a class first, then you can upload files to it.'); return; }
+      if(!target){ notify('No class yet', 'Add a class first, then you can upload files to it.'); return; }
       triggerLibraryUpload(target, { folderId: (target === filesFolder ? filesSubfolder : null) });
       return;
     }
     if(action==='save-event'){ saveEventFromForm(t.dataset.id||null); return; }
     if(action==='delete-event'){
-      if(confirmAction('Delete this event?', "This can't be undone.")){ deleteEventRec(t.dataset.id).then(closeModal).catch(reportError); }
+      confirmAction('Delete this event?', "This can't be undone.")
+        .then(function(ok){ if(ok) deleteEventRec(t.dataset.id).then(closeModal).catch(reportError); });
       return;
     }
     if(action==='cal-pick-day'){ calSelectedDay = t.dataset.date; renderView(); paintIcons(); return; }
@@ -11818,11 +12033,12 @@
       return;
     }
     if(action==='asg-bulk-delete'){
-      if(confirmAction('Delete '+asgSelected.size+' assignment(s)?', "This can't be undone.")){
+      confirmAction('Delete '+asgSelected.size+' assignment(s)?', "This can't be undone.").then(function(ok){
+        if(!ok) return;
         var delIds = Array.from(asgSelected);
         Promise.all(delIds.map(function(id){ return deleteItem(id); }))
           .then(function(){ asgSelected.clear(); render(); }).catch(reportError);
-      }
+      });
       return;
     }
     if(action==='cycle-status'){
@@ -11850,7 +12066,8 @@
       return;
     }
     if(action==='detail-delete-class'){
-      if(confirmAction('Delete this class?', 'This also removes its to-dos. This can\'t be undone.')){ deleteClass(t.dataset.id).then(closeModal).catch(reportError); }
+      confirmAction('Delete this class?', 'This also removes its to-dos. This can\'t be undone.')
+        .then(function(ok){ if(ok) deleteClass(t.dataset.id).then(closeModal).catch(reportError); });
       return;
     }
     if(action==='browse-file'){ var fi=document.getElementById('file-input'); if(fi) fi.click(); return; }
@@ -11904,17 +12121,23 @@
     }
     if(action==='open-edit-item'){ openItemModal(items.find(function(i){return i.id===t.dataset.id;})); return; }
     if(action==='delete-item'){
-      if(confirmAction('Delete this item?', 'This can\'t be undone.')){ deleteItem(t.dataset.id).catch(reportError); }
+      confirmAction('Delete this item?', 'This can\'t be undone.')
+        .then(function(ok){ if(ok) deleteItem(t.dataset.id).catch(reportError); });
       return;
     }
     if(action==='save-item-delete'){
-      if(confirmAction('Delete this item?', 'This can\'t be undone.')){ deleteItem(t.dataset.id).then(closeModal).catch(reportError); }
+      confirmAction('Delete this item?', 'This can\'t be undone.')
+        .then(function(ok){ if(ok) deleteItem(t.dataset.id).then(closeModal).catch(reportError); });
       return;
     }
     if(action==='save-class-delete'){
-      if(confirmAction('Delete this class?', 'This also removes its to-dos. This can\'t be undone.')){ deleteClass(t.dataset.id).then(closeModal).catch(reportError); }
+      confirmAction('Delete this class?', 'This also removes its to-dos. This can\'t be undone.')
+        .then(function(ok){ if(ok) deleteClass(t.dataset.id).then(closeModal).catch(reportError); });
       return;
     }
+    if(action==='dlg-stop'){ e.stopPropagation(); return; }
+    if(action==='dlg-ok'){ closeDialog(dialogValue()); return; }
+    if(action==='dlg-cancel' || action==='dlg-backdrop'){ closeDialog(null); return; }
     if(action==='modal-close' || action==='modal-backdrop'){ closeModal(); return; }
     if(action==='modal-stop'){ e.stopPropagation(); return; }
     if(action==='pick-color'){ editingColor = t.dataset.color; document.querySelectorAll('.swatch').forEach(function(s){ s.classList.toggle('selected', s.dataset.color===editingColor); }); return; }
@@ -12161,7 +12384,8 @@
     if(action==='toggle-item-detail'){ toggleItemDone(t.dataset.id).then(function(){ openItemDetailModal(t.dataset.id); }).catch(reportError); return; }
     if(action==='edit-from-detail'){ openItemModal(items.find(function(i){ return i.id===t.dataset.id; })); return; }
     if(action==='detail-delete-item'){
-      if(confirmAction('Delete this item?', 'This can\'t be undone.')){ deleteItem(t.dataset.id).then(closeModal).catch(reportError); }
+      confirmAction('Delete this item?', 'This can\'t be undone.')
+        .then(function(ok){ if(ok) deleteItem(t.dataset.id).then(closeModal).catch(reportError); });
       return;
     }
     if(action==='open-rubric'){ openRubricModal(t.dataset.mid, t.dataset.class); return; }
@@ -12176,13 +12400,14 @@
       return;
     }
     if(action==='rubric-delete'){
-      if(confirmAction('Delete this rubric?', 'This removes the parsed criteria. The file itself stays.')){
+      confirmAction('Delete this rubric?', 'This removes the parsed criteria. The file itself stays.').then(function(ok){
+        if(!ok) return;
         deleteRubricRecord(currentRubric.id).then(function(){
           currentRubric = null;
           renderRubricModal();
           loadState();
         }).catch(reportError);
-      }
+      });
       return;
     }    // ---- Headstart ----
     if(action==='hs-pick-class'){ hsClassId = t.dataset.id || null; renderView(); paintIcons(); return; }
@@ -12279,9 +12504,9 @@
     }
     if(action==='qz-retake'){ openQuiz(t.dataset.id); return; }
     if(action==='qz-delete'){
-      if(confirmAction('Delete this quiz?', 'The questions and your past results go with it.')){
-        apiDelete('/api/quizzes/'+t.dataset.id).then(function(){ closeModal(); hsLoadSide(); }).catch(reportError);
-      }
+      confirmAction('Delete this quiz?', 'The questions and your past results go with it.').then(function(ok){
+        if(ok) apiDelete('/api/quizzes/'+t.dataset.id).then(function(){ closeModal(); hsLoadSide(); }).catch(reportError);
+      });
       return;
     }
 
@@ -12289,29 +12514,34 @@
     if(action==='hs-open-deck'){ hsBackItemId = null; openDeck(t.dataset.id); return; }
     if(action==='fc-review'){ fcStartReview(); return; }
     if(action==='fc-list'){ FC.mode = 'list'; renderDeck(); return; }
-    if(action==='fc-flip'){ FC.flipped = !FC.flipped; renderDeck(); return; }
+    if(action==='fc-flip'){ FC.flipped = !FC.flipped; FC.pick = FC_DEFAULT_PICK; renderDeck(); return; }
     if(action==='fc-grade'){ fcGrade(parseInt(t.dataset.g,10)); return; }
     if(action==='fc-add'){
-      var front = window.prompt('Front of the card');
-      if(!front) return;
-      var back = window.prompt('Back of the card') || '';
-      apiPost('/api/decks/'+FC.deck.id+'/cards', { front:front, back:back })
-        .then(function(card){ FC.deck.cards.push(card); renderDeck(); hsLoadSide(); }).catch(reportError);
+      askForFields('Add a card', [
+        { id:'front', label:'Front', placeholder:'The term or question' },
+        { id:'back',  label:'Back',  placeholder:'The answer' }
+      ], { confirmLabel:'Add' }).then(function(v){
+        if(!v || !v.front.trim()) return;
+        apiPost('/api/decks/'+FC.deck.id+'/cards', { front:v.front.trim(), back:v.back })
+          .then(function(card){ FC.deck.cards.push(card); renderDeck(); hsLoadSide(); }).catch(reportError);
+      });
       return;
     }
     if(action==='fc-edit'){
       var card = FC.deck.cards.find(function(c){ return c.id===t.dataset.id; });
       if(!card) return;
-      var nf = window.prompt('Front of the card', card.front);
-      if(nf === null) return;
-      var nb = window.prompt('Back of the card', card.back);
-      if(nb === null) return;
-      apiPut('/api/cards/'+card.id, { front:nf, back:nb }).then(function(updated){
-        for(var i=0;i<FC.deck.cards.length;i++){
-          if(FC.deck.cards[i].id===updated.id) FC.deck.cards[i] = updated;
-        }
-        renderDeck();
-      }).catch(reportError);
+      askForFields('Edit this card', [
+        { id:'front', label:'Front', value:card.front },
+        { id:'back',  label:'Back',  value:card.back }
+      ]).then(function(v){
+        if(!v) return;
+        apiPut('/api/cards/'+card.id, { front:v.front, back:v.back }).then(function(updated){
+          for(var i=0;i<FC.deck.cards.length;i++){
+            if(FC.deck.cards[i].id===updated.id) FC.deck.cards[i] = updated;
+          }
+          renderDeck();
+        }).catch(reportError);
+      });
       return;
     }
     if(action==='fc-delete'){
@@ -12323,9 +12553,9 @@
       return;
     }
     if(action==='fc-delete-deck'){
-      if(confirmAction('Delete this deck?', 'Every card in it goes too.')){
-        apiDelete('/api/decks/'+t.dataset.id).then(function(){ closeModal(); hsLoadSide(); }).catch(reportError);
-      }
+      confirmAction('Delete this deck?', 'Every card in it goes too.').then(function(ok){
+        if(ok) apiDelete('/api/decks/'+t.dataset.id).then(function(){ closeModal(); hsLoadSide(); }).catch(reportError);
+      });
       return;
     }
     if(action==='open-focus'){ openFocusOverlay(); return; }
@@ -12373,7 +12603,8 @@
     }
     if(action==='focus-toggle-pause'){ focusPrimaryAction(); return; }
     if(action==='focus-end'){
-      if(confirmAction('End this focus session?', "You'll lose the current timer progress.")){ endFocusSession(); }
+      confirmAction('End this focus session?', "You'll lose the current timer progress.", 'End session')
+        .then(function(ok){ if(ok) endFocusSession(); });
       return;
     }
   });
@@ -12571,6 +12802,21 @@
   });
 
   document.addEventListener('keydown', function(e){
+    // A dialog is modal over everything, so it takes Escape and Enter first.
+    if(dialogOpen()){
+      if(e.key === 'Escape'){
+        e.preventDefault();
+        closeDialog(DLG.kind === 'error' || DLG.kind === 'notice' ? true : null);
+        return;
+      }
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        closeDialog(dialogValue());
+        return;
+      }
+      return;   // nothing else reaches the page while a dialog is up
+    }
+    if(fcHandleKey(e)) return;
     if(e.key === 'Tab'){
       var ed = e.target.closest && e.target.closest('.rte-editor');
       if(ed){ rteHandleTab(e, ed); return; }
