@@ -292,7 +292,57 @@ CREATE TABLE IF NOT EXISTS ai_usage (
     model TEXT,
     input_tokens INTEGER DEFAULT 0,
     output_tokens INTEGER DEFAULT 0,
+    -- Cached prompt tokens are billed differently (a read is about a tenth of the
+    -- input rate, a write about a quarter more), so they are counted apart. Without
+    -- these a caching regression is invisible: requests still succeed, the bill
+    -- just goes up.
+    cache_read_tokens INTEGER DEFAULT 0,
+    cache_write_tokens INTEGER DEFAULT 0,
     day TEXT,
+    created_at TEXT
+);
+
+-- A continuing conversation about one class. Several per class, named by the student:
+-- "Discussions", "Midterm 2 prep". The point of a thread over a one-shot run is that
+-- its sources are attached once and its history is kept, so the next question does
+-- not start from nothing.
+CREATE TABLE IF NOT EXISTS threads (
+    id TEXT PRIMARY KEY,
+    semester_id TEXT REFERENCES semesters(id) ON DELETE SET NULL,
+    class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
+    -- optional: a thread started from an assignment remembers which one
+    item_id TEXT REFERENCES items(id) ON DELETE SET NULL,
+    title TEXT,
+    archived INTEGER DEFAULT 0,
+    created_at TEXT,
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS thread_messages (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    role TEXT,                      -- 'user' or 'assistant'
+    content TEXT,
+    -- which Headstart tool seeded this turn, when one did. Kept so a transcript can
+    -- show "Draft it" rather than the full prompt the button stands for.
+    tool TEXT,
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    cache_read_tokens INTEGER DEFAULT 0,
+    cache_write_tokens INTEGER DEFAULT 0,
+    created_at TEXT
+);
+
+-- What a thread reads. Pinned once and reused on every turn, which is the whole
+-- point: the same shape as headstart_sources, but attached to the conversation
+-- rather than to a single generation.
+CREATE TABLE IF NOT EXISTS thread_sources (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    material_id TEXT REFERENCES materials(id) ON DELETE CASCADE,
+    note_id TEXT REFERENCES notes(id) ON DELETE CASCADE,
+    folder_id TEXT REFERENCES note_folders(id) ON DELETE CASCADE,
+    syllabus_id TEXT REFERENCES syllabus_topics(id) ON DELETE CASCADE,
     created_at TEXT
 );
 
@@ -659,6 +709,13 @@ def init_db():
         if col not in ecols:
             conn.execute(f"ALTER TABLE events ADD COLUMN {col} {ddl}")
 
+    # Cached prompt tokens on an existing database. Billed at different rates from
+    # ordinary input, so they are counted separately or caching cannot be checked.
+    ucols = [r["name"] for r in conn.execute("PRAGMA table_info(ai_usage)").fetchall()]
+    for col in ("cache_read_tokens", "cache_write_tokens"):
+        if col not in ucols:
+            conn.execute(f"ALTER TABLE ai_usage ADD COLUMN {col} INTEGER DEFAULT 0")
+
     conn.commit()
     drop_class_not_null(conn)
     move_item_links(conn)
@@ -671,7 +728,7 @@ def init_db():
 
 # Everything that can exist without a class, and therefore cannot find its term by
 # looking at one. Rows that do have a class mirror that class's semester.
-SEMESTER_SCOPED = ("items", "events", "notes", "materials", "flashcard_decks", "quizzes")
+SEMESTER_SCOPED = ("items", "events", "notes", "materials", "flashcard_decks", "quizzes", "threads")
 
 
 def default_term_name(today=None):

@@ -86,6 +86,8 @@ create table if not exists ai_usage (
   "model" text,
   "input_tokens" integer default 0,
   "output_tokens" integer default 0,
+  "cache_read_tokens" integer default 0,
+  "cache_write_tokens" integer default 0,
   "day" text,
   "created_at" text,
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -147,6 +149,27 @@ create table if not exists term_settings (
   primary key (user_id, "id")
 );
 create index if not exists term_settings_user_idx on term_settings(user_id);
+
+-- ----------------------------------------------------------------------
+create table if not exists calendar_feeds (
+  "id" text,
+  "account_id" text not null references calendar_accounts("id") on delete cascade,
+  "calendar_id" text not null,
+  "name" text,
+  "colour" text,
+  "writable" integer default 0,
+  "is_vesta" integer default 0,
+  "enabled" integer default 0,
+  "sync_token" text,
+  "last_sync" text,
+  "last_error" text,
+  "created_at" text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  primary key ("id"),
+  unique ("account_id", "calendar_id")
+);
+create index if not exists calendar_feeds_user_idx on calendar_feeds(user_id);
+create index if not exists calendar_feeds_by_account on calendar_feeds("account_id");
 
 -- ----------------------------------------------------------------------
 create table if not exists classes (
@@ -223,11 +246,27 @@ create table if not exists events (
   "read_only" integer default 0,
   "updated_at" text,
   "deleted_at" text,
+  "feed_id" text,
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   primary key ("id")
 );
 create index if not exists events_user_idx on events(user_id);
 create index if not exists events_by_semester on events("semester_id");
+
+-- ----------------------------------------------------------------------
+create table if not exists file_folders (
+  "id" text,
+  "class_id" text not null references classes("id") on delete cascade,
+  "parent_id" text references file_folders("id") on delete cascade,
+  "name" text,
+  "kind" text default 'custom',
+  "sort_order" integer default 0,
+  "created_at" text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  primary key ("id")
+);
+create index if not exists file_folders_user_idx on file_folders(user_id);
+create index if not exists file_folders_by_class on file_folders("class_id");
 
 -- ----------------------------------------------------------------------
 create table if not exists grade_categories (
@@ -282,12 +321,16 @@ create table if not exists materials (
   "mimetype" text,
   "size" integer,
   "extracted_text" text,
+  "preview_name" text,
+  "preview_status" text,
   "created_at" text,
   "item_id" text,
+  "folder_id" text,
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   primary key ("id")
 );
 create index if not exists materials_user_idx on materials(user_id);
+create index if not exists materials_by_folder on materials("folder_id");
 create index if not exists materials_by_semester on materials("semester_id");
 
 -- ----------------------------------------------------------------------
@@ -447,6 +490,22 @@ create table if not exists subtasks (
 create index if not exists subtasks_user_idx on subtasks(user_id);
 
 -- ----------------------------------------------------------------------
+create table if not exists threads (
+  "id" text,
+  "semester_id" text references semesters("id") on delete set null,
+  "class_id" text references classes("id") on delete cascade,
+  "item_id" text references items("id") on delete set null,
+  "title" text,
+  "archived" integer default 0,
+  "created_at" text,
+  "updated_at" text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  primary key ("id")
+);
+create index if not exists threads_user_idx on threads(user_id);
+create index if not exists threads_by_semester on threads("semester_id");
+
+-- ----------------------------------------------------------------------
 create table if not exists flashcard_decks (
   "id" text,
   "semester_id" text references semesters("id") on delete set null,
@@ -537,6 +596,37 @@ create table if not exists quiz_questions (
 create index if not exists quiz_questions_user_idx on quiz_questions(user_id);
 
 -- ----------------------------------------------------------------------
+create table if not exists thread_messages (
+  "id" text,
+  "thread_id" text not null references threads("id") on delete cascade,
+  "role" text,
+  "content" text,
+  "tool" text,
+  "input_tokens" integer default 0,
+  "output_tokens" integer default 0,
+  "cache_read_tokens" integer default 0,
+  "cache_write_tokens" integer default 0,
+  "created_at" text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  primary key ("id")
+);
+create index if not exists thread_messages_user_idx on thread_messages(user_id);
+
+-- ----------------------------------------------------------------------
+create table if not exists thread_sources (
+  "id" text,
+  "thread_id" text not null references threads("id") on delete cascade,
+  "material_id" text references materials("id") on delete cascade,
+  "note_id" text references notes("id") on delete cascade,
+  "folder_id" text references note_folders("id") on delete cascade,
+  "syllabus_id" text references syllabus_topics("id") on delete cascade,
+  "created_at" text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  primary key ("id")
+);
+create index if not exists thread_sources_user_idx on thread_sources(user_id);
+
+-- ----------------------------------------------------------------------
 create table if not exists flashcards (
   "id" text,
   "deck_id" text not null references flashcard_decks("id") on delete cascade,
@@ -570,10 +660,12 @@ begin
     'calendar_accounts',
     'semesters',
     'term_settings',
+    'calendar_feeds',
     'classes',
     'sync_links',
     'calendar_imports',
     'events',
+    'file_folders',
     'grade_categories',
     'items',
     'materials',
@@ -587,12 +679,15 @@ begin
     'quizzes',
     'rubrics',
     'subtasks',
+    'threads',
     'flashcard_decks',
     'headstart_sources',
     'note_links',
     'note_versions',
     'quiz_attempts',
     'quiz_questions',
+    'thread_messages',
+    'thread_sources',
     'flashcards'
   ] loop
     perform apply_owner_rls(t);

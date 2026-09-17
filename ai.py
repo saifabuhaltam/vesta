@@ -160,14 +160,14 @@ def spent_today_everyone(cfg):
     return _global_spend["usd"]
 
 
-def record_usage(conn, kind, model, in_tokens, out_tokens):
+def record_usage(conn, kind, model, in_tokens, out_tokens, cache_read=0, cache_write=0):
     # A spend just happened, so the cached global total is now wrong. Cheaper to
     # invalidate than to hold a number that lets the next call through wrongly.
     _global_spend["at"] = 0.0
     conn.execute(
-        "INSERT INTO ai_usage (id, kind, model, input_tokens, output_tokens, day, created_at) "
-        "VALUES (?,?,?,?,?,?,?)",
-        (str(uuid.uuid4()), kind, model, in_tokens, out_tokens,
+        "INSERT INTO ai_usage (id, kind, model, input_tokens, output_tokens, "
+        "cache_read_tokens, cache_write_tokens, day, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (str(uuid.uuid4()), kind, model, in_tokens, out_tokens, cache_read, cache_write,
          datetime.utcnow().strftime("%Y-%m-%d"), datetime.utcnow().isoformat()),
     )
     conn.commit()
@@ -249,6 +249,100 @@ def call_claude(conn, kind, prompt, max_tokens=4000, confirmed=False):
     if not text:
         raise AiRefused({"error": "The model returned nothing. Try again, or add more detail."}, 502)
     return text
+
+
+# The standing instruction for a thread. It is the cached prefix's first block, so it
+# must not carry anything that changes per turn, or the cache misses every time.
+CHAT_SYSTEM = (
+    "You are helping a university student with their coursework inside Vesta, their "
+    "study app. You are given the course material they have attached to this "
+    "conversation, and the conversation so far.\n\n"
+    "Work from the attached material. Where it does not cover something, say so rather "
+    "than inventing a source, a citation or a fact. Anything you produce is scaffolding "
+    "for the student to revise and build on, not work to hand in as it stands; where "
+    "they need to supply their own specifics, say so plainly.\n\n"
+    "Keep continuity with what has already been said in this conversation. If they ask "
+    "for a second piece of work like an earlier one, do not repeat the earlier one's "
+    "points unless they ask you to."
+)
+
+
+def call_claude_chat(conn, kind, context, history, max_tokens=4000, confirmed=False):
+    """One turn of a thread: the pinned material, then the conversation so far.
+
+    The material goes in `system` with a cache breakpoint after it. Render order is
+    tools, then system, then messages, so caching there means the expensive part of
+    the prompt is a cache read on every turn after the first while the conversation
+    grows after the breakpoint. A ten-turn thread over 15,000 tokens of readings costs
+    roughly $0.10 this way against $0.35 without it.
+
+    `history` is the full conversation including the new user turn, oldest first.
+    """
+    cfg = settings(conn)
+    system = [{"type": "text", "text": CHAT_SYSTEM}]
+    if context:
+        system.append({
+            "type": "text",
+            "text": "Course material the student attached to this conversation:\n\n" + context,
+            "cache_control": {"type": "ephemeral"},
+        })
+
+    prompt_chars = len(CHAT_SYSTEM) + len(context or "") + sum(len(m["content"]) for m in history)
+    in_tokens = estimate_tokens("x" * prompt_chars)
+    est = estimate_cost(cfg, in_tokens, max_tokens)
+    used = spent_today(conn, cfg)
+
+    if cfg["daily_cap_usd"] and used["usd"] >= cfg["daily_cap_usd"]:
+        raise AiRefused({"error": "You have reached today's AI limit.", "reason": "daily_cap",
+                         "spentToday": used["usd"], "dailyCap": cfg["daily_cap_usd"]})
+    everyone = spent_today_everyone(cfg)
+    if GLOBAL_CAP_USD and everyone is not None and everyone >= GLOBAL_CAP_USD:
+        raise AiRefused({"error": "Vesta has reached today's AI limit across all accounts.",
+                         "reason": "global_cap", "spentTodayEveryone": everyone,
+                         "globalCap": GLOBAL_CAP_USD})
+    if not confirmed and cfg["confirm_over_usd"] and est > cfg["confirm_over_usd"]:
+        raise AiRefused({"error": "This is a big one.", "reason": "confirm",
+                         "estimateUsd": round(est, 4), "inputTokens": in_tokens,
+                         "maxOutputTokens": max_tokens, "spentToday": used["usd"],
+                         "dailyCap": cfg["daily_cap_usd"]}, status=409)
+
+    try:
+        client = anthropic.Anthropic()
+        response = client.messages.create(
+            model=cfg["model"],
+            max_tokens=max_tokens,
+            system=system,
+            messages=[{"role": m["role"], "content": m["content"]} for m in history],
+        )
+    except anthropic.AuthenticationError:
+        raise AiRefused({"error": "The Anthropic API key is missing or was rejected."}, 503)
+    except anthropic.RateLimitError:
+        raise AiRefused({"error": "Rate limited by Anthropic. Wait a moment and try again."}, 429)
+    except anthropic.APIConnectionError:
+        raise AiRefused({"error": "Could not reach the Anthropic API."}, 502)
+    except anthropic.APIStatusError as e:
+        raise AiRefused({"error": f"Anthropic error: {e.message}"}, 502)
+    except Exception as e:
+        raise AiRefused({"error": f"AI call failed ({e})."}, 503)
+
+    text = "\n".join(b.text for b in response.content if b.type == "text").strip()
+    tin, tout, cread, cwrite = usage_from(response, in_tokens, estimate_tokens(text))
+    record_usage(conn, kind, cfg["model"], tin, tout, cread, cwrite)
+    if not text:
+        raise AiRefused({"error": "The model returned nothing. Try again, or add more detail."}, 502)
+    return {"text": text, "inputTokens": tin, "outputTokens": tout,
+            "cacheReadTokens": cread, "cacheWriteTokens": cwrite, "model": cfg["model"]}
+
+
+def usage_from(response, fallback_in, fallback_out):
+    """The four token counts off a response, whatever the SDK hands back."""
+    u = getattr(response, "usage", None)
+    if not u:
+        return fallback_in, fallback_out, 0, 0
+    return (getattr(u, "input_tokens", fallback_in) or 0,
+            getattr(u, "output_tokens", fallback_out) or 0,
+            getattr(u, "cache_read_input_tokens", 0) or 0,
+            getattr(u, "cache_creation_input_tokens", 0) or 0)
 
 
 # ---------------------------------------------------------------------------

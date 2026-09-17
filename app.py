@@ -57,6 +57,9 @@ from ai import bp as ai_bp  # noqa: E402
 app.register_blueprint(ai_bp)
 from links import bp as links_bp  # noqa: E402
 app.register_blueprint(links_bp)
+# Continuing conversations: pinned sources plus history, beside the one-shot tools.
+from threads import bp as threads_bp  # noqa: E402
+app.register_blueprint(threads_bp)
 # syllabus import reads uploads with the same extractor the rest of the app uses
 # looked up at call time: extract_text is defined further down this file
 app.config["EXTRACT_TEXT"] = lambda path, name: extract_text(path, name)

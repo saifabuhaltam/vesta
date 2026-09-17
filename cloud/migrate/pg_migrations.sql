@@ -200,3 +200,79 @@ create index if not exists materials_by_folder on materials(folder_id);
 select apply_owner_rls('file_folders');
 grant select, insert, update, delete on file_folders to authenticated;
 revoke all on file_folders from anon;
+
+
+-- migration: 004_threads
+-- Headstart gains continuing conversations: a thread per topic inside a class, its
+-- sources pinned once and its history kept.
+--
+-- The partner block migration 003 asked for. `db.init_db()` creates these tables at
+-- every local start and adds the two ai_usage columns by ALTER, but it returns early
+-- when DATABASE_URL is set, so a deployed database would never see any of it and the
+-- first /api/threads would raise `relation "threads" does not exist`.
+--
+-- No backfill. Existing one-shot Headstart runs stay where they are in `headstarts`;
+-- turning them into single-message threads is a separate decision, not something to
+-- do to a live database in passing.
+
+create table if not exists threads (
+  "id"          text primary key,
+  "semester_id" text references semesters("id") on delete set null,
+  "class_id"    text references classes("id") on delete cascade,
+  "item_id"     text references items("id") on delete set null,
+  "title"       text,
+  "archived"    integer default 0,
+  "created_at"  text,
+  "updated_at"  text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade
+);
+create index if not exists threads_user_idx on threads(user_id);
+create index if not exists threads_by_class on threads("class_id");
+create index if not exists threads_by_semester on threads("semester_id");
+
+create table if not exists thread_messages (
+  "id"                 text primary key,
+  "thread_id"          text not null references threads("id") on delete cascade,
+  "role"               text,
+  "content"            text,
+  "tool"               text,
+  "input_tokens"       integer default 0,
+  "output_tokens"      integer default 0,
+  "cache_read_tokens"  integer default 0,
+  "cache_write_tokens" integer default 0,
+  "created_at"         text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade
+);
+create index if not exists thread_messages_user_idx on thread_messages(user_id);
+-- every turn is fetched by thread, in order, on every open
+create index if not exists thread_messages_by_thread on thread_messages("thread_id", "created_at");
+
+create table if not exists thread_sources (
+  "id"          text primary key,
+  "thread_id"   text not null references threads("id") on delete cascade,
+  "material_id" text references materials("id") on delete cascade,
+  "note_id"     text references notes("id") on delete cascade,
+  "folder_id"   text references note_folders("id") on delete cascade,
+  "syllabus_id" text references syllabus_topics("id") on delete cascade,
+  "created_at"  text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade
+);
+create index if not exists thread_sources_user_idx on thread_sources(user_id);
+create index if not exists thread_sources_by_thread on thread_sources("thread_id");
+
+-- Cached prompt tokens are billed at different rates from ordinary input, so they are
+-- counted apart. Without them a caching regression is invisible: the requests still
+-- succeed and only the bill moves.
+alter table ai_usage add column if not exists cache_read_tokens integer default 0;
+alter table ai_usage add column if not exists cache_write_tokens integer default 0;
+
+select apply_owner_rls('threads');
+select apply_owner_rls('thread_messages');
+select apply_owner_rls('thread_sources');
+
+grant select, insert, update, delete on threads to authenticated;
+grant select, insert, update, delete on thread_messages to authenticated;
+grant select, insert, update, delete on thread_sources to authenticated;
+revoke all on threads from anon;
+revoke all on thread_messages from anon;
+revoke all on thread_sources from anon;

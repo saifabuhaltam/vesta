@@ -163,6 +163,7 @@ EXPORT_TABLES = [
     "sync_links", "syllabus_imports", "syllabus_topics", "headstarts",
     "headstart_sources", "rubrics", "quizzes", "quiz_questions", "quiz_attempts",
     "flashcard_decks", "flashcards", "app_settings", "ai_usage",
+    "threads", "thread_messages", "thread_sources",
 ]
 
 

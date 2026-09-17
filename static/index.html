@@ -1755,6 +1755,45 @@
     .ff-group{ width:100%; }
   }
 
+  /* ---------- Threads ---------- */
+  /* A transcript in the same bubble language as the rest of the app: the student's
+     turns are accent-tinted and sit right, Vesta's are a plain surface and sit left. */
+  .th-modal{ max-width:760px; }
+  .th-body{ max-height:70vh; display:flex; flex-direction:column; gap:0; padding-bottom:0; }
+  .th-srcbar{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; padding:10px 12px;
+    background:var(--surface-2); border-radius:var(--r-md); margin-bottom:12px; font-size:12px; }
+  .th-srclabel{ font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-faint); }
+  .th-srclist{ display:flex; gap:6px; flex-wrap:wrap; flex:1; min-width:0; }
+  .th-srclist.th-none{ color:var(--text-faint); }
+  .th-src{ background:var(--surface); border:1px solid var(--border); border-radius:var(--r-pill);
+    padding:3px 9px; font-size:11.5px; }
+  .th-src-dim{ opacity:.5; text-decoration:line-through; }
+  .th-srcwarn{ width:100%; font-size:11.5px; color:var(--text-faint); }
+  .th-scroll{ flex:1; overflow:auto; display:flex; flex-direction:column; gap:14px;
+    padding:4px 2px 14px; min-height:220px; }
+  .th-msg{ max-width:82%; display:flex; flex-direction:column; gap:5px; }
+  .th-msg.th-user{ align-self:flex-end; align-items:flex-end; }
+  .th-msg.th-assistant{ align-self:flex-start; }
+  .th-who{ font-size:11px; font-weight:700; color:var(--text-faint); text-transform:lowercase; }
+  .th-text{ border-radius:var(--r-card); padding:11px 14px; font-size:13.5px; line-height:1.6;
+    overflow-wrap:anywhere; }
+  .th-user .th-text{ background:var(--accent-soft); color:var(--accent-ink); }
+  .th-assistant .th-text{ background:var(--surface); border:1px solid var(--border); color:var(--text); }
+  .th-md h1, .th-md h2, .th-md h3{ font-size:14px; margin:10px 0 4px; }
+  .th-md p{ margin:0 0 8px; }
+  .th-md ul, .th-md ol{ margin:0 0 8px 18px; }
+  .th-msg-acts{ display:flex; gap:6px; opacity:0; transition:opacity .12s ease; }
+  .th-msg:hover .th-msg-acts, .th-msg:focus-within .th-msg-acts{ opacity:1; }
+  .th-empty{ color:var(--text-faint); font-size:13px; text-align:center; padding:18px 0 6px; }
+  .th-starters{ display:flex; flex-wrap:wrap; gap:7px; padding-top:6px; }
+  .th-starters .hs-group-label{ width:100%; }
+  .th-composer{ display:flex; gap:8px; align-items:flex-end; padding:12px 0 16px;
+    border-top:1px solid var(--border); background:var(--surface); position:sticky; bottom:0; }
+  .th-composer textarea{ flex:1; resize:none; min-height:42px; max-height:150px; }
+  .th-picker{ overflow:auto; }
+  .hs-none{ color:var(--text-faint); font-size:12.5px; padding:4px 0; }
+  @media (max-width:640px){ .th-msg{ max-width:94%; } }
+
   .files-result-banner{ display:flex; align-items:center; gap:10px; flex-wrap:wrap;
     background:var(--accent-soft); border:1px solid var(--accent); border-radius:var(--r-card);
     padding:11px 14px; margin-bottom:16px; font-size:13px; }
@@ -4307,6 +4346,7 @@
   // Tools that need you to paste something in.
   var HS_NEEDS_TEXT = { revise:true, refine:true };
 
+  var hsThreads = [];        // continuing conversations, newest first
   var hsClassId = null;      // null means every class
   var HS_VIEW_KEY = 'vesta_headstart_view';
   var hsView = (function(){
@@ -4349,11 +4389,13 @@
     return Promise.all([
       apiGet('/api/ai/settings').catch(function(){ return null; }),
       apiGet('/api/decks').catch(function(){ return []; }),
-      apiGet('/api/quizzes').catch(function(){ return []; })
+      apiGet('/api/quizzes').catch(function(){ return []; }),
+      apiGet('/api/threads').catch(function(){ return []; })
     ]).then(function(r){
       if(r[0]){ hsSettings = r[0]; hsUsage = r[0].usage; }
       hsDecks = r[1] || [];
       hsQuizzes = r[2] || [];
+      hsThreads = r[3] || [];
       hsSideLoaded = true;
       if(activeTab==='headstart'){ renderView(); paintIcons(); }
     });
@@ -4447,7 +4489,23 @@
         + '<span class="hs-saved-sub">'+q.questionCount+' question'+(q.questionCount===1?'':'s')
         + (q.bestScore!=null ? ' · best '+q.bestScore+'%' : ' · not taken yet')+'</span></button>';
     }).join('');
+    // Threads first: a conversation you already started is more likely to be what
+    // you came back for than a new one-shot run.
+    var mine = hsThreads.filter(function(t){ return t.classId===c.id; });
+    var threads = mine.slice(0, 3).map(function(t){
+      return '<button type="button" class="hs-saved" data-action="hs-open-thread" data-id="'+t.id+'">'
+        + '<b>'+escapeHtml(t.title||'Thread')+'</b>'
+        + '<span class="hs-saved-sub">'+t.messageCount+' message'+(t.messageCount===1?'':'s')
+        + (t.lastMessageAt ? ' · '+relTimeAgo(t.lastMessageAt) : ' · not started')+'</span></button>';
+    }).join('');
+    var more = mine.length > 3
+      ? '<button type="button" class="hs-study-btn" data-action="hs-all-threads" data-class="'+c.id+'">'
+        + (mine.length - 3) + ' more</button>'
+      : '';
     return '<div class="hs-study">'
+      + '<button type="button" class="hs-study-btn" data-action="hs-new-thread" data-class="'+c.id+'">'
+        + iconSvg('plus')+'New thread</button>'
+      + threads + more
       + '<button type="button" class="hs-study-btn" data-action="hs-open-class" data-id="'+c.id+'">'
         + iconSvg('zap')+'Work on class material</button>'
       + '<button type="button" class="hs-study-btn" data-action="hs-new-cards" data-class="'+c.id+'">'
@@ -5430,7 +5488,7 @@
     // walking away before the read leaves nothing behind
     if(SI && SI.stage !== 'review' && SI.stage !== 'reading'){ siDiscard(); }
     syllabusModalClassId = null;
-    HW = QM = QZ = FC = null;
+    HW = QM = QZ = FC = TH = null;
     hsBackItemId = null;
     document.getElementById('modal-root').innerHTML='';
   }
@@ -10245,6 +10303,256 @@
     }).catch(reportError);
   }
 
+  // ---------------- Threads ----------------
+  // A thread is the Headstart workspace with a memory: its sources are pinned once and
+  // its turns are kept, so "now do discussion 2" can build on discussion 1 instead of
+  // starting from nothing. The tools still exist here, as one-click ways to open.
+
+  var TH = null;   // the open thread
+
+  function openThread(tid){
+    TH = { id: tid, loading: true, data: null, draft: '', busy: false, confirm: null, picking: false, ctx: null };
+    renderThread();
+    apiGet('/api/threads/'+tid).then(function(d){
+      if(!TH || TH.id !== tid) return;
+      TH.loading = false;
+      TH.data = d;
+      renderThread();
+      if(d.classId){
+        apiGet('/api/ai/context/'+d.classId).then(function(ctx){
+          if(TH && TH.id === tid){ TH.ctx = ctx; }
+        }).catch(function(){});
+      }
+    }).catch(function(err){ closeModal(); reportError(err); });
+  }
+
+  function threadBubbleHtml(m){
+    var who = m.role === 'user' ? 'you' : 'Vesta';
+    var body = m.role === 'user'
+      ? '<div class="th-text">'+escapeHtml(m.content||'')+'</div>'
+      : '<div class="th-text th-md">'+mdLite(m.content||'')+'</div>';
+    return '<div class="th-msg th-'+m.role+'">'
+      + '<div class="th-who">'+who
+      + (m.tool && HS_TOOLS[m.tool] ? ' · '+escapeHtml(HS_TOOLS[m.tool].label) : '')+'</div>'
+      + body
+      + (m.role === 'assistant'
+          ? '<div class="th-msg-acts">'
+            + '<button type="button" class="btn ghost" data-action="th-copy" data-id="'+m.id+'">Copy</button>'
+            + '<button type="button" class="btn ghost" data-action="th-to-note" data-id="'+m.id+'">Save as a note</button>'
+            + '</div>'
+          : '')
+      + '</div>';
+  }
+
+  /** The opening moves, shown only on an empty thread so they do not crowd a conversation. */
+  function threadStartersHtml(){
+    return '<div class="th-starters">'
+      + '<div class="hs-group-label">Start with</div>'
+      + HS_TOOL_GROUPS.map(function(g){
+          return g.tools.filter(function(k){ return !HS_NEEDS_TEXT[k]; }).map(function(k){
+            return '<button type="button" class="hs-study-btn" data-action="th-tool" data-tool="'+k+'">'
+              + escapeHtml(HS_TOOLS[k].label)+'</button>';
+          }).join('');
+        }).join('')
+      + '</div>';
+  }
+
+  function threadSourcesHtml(){
+    // `pinned` is everything attached; `sources` is only what had readable text in it.
+    // Showing the second alone means ticking three files and seeing one, with nothing
+    // saying why the others went missing.
+    var pinned = (TH.data && TH.data.pinned) || [];
+    var unreadable = pinned.filter(function(s){ return !s.readable; }).length;
+    return '<div class="th-srcbar">'
+      + '<span class="th-srclabel">Reads</span>'
+      + (pinned.length
+          ? '<span class="th-srclist">'+pinned.map(function(s){
+              return '<span class="th-src'+(s.readable?'':' th-src-dim')+'"'
+                + (s.readable ? '' : ' title="No text could be read out of this one, so it is not sent."')
+                + '>'+escapeHtml(s.title||'Source')+'</span>';
+            }).join('')+'</span>'
+          : '<span class="th-srclist th-none">Nothing pinned yet. It will answer from the '
+            + 'conversation alone until you attach something.</span>')
+      + '<button type="button" class="btn ghost" data-action="th-pick">Change</button>'
+      + (unreadable
+          ? '<div class="th-srcwarn">'
+            + (unreadable===1
+                ? 'One of these has no text Vesta can read, so it is not being sent.'
+                : unreadable+' of these have no text Vesta can read, so they are not being sent.')
+            + ' Scanned PDFs and images have no text layer.</div>'
+          : '')
+      + '</div>';
+  }
+
+  function renderThread(){
+    if(!TH) return;
+    var d = TH.data;
+    var body;
+    if(TH.loading){
+      body = '<div class="hs-thinking"><i></i>Opening the thread…</div>';
+    } else if(TH.picking){
+      body = threadPickerHtml();
+    } else {
+      var msgs = (d.messages||[]).map(threadBubbleHtml).join('');
+      body = threadSourcesHtml()
+        + '<div class="th-scroll" id="th-scroll">'
+        + (msgs || '<div class="th-empty">Nothing here yet. Ask for anything, or start with one of these.</div>')
+        + (TH.busy ? '<div class="hs-thinking"><i></i>Working through your material. This can take a minute.</div>' : '')
+        + ((d.messages||[]).length ? '' : threadStartersHtml())
+        + '</div>'
+        + (TH.confirm ? threadConfirmHtml() : '')
+        + '<div class="th-composer">'
+        + '<textarea id="th-draft" data-action="th-draft" rows="2" placeholder="Ask for anything, or say what to change…"'
+        + (TH.busy ? ' disabled' : '')+'>'+escapeHtml(TH.draft||'')+'</textarea>'
+        + '<button type="button" class="btn primary" data-action="th-send"'+(TH.busy?' disabled':'')+'>Send</button>'
+        + '</div>';
+    }
+    document.getElementById('modal-root').innerHTML =
+      '<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide th-modal" data-action="modal-stop">'
+      + '<div class="modal-head"><h2>'+escapeHtml(d ? (d.title||'Thread') : 'Thread')+'</h2>'
+      + (d ? '<div class="row-meta" style="margin-top:6px;">'
+             + '<span class="type-badge">'+escapeHtml(classLabel(d.classId))+'</span>'
+             + '<span class="type-badge">'+((d.messages||[]).length)+' message'
+             + (((d.messages||[]).length)===1?'':'s')+'</span></div>' : '')
+      + '</div>'
+      + '<div class="modal-body th-body">'+body+'</div>'
+      + '<div class="modal-foot">'
+      + '<span style="display:flex;gap:8px;">'
+      + '<button class="btn" data-action="th-rename">Rename</button>'
+      + '<button class="btn ghost danger" data-action="th-delete">Delete thread</button></span>'
+      + '<div class="right"><button class="btn" data-action="modal-close">Close</button></div>'
+      + '</div></div></div>';
+    paintIcons();
+    var sc = document.getElementById('th-scroll');
+    if(sc) sc.scrollTop = sc.scrollHeight;
+    var ta = document.getElementById('th-draft');
+    if(ta && !TH.busy){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  }
+
+  function threadConfirmHtml(){
+    var c = TH.confirm;
+    return '<div class="hs-confirm"><b>'+escapeHtml(c.error||'This is a big one.')+'</b>'
+      + (c.reason === 'confirm'
+          ? '<div style="margin-top:8px;">It reads about '+(c.inputTokens||0).toLocaleString()
+            + ' tokens and would cost roughly <b>$'+(c.estimateUsd||0).toFixed(3)+'</b>.</div>'
+            + '<div class="hs-actions">'
+            + '<button type="button" class="btn primary" data-action="th-send" data-confirmed="1">Send it anyway</button>'
+            + '<button type="button" class="btn ghost" data-action="th-dismiss">Cancel</button></div>'
+          : '<div class="hs-actions">'
+            + '<button type="button" class="btn" data-action="hs-open-settings">Change the limit</button>'
+            + '<button type="button" class="btn ghost" data-action="th-dismiss">Not now</button></div>')
+      + '</div>';
+  }
+
+  /** Same picker as the one-shot workspace, writing to the thread instead of a run. */
+  function threadPickerHtml(){
+    var ctx = TH.ctx;
+    if(!ctx) return '<div class="hs-thinking"><i></i>Loading what this class has…</div>';
+    var sel = TH.data.selection || { materialIds:[], noteIds:[] };
+    function row(kind, id, label, sub, on){
+      return '<label class="hs-srcrow"><input type="checkbox" data-action="th-src-toggle"'
+        + ' data-kind="'+kind+'" data-id="'+id+'"'+(on?' checked':'')+'>'
+        + '<span><b>'+escapeHtml(label)+'</b>'
+        + (sub ? '<span class="hs-saved-sub"> '+escapeHtml(sub)+'</span>' : '')+'</span></label>';
+    }
+    var files = (ctx.files||[]).map(function(f){
+      return row('material', f.id, f.title, f.readable ? '' : 'no readable text',
+                 (sel.materialIds||[]).indexOf(f.id) >= 0);
+    }).join('');
+    var notes = (ctx.notes||[]).map(function(nt){
+      return row('note', nt.id, nt.title, '', (sel.noteIds||[]).indexOf(nt.id) >= 0);
+    }).join('');
+    return '<div class="th-picker">'
+      + '<div class="hs-group-label">Files</div>'+(files || '<div class="hs-none">No files in this class yet.</div>')
+      + '<div class="hs-group-label" style="margin-top:12px;">Notes</div>'
+      + (notes || '<div class="hs-none">No notes in this class yet.</div>')
+      + '<div class="hs-actions" style="margin-top:14px;">'
+      + '<button type="button" class="btn primary" data-action="th-pick-done">Done</button></div>'
+      + '</div>';
+  }
+
+  /** Every thread in a class, for when the strip only had room for three. */
+  function openThreadList(cid){
+    var mine = hsThreads.filter(function(t){ return t.classId===cid; });
+    document.getElementById('modal-root').innerHTML =
+      '<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop">'
+      + '<div class="modal-head"><h2>Threads</h2>'
+      + '<div class="row-meta" style="margin-top:6px;"><span class="type-badge">'
+      + escapeHtml(classLabel(cid))+'</span></div></div>'
+      + '<div class="modal-body">'
+      + (mine.length
+          ? mine.map(function(t){
+              return '<button type="button" class="hs-saved" style="width:100%;margin-bottom:6px;"'
+                + ' data-action="hs-open-thread" data-id="'+t.id+'">'
+                + '<b>'+escapeHtml(t.title||'Thread')+'</b>'
+                + '<span class="hs-saved-sub">'+t.messageCount+' message'
+                + (t.messageCount===1?'':'s')
+                + (t.lastMessageAt ? ' · '+relTimeAgo(t.lastMessageAt) : ' · not started')
+                + '</span></button>';
+            }).join('')
+          : '<div class="empty">No threads in this class yet.</div>')
+      + '</div>'
+      + '<div class="modal-foot"><span></span><div class="right">'
+      + '<button class="btn" data-action="hs-new-thread" data-class="'+cid+'">New thread</button>'
+      + '<button class="btn" data-action="modal-close">Close</button></div></div>'
+      + '</div></div>';
+    paintIcons();
+  }
+
+  function threadSend(toolKey, confirmed){
+    if(!TH || TH.busy) return;
+    var ta = document.getElementById('th-draft');
+    if(ta) TH.draft = ta.value;
+    var text = (TH.draft||'').trim();
+    if(!toolKey && !text) return;
+    TH.busy = true; TH.confirm = null;
+    renderThread();
+    apiPostRaw('/api/threads/'+TH.id+'/messages',
+               { text: toolKey ? '' : text, tool: toolKey || null, confirmed: !!confirmed })
+      .then(function(r){
+        if(!TH) return;
+        TH.busy = false;
+        // A refusal still kept the question, so show it rather than pretend it vanished.
+        if(r.status === 409 || r.status === 402){
+          TH.confirm = r.body;
+          if(r.body.userMessageId){
+            TH.data.messages = (TH.data.messages||[]).concat(
+              [{ id:r.body.userMessageId, role:'user', content:text, tool:toolKey||null }]);
+            TH.draft = '';
+          }
+          renderThread();
+          return;
+        }
+        if(!r.ok) throw new Error(r.body.error || 'That did not work.');
+        TH.draft = '';
+        TH.data.messages = (TH.data.messages||[]).concat([r.body.userMessage, r.body.reply]);
+        if(r.body.usage) hsUsage = r.body.usage;
+        renderThread();
+        hsLoadSide();
+      })
+      .catch(function(err){
+        if(!TH) return;
+        TH.busy = false;
+        renderThread();
+        reportError(err);
+      });
+  }
+
+  function threadSelectionFromChecks(){
+    var sel = { materialIds:[], noteIds:[], folderIds:[], syllabusIds:[] };
+    Array.prototype.forEach.call(
+      document.querySelectorAll('[data-action="th-src-toggle"]:checked'), function(el){
+        if(el.dataset.kind === 'material') sel.materialIds.push(el.dataset.id);
+        else if(el.dataset.kind === 'note') sel.noteIds.push(el.dataset.id);
+      });
+    return sel;
+  }
+
+  function classLabel(cid){
+    var c = classById(cid);
+    return c ? (c.code || c.name || 'Class') : 'No class';
+  }
+
   // ---------------- What Headstart is allowed to spend ----------------
 
   function openAiSettings(){
@@ -11193,6 +11501,7 @@
   });
 
   document.addEventListener('input', function(e){
+    if(TH && e.target && e.target.id === 'th-draft'){ TH.draft = e.target.value; return; }
     if(QZ && e.target && e.target.dataset && e.target.dataset.action === 'qz-write'){
       QZ.answers[e.target.dataset.id] = e.target.value;
       qzPaintProgress();   // not a full render: that would take the caret with it
@@ -12578,6 +12887,67 @@
     }
     if(action==='hs-to-note'){ hsSaveAsNote(); return; }
     if(action==='hs-view-saved'){ hsShowSaved(t.dataset.id); return; }
+    // ---- threads ----
+    if(action==='hs-open-thread'){ openThread(t.dataset.id); return; }
+    if(action==='hs-new-thread'){
+      var ncid = t.dataset.class;
+      askForText('New thread', { label:'What is it about?', placeholder:'Discussions',
+                                 confirmLabel:'Create' }).then(function(name){
+        if(name === null) return;
+        return apiPost('/api/threads', { classId:ncid, title:(name||'').trim() || 'New thread' })
+          .then(function(th){ return hsLoadSide().then(function(){ openThread(th.id); }); });
+      }).catch(reportError);
+      return;
+    }
+    if(action==='hs-all-threads'){ openThreadList(t.dataset.class); return; }
+    if(action==='th-send'){ threadSend(null, t.dataset.confirmed === '1'); return; }
+    if(action==='th-tool'){ threadSend(t.dataset.tool, false); return; }
+    if(action==='th-dismiss'){ TH.confirm = null; renderThread(); return; }
+    if(action==='th-pick'){ TH.picking = true; renderThread(); return; }
+    if(action==='th-pick-done'){
+      var sel = threadSelectionFromChecks();
+      TH.picking = true;
+      apiPut('/api/threads/'+TH.id, { selection: sel }).then(function(){
+        return apiGet('/api/threads/'+TH.id);
+      }).then(function(d){
+        if(!TH) return;
+        TH.data = d; TH.picking = false; renderThread();
+      }).catch(function(err){ if(TH){ TH.picking = false; renderThread(); } reportError(err); });
+      return;
+    }
+    if(action==='th-copy'){
+      var cm = (TH.data.messages||[]).find(function(m){ return m.id===t.dataset.id; });
+      if(cm) navigator.clipboard.writeText(cm.content||'')
+        .then(function(){ notify('Copied', 'The reply is on your clipboard.'); })
+        .catch(function(){ reportError(new Error('The browser would not let me copy that.')); });
+      return;
+    }
+    if(action==='th-to-note'){
+      var nm = (TH.data.messages||[]).find(function(m){ return m.id===t.dataset.id; });
+      if(!nm) return;
+      addNote(TH.data.classId, { title: TH.data.title || 'From a thread', text: mdLite(nm.content||'') })
+        .then(function(){ notify('Saved to Notes', 'Filed under “'+(TH.data.title||'thread')+'”.'); })
+        .catch(reportError);
+      return;
+    }
+    if(action==='th-rename'){
+      askForText('Rename thread', { label:'Name', value: TH.data.title || '' }).then(function(nm2){
+        if(!nm2 || !nm2.trim()) return;
+        return apiPut('/api/threads/'+TH.id, { title: nm2.trim() }).then(function(){
+          TH.data.title = nm2.trim(); renderThread(); return hsLoadSide();
+        });
+      }).catch(reportError);
+      return;
+    }
+    if(action==='th-delete'){
+      confirmAction('Delete this thread?', 'Its whole conversation goes with it.').then(function(ok){
+        if(!ok) return;
+        return apiDelete('/api/threads/'+TH.id).then(function(){
+          closeModal(); return hsLoadSide();
+        });
+      }).catch(reportError);
+      return;
+    }
     if(action==='hs-open-settings'){ openAiSettings(); return; }
     if(action==='ai-save-settings'){ saveAiSettings(); return; }
 
@@ -12933,6 +13303,10 @@
         return;
       }
       return;   // nothing else reaches the page while a dialog is up
+    }
+    // Enter sends in a thread; shift-enter is a newline, as everywhere else.
+    if(TH && e.target && e.target.id === 'th-draft' && e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault(); threadSend(null, false); return;
     }
     if(fcHandleKey(e)) return;
     if(e.key === 'Tab'){
