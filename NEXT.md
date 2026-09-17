@@ -771,6 +771,123 @@ of view makes the browser scroll to it before the click lands, so the test was m
 page and then blaming the app. Any future test that clicks inside a scrolling container
 has to pick an element already on screen. `verify.py` now does.
 
+### Files page filter bar, reorganised 2026-09-17
+
+Saif's words: "I want the sort by type and time to be better organized, i don't like the
+cluttered look of it right now." The clutter was structural — eleven borderless, background-
+less buttons floating loose across two full-width rows, with the two selected ones tinted
+blue, so the eye saw eleven separate things and two unrelated blue blobs.
+
+Folding them into dropdowns was not an option: the rule that every filter stays on screen
+is deliberate, and `filesFiltersHtml` already carried the comment "Always on screen, never
+folded into a menu." So the grouping is purely visual and nothing was hidden. He chose the
+one-row option from three presented.
+
+- **Two labelled segmented groups on a single row.** `Type` and `When` each get a small
+  uppercase label and a grey track (`.ff-group` / `.ff-label` / `.ff-track`), built the same
+  way as the `.seg-tabs` above them so the page reads as one system. Eleven loose chips
+  become two controls, and a full row of vertical height comes back.
+- **The selected option is a raised pill** rather than a tinted one, which reads as a
+  position within a control instead of a stray highlight.
+- **Option labels shortened** now the group is titled: "All types" to "All", "Documents"
+  to "Docs", "Past week" to "Week". The row reads "Type: All, PDF, Docs…".
+- **Below 820px the two groups stack**, each keeping its label, so the labels line up.
+- **Dark mode needed its own rule.** `--surface` is *darker* than `--surface-2` on a dark
+  page, so the raised pill would have read as a hole and at those values was nearly
+  invisible (track `#24252F` against pill `#1E1F27`). The active pill steps up to
+  `--surface-3` in dark and drops the shadow.
+- The new styles are scoped to `.ff-track .asg-filter`, so the assignments page and the
+  focus settings, which share the `.asg-filter` class, are untouched — verified.
+
+- [x] ~~**The Slides and Sheets filters could never match anything.**~~ Found while
+      testing the above, and it is the more serious half of this change. `MIME_LABEL` is
+      first-match-wins and tested `/word|document|docx?/` second. Every Office Open XML
+      type contains the string **"officedocument"** — a `.pptx` is
+      `application/vnd.openxmlformats-officedocument.presentationml.presentation` — so
+      every slide deck and every spreadsheet was labelled "Document". Filtering by Slides
+      returned nothing on a library full of lecture decks, and the file card's own badge
+      said PPTX at the same time, because that comes from the extension rather than from
+      this table. The table is reordered so specific formats are tested before general
+      ones, with Document near the end, and `.odp`, `.ods`, `.odt`, `.rtf` and `.svg` added
+      while there. Checked against ten formats including the older `.ppt` / `.xls` / `.doc`
+      MIME types: all correct. In the app, Slides went from 0 files to 1 on the same data.
+
+Screenshots in `reference/files-page/`: wide, narrow, dark, PDF-filtered, Slides-filtered,
+and the assignments page for comparison.
+
+## Threads: continuing conversations, built 2026-09-17
+
+Saif's complaint: four discussion posts in one week meant attaching the same readings
+four times, each run its own dead end, "compared to a claude or chatgpt chat history
+where i can just go back in and ask it to answer discussion 2 based on other material
+and it feels continuous".
+
+A telling detail found on the way in: `headstart_sources` has always recorded what every
+run read, and **nothing has ever read it back**. The data needed to stop re-attaching was
+being written and thrown away.
+
+### What was built
+
+- **`threads`, `thread_messages`, `thread_sources`** in `db.py`. A thread belongs to a
+  class, is named by the student, and pins its own sources. Registered in
+  `SEMESTER_SCOPED` and in `prefs.py`'s `EXPORT_TABLES`, so threads travel with a term
+  and with an export.
+- **`threads.py`**, a new blueprint: list, create, read, rename, re-pin, delete, and
+  `POST /api/threads/<id>/messages` for a turn.
+- **`call_claude_chat` in `ai.py`**, which is where the cost model lives. The pinned
+  material goes in `system` with a cache breakpoint after it; the conversation grows
+  after that breakpoint. Render order is tools, system, messages, so every turn after
+  the first reads the expensive half of the prompt from cache. A test asserts the cached
+  prefix is **byte-identical between turns**, which is the invariant the whole $0.10-per-
+  ten-turns figure depends on; a single stray timestamp in that block would silently
+  triple the bill.
+- **`ai_usage` now records `cache_read_tokens` and `cache_write_tokens`**, with an
+  `ALTER TABLE` migration for existing databases. Without these a caching regression is
+  invisible: the requests still succeed, the bill just goes up.
+- **UI**: each class strip gains "New thread" plus its three most recent threads and a
+  "N more" list. A thread opens as a transcript with a composer, the pinned sources
+  along the top, and the ten tools offered as openers on an empty thread only. Enter
+  sends, shift-enter is a newline. A reply can be copied or saved as a note.
+
+### Decisions worth remembering
+
+- **No streaming, deliberately.** I had called streaming the expensive blocker. That was
+  wrong: Headstart was already non-streaming and in use that way, so a thread reply
+  reuses the same "this can take a minute" state. That turned a staged build into one
+  build. Streaming is a later polish item, not a prerequisite.
+- **A refusal does not eat the question.** The user's turn is written before the model is
+  called, so hitting the daily cap or the confirm threshold leaves what they typed in the
+  thread rather than discarding it. Tested.
+- **Pinned but unreadable sources are shown, not dropped.** `collect_sources` only
+  returns what it could read, so a pinned scanned PDF simply vanished from the list —
+  tick three files, see one, with nothing saying why. The thread now lists everything
+  pinned, strikes through what has no extractable text, and says so underneath.
+
+### Tested
+
+30 backend checks with the Anthropic call stubbed (creation, pinning, tool-seeded first
+turn, history replayed in order, the byte-identical cached prefix, cache tokens recorded,
+re-pinning, a failed call keeping the question, cascade delete) and 20 through the real
+interface with Playwright, walking Saif's exact scenario: pin once, draft discussion 1
+from a tool, ask for discussion 2 in the same thread without re-attaching anything, ask
+for it shorter, close, reopen, and find the whole conversation and its sources still
+there. Harness and screenshots in `reference/threads/`.
+
+- [ ] **Never run against the live API.** Every test so far stubs `anthropic.Anthropic`,
+      so the assembly, the caching structure and the persistence are proven but the real
+      request has never been sent. One small live call would settle it; it costs a cent
+      or two of Saif's key and has not been done without asking.
+- [ ] **The Headstart page is now denser**, which Saif already considered cluttered before
+      this landed. He has asked for a layout rework as a separate piece of work, using the
+      `frontend-design` skill, keeping the current visual language (assignment cards,
+      colours, the bubble style) and accounting for friends arriving as new users. Threads
+      were built in the existing language with the smallest footprint on purpose; the
+      rework is where the page gets reorganised.
+- [ ] Existing saved Headstarts are **not** migrated into threads yet. They still open the
+      way they did. Worth doing so there is one place generated work lives, not two.
+- [ ] A thread cannot yet be started from an assignment card, only from the class strip.
+      `threads.item_id` exists for it and the server accepts it; the button does not exist.
+
 ## Decisions waiting on Saif
 
 - [ ] **Delete `cloud/`?** The Worker, R2 integration and four JavaScript shims are
