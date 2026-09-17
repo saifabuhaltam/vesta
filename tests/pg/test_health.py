@@ -16,6 +16,16 @@ def test_health_reports_that_rls_is_actually_enforced():
     assert body["tables"] > 20
 
 
+def test_health_reports_the_global_ai_ceiling(monkeypatch):
+    """Unset must read as null, not as zero, or "no cap" and "cap of nothing" look alike."""
+    import ai
+    with vesta_app.app.test_client() as c:
+        monkeypatch.setattr(ai, "GLOBAL_CAP_USD", None)
+        assert c.get("/health").get_json()["aiGlobalDailyCapUsd"] is None
+        monkeypatch.setattr(ai, "GLOBAL_CAP_USD", 5.0)
+        assert c.get("/health").get_json()["aiGlobalDailyCapUsd"] == 5.0
+
+
 def test_health_says_whether_the_invite_list_is_on(monkeypatch):
     with vesta_app.app.test_client() as c:
         monkeypatch.delenv("INVITE_EMAILS", raising=False)

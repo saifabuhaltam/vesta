@@ -2554,6 +2554,14 @@ def health():
     # match what is registered. The client *secret* is never reported.
     # Whether the sign-in screen's "Invite only" is telling the truth.
     out["inviteOnly"] = bool(vesta_auth.allowlist())
+    out["invitedCount"] = len(vesta_auth.allowlist())
+    # The ceiling on AI spend across every account, which is the only number the people
+    # spending cannot raise themselves. null means there is none.
+    try:
+        import ai as _ai
+        out["aiGlobalDailyCapUsd"] = _ai.GLOBAL_CAP_USD
+    except Exception:
+        out["aiGlobalDailyCapUsd"] = None
     try:
         import calendar_api as _cal
         out["google"] = {

@@ -291,3 +291,95 @@ def test_one_accounts_export_cannot_reach_another():
     assert seen[ALICE] == ["Alice's class"]
     assert seen[BOB] == ["Bob's class"]
     assert "classes" in prefs.EXPORT_TABLES
+
+
+# ---------------------------------------------------------------------------
+# The global spend ceiling, which is the only thing standing between a shared
+# Anthropic key and everyone else's enthusiasm
+# ---------------------------------------------------------------------------
+def _spend(uid, input_tokens):
+    import ai
+    conn = vdb.get_db(user_id=uid)
+    ai.record_usage(conn, "headstart", "claude-sonnet-5", input_tokens, 0)
+    conn.close()
+
+
+def test_the_global_cap_refuses_before_spending_anything():
+    """Neither account is over its own $1, but together they are over the global $1."""
+    import ai
+    _spend(ALICE, 250_000)        # $0.50 at $2 per million
+    _spend(BOB, 300_000)          # $0.60
+    ai._global_spend["at"] = 0.0
+
+    conn = vdb.get_db(user_id=ALICE)
+    try:
+        old = ai.GLOBAL_CAP_USD
+        ai.GLOBAL_CAP_USD = 1.00
+        with pytest.raises(ai.AiRefused) as caught:
+            ai.call_claude(conn, "headstart", "write me an essay", max_tokens=100)
+        assert caught.value.payload["reason"] == "global_cap"
+        assert caught.value.payload["spentTodayEveryone"] == pytest.approx(1.10)
+    finally:
+        ai.GLOBAL_CAP_USD = old
+        conn.close()
+
+
+def test_without_a_global_cap_the_per_account_one_is_all_there_is(monkeypatch):
+    """The default state, and the reason the variable matters before friends arrive.
+
+    Alice is well under her own dollar, so with no global ceiling nothing stops the
+    call on cost grounds and it proceeds to the API. The Anthropic client is stubbed
+    to prove that without spending anything: an earlier version of this test had no
+    stub, reached the real API, and billed a live key.
+    """
+    import ai
+    import anthropic
+
+    class Boom(Exception):
+        pass
+
+    def exploding_client(*a, **kw):
+        raise Boom("the cost checks let this through")
+
+    monkeypatch.setattr(anthropic, "Anthropic", exploding_client)
+
+    _spend(ALICE, 250_000)
+    _spend(BOB, 300_000)
+    ai._global_spend["at"] = 0.0
+
+    conn = vdb.get_db(user_id=ALICE)
+    try:
+        monkeypatch.setattr(ai, "GLOBAL_CAP_USD", None)
+        with pytest.raises(ai.AiRefused) as caught:
+            ai.call_claude(conn, "headstart", "write me an essay", max_tokens=100)
+        # call_claude wraps anything the client throws in a broad except, so the stub
+        # surfaces as a 503 rather than as Boom. What matters is which refusal it is
+        # NOT: the spend checks passed and the call went on to the API.
+        assert caught.value.payload.get("reason") != "global_cap"
+        assert "the cost checks let this through" in caught.value.payload["error"]
+    finally:
+        conn.close()
+
+
+def test_the_api_is_never_reached_once_the_global_cap_is_hit(monkeypatch):
+    """The cap has to refuse *before* the client is built, or it saves no money."""
+    import ai
+    import anthropic
+
+    def exploding_client(*a, **kw):
+        raise AssertionError("the API was reached despite the global cap")
+
+    monkeypatch.setattr(anthropic, "Anthropic", exploding_client)
+
+    _spend(ALICE, 250_000)
+    _spend(BOB, 300_000)
+    ai._global_spend["at"] = 0.0
+
+    conn = vdb.get_db(user_id=ALICE)
+    try:
+        monkeypatch.setattr(ai, "GLOBAL_CAP_USD", 1.00)
+        with pytest.raises(ai.AiRefused) as caught:
+            ai.call_claude(conn, "headstart", "write me an essay", max_tokens=100)
+        assert caught.value.payload["reason"] == "global_cap"
+    finally:
+        conn.close()
