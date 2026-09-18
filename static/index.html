@@ -9226,13 +9226,11 @@
   var SETTINGS_SECTIONS = [
     { id:'account',       label:'Account & Profile' },
     { id:'semester',      label:'Semester' },
-    { id:'calendar',      label:'Calendar & Integrations' },
+    { id:'calendar',      label:'Integrations' },
     { id:'notifications', label:'Notifications' },
     { id:'grades',        label:'Grades & Grading Scale' },
     { id:'notes',         label:'Notes & Editor' },
-    { id:'files',         label:'Files' },
-    { id:'focus',         label:'Focus' },
-    { id:'ai',            label:'Headstart & AI' },
+
     { id:'appearance',    label:'Appearance' },
     { id:'data',          label:'Data & Export' }
   ];
@@ -9324,7 +9322,6 @@
     return apiGet('/api/ai/settings').then(function(r){
       hsSettings = r;
       hsUsage = r.usage || hsUsage;
-      if(settingsSection === 'ai') openSettingsModal();
       return r;
     }).catch(function(){ return null; });
   }
@@ -9333,7 +9330,7 @@
     var fn = {
       account: secAccount, semester: secSemester, calendar: secCalendar,
       notifications: secNotifications, grades: secGrades, notes: secNotes,
-      files: secFiles, focus: secFocus, ai: secAi, appearance: secAppearance,
+      appearance: secAppearance,
       data: secData
     }[id] || secAccount;
     return fn();
@@ -9380,14 +9377,10 @@
   }
 
   // -- Calendar & Integrations ----------------------------------------------------
+  // Month/Week/List and Simple/Detailed both live on the calendar's own toolbar and
+  // both remember what you pick, so this section is only about what it reads from.
   function secCalendar(){
-    return secHead('Calendar & Integrations', 'How the calendar opens, and what it reads from.')
-      + setRow('Default view', 'Which view the calendar opens on.',
-          prefSeg('calendarDefaultView', [
-            {value:'month', label:'Month'}, {value:'week', label:'Week'}, {value:'list', label:'List'}]))
-      + setRow('Detail', 'Simple shows titles only. Detailed adds times and class colours.',
-          prefSeg('calendarDetail', [
-            {value:'simple', label:'Simple'}, {value:'detailed', label:'Detailed'}]))
+    return secHead('Integrations', 'What the calendar reads from.')
       + googleSectionHtml();
   }
 
@@ -9436,55 +9429,6 @@
           prefSeg('editorFontSize', [
             {value:'small', label:'Small'}, {value:'medium', label:'Medium'}, {value:'large', label:'Large'}]))
       + setRow('Spell check', 'Underline misspelled words while writing.', prefCheck('editorSpellcheck'));
-  }
-
-  // -- Files ----------------------------------------------------------------------
-  function secFiles(){
-    return secHead('Files', 'How the Files view opens.')
-      + setRow('Default layout', null,
-          prefSeg('filesDefaultLayout', [{value:'grid', label:'Grid'}, {value:'list', label:'List'}]));
-  }
-
-  // -- Focus ----------------------------------------------------------------------
-  function secFocus(){
-    return secHead('Focus', 'Defaults for the Lock In timer. Changing these does not touch a session already running.')
-      + setRow('Focus block', 'Minutes.', prefNumber('focus.work', 5, 120))
-      + setRow('Short break', 'Minutes.', prefNumber('focus.shortBreak', 1, 30))
-      + setRow('Long break', 'Minutes.', prefNumber('focus.longBreak', 5, 60))
-      + setRow('Focus blocks before a long break', null, prefNumber('focus.sessionsBeforeLong', 2, 8))
-      + setRow('Start breaks automatically', null, prefCheck('focus.autoStartBreaks'))
-      + setRow('Start the next focus block automatically', null, prefCheck('focus.autoStartFocus'))
-      + setRow('Sound at the end of a block', null, prefCheck('focus.alarmOn'))
-      + setRow('Which sound', null, prefSelect('focus.alarmSound', [
-          {value:'chime', label:'Chime'}, {value:'bell', label:'Bell'}, {value:'digital', label:'Digital'}]));
-  }
-
-  // -- Headstart & AI -------------------------------------------------------------
-  function secAi(){
-    var head = secHead('Headstart & AI', 'What Headstart may spend, and how it looks.');
-    var view = setRow('Headstart layout', null,
-      prefSeg('headstartView', [{value:'cards', label:'Cards'}, {value:'list', label:'List'}]));
-    if(!hsSettings) return head + view + '<div class="hint">Loading AI settings…</div>';
-    var usage = hsUsage ? ('$'+Number(hsUsage.usd||0).toFixed(2)+' spent today') : '';
-    return head + view
-      + setRow('Spent today', 'Across this account only.', '<span class="hint">'+escapeHtml(usage)+'</span>')
-      + setRow('Daily limit', 'Dollars a day, for this account.',
-          '<input type="number" min="0" step="0.5" id="ai-daily-cap" value="'
-          + escapeHtml(String(hsSettings.daily_cap_usd))+'">')
-      + setRow('Ask before spending more than', 'Dollars, for a single generation.',
-          '<input type="number" min="0" step="0.01" id="ai-confirm-over" value="'
-          + escapeHtml(String(hsSettings.confirm_over_usd))+'">')
-      + '<details class="set-adv"><summary>Advanced</summary>'
-      + setRow('Model', 'Only change this if you know what it costs.',
-          '<select id="ai-model">' + ['claude-opus-5','claude-sonnet-5','claude-haiku-4-5'].map(function(m){
-            return '<option value="'+m+'"'+(hsSettings.model===m?' selected':'')+'>'+m+'</option>';
-          }).join('') + '</select>')
-      + setRow('Input price', 'Dollars per million tokens.',
-          '<input type="number" min="0" step="0.5" id="ai-in-price" value="'+escapeHtml(String(hsSettings.input_per_m))+'">')
-      + setRow('Output price', 'Dollars per million tokens.',
-          '<input type="number" min="0" step="0.5" id="ai-out-price" value="'+escapeHtml(String(hsSettings.output_per_m))+'">')
-      + '</details>'
-      + '<div style="margin-top:12px;"><button type="button" class="btn primary" data-action="ai-save">Save AI settings</button></div>';
   }
 
   // -- Appearance -----------------------------------------------------------------
@@ -13066,7 +13010,12 @@
       addNote(ncls, { title:'', text:'' }).then(function(){ openNewestNote(ncls); }).catch(reportError);
       return;
     }
-    if(action==='files-layout'){ filesLayout = t.dataset.layout; renderView(); paintIcons(); return; }
+    if(action==='files-layout'){
+      filesLayout = t.dataset.layout;
+      if(PREFS && PREFS.filesDefaultLayout !== filesLayout) savePrefs({ filesDefaultLayout: filesLayout });
+      renderView(); paintIcons();
+      return;
+    }
     if(action==='files-open-folder'){
       // Opening a class always lands at its top level, never inside whatever folder
       // happened to be open in the class you were in before.
@@ -13427,7 +13376,6 @@
       // Each section fetches what only it needs, the first time it is opened.
       if(settingsSection === 'semester' && termList === null) loadTermList();
       if(settingsSection === 'calendar') loadGoogleStatus();
-      if(settingsSection === 'ai' && !hsSettings) loadAiSettingsInto();
       return;
     }
     if(action==='set-pref'){
@@ -13514,7 +13462,12 @@
     if(action==='delete-term'){ deleteTerm(t.dataset.id); return; }
     if(action==='unlock-term'){ unlockTerm(false).catch(reportError); return; }
     if(action==='lock-term'){ unlockTerm(true).catch(reportError); return; }
-    if(action==='cal-view'){ calView = t.dataset.view; renderView(); return; }
+    if(action==='cal-view'){
+      calView = t.dataset.view;
+      if(PREFS && PREFS.calendarDefaultView !== calView) savePrefs({ calendarDefaultView: calView });
+      renderView();
+      return;
+    }
     if(action==='toggle-filter'){
       var key = t.dataset.key;
       if(hiddenClassIds.has(key)) hiddenClassIds.delete(key); else hiddenClassIds.add(key);
