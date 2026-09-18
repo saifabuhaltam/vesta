@@ -888,6 +888,40 @@ there. Harness and screenshots in `reference/threads/`.
 - [ ] A thread cannot yet be started from an assignment card, only from the class strip.
       `threads.item_id` exists for it and the server accepts it; the button does not exist.
 
+## Headstart rework, first pass 2026-09-17
+
+Saif: "this whole headstart page needs to be reworked... It's like 20% of the screen for
+something supposed to be important." Two decisions taken with him before building: work
+screens replace modals, and the two doors to the ten tools become one.
+
+Done:
+
+- **A thread is a screen.** Headstart has an inner screen (`hsScreen`), so home is for
+  browsing and a thread takes the page: back link, a rail of the class's other threads,
+  and the conversation at 50% of the window rather than 20%.
+- **Home is three labelled rows** per class, Due / Threads / Study, instead of one flat
+  strip that mixed four kinds of object at the same weight.
+- **One door to the tools.** "Work on class material" and an assignment's Headstart
+  button both started a run that was discarded on close. Both open a conversation now.
+  `openHeadstartWorkspace` stays only because older saved runs still open in it.
+- **The Reads bar collapses** to one line, opening on hover and pinning open on click.
+
+Still modals, and the obvious next pass:
+
+- [ ] **The quiz player and the deck review are still modals.** A quiz you are sitting
+      an exam-practice run of has the same cramped panel the thread used to. They should
+      become screens the same way; `hsScreen` already has room for `{kind:'quiz'}` and
+      `{kind:'deck'}`.
+- [ ] **The makers are still modals** (Quiz me, Make flashcards). Those are short
+      configuration steps, so a modal may be right for them. Worth deciding rather than
+      inheriting.
+- [ ] **No deep links.** `hsScreen` is in memory, so a thread cannot be linked to or
+      reopened by URL, and the browser back button does not walk the screens. That is
+      the next structural thing, and it wants a decision about routing before more
+      screens are added.
+- [ ] **Existing saved Headstarts still are not threads.** They open in the old
+      workspace. Migrating them would finish collapsing the two surfaces into one.
+
 ## Decisions waiting on Saif
 
 - [ ] **Delete `cloud/`?** The Worker, R2 integration and four JavaScript shims are
