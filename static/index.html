@@ -1755,6 +1755,82 @@
     .ff-group{ width:100%; }
   }
 
+  /* A class block is three labelled rows now. The label is the whole point: it says
+     what a row of pills actually is, which the flat strip never did. */
+  .hs-row{ display:flex; gap:12px; align-items:flex-start; margin-top:12px; }
+  .hs-row-label{ width:62px; flex:none; font-size:11px; font-weight:700; text-transform:uppercase;
+    color:var(--text-faint); padding-top:9px; }
+  .hs-row-items{ flex:1; min-width:0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .hs-row-hint{ font-size:12.5px; color:var(--text-faint); max-width:52ch; }
+  .hs-row > .hs-grid, .hs-row > .hs-list{ flex:1; min-width:0; }
+  .hs-study-btn.primary-ish{ border-color:var(--accent); color:var(--accent-ink); }
+  .hs-study-btn.primary-ish:hover{ background:var(--accent-soft); }
+  @media (max-width:760px){
+    .hs-row{ flex-direction:column; gap:6px; }
+    .hs-row-label{ width:auto; padding-top:0; }
+  }
+
+  /* ---------- The thread screen ---------- */
+  /* A conversation is the work, so it gets the page. The rail keeps the other threads
+     in the class one click away, which is what stops a full screen feeling like a
+     dead end you have to reverse out of. */
+  .th-screen{ display:flex; flex-direction:column; gap:14px; height:calc(100vh - 150px); min-height:420px; }
+  .th-screen-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .th-back{ border:1px solid var(--border); background:var(--surface); border-radius:var(--r-pill);
+    padding:6px 13px; font:inherit; font-size:12.5px; font-weight:600; color:var(--text-muted);
+    cursor:pointer; flex:none; }
+  .th-back:hover{ color:var(--text); border-color:var(--text-faint); }
+  .th-screen-title{ display:flex; align-items:center; gap:9px; min-width:0; flex:1; }
+  .th-screen-title h2{ font-size:19px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .th-screen-acts{ display:flex; align-items:center; gap:8px; }
+  .th-body-wrap{ display:flex; gap:14px; flex:1; min-height:0; }
+
+  .th-rail{ width:196px; flex:none; display:flex; flex-direction:column; gap:4px;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    padding:10px; overflow:auto; }
+  .th-rail-head{ font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-faint);
+    padding:4px 8px 6px; }
+  .th-rail-item{ display:flex; flex-direction:column; gap:2px; text-align:left; border:none;
+    background:transparent; border-radius:var(--r-md); padding:8px 10px; cursor:pointer; font:inherit; }
+  .th-rail-item:hover{ background:var(--surface-2); }
+  .th-rail-item.active{ background:var(--accent-soft); }
+  .th-rail-name{ font-size:13px; font-weight:650; color:var(--text); }
+  .th-rail-item.active .th-rail-name{ color:var(--accent-ink); }
+  .th-rail-sub{ font-size:11px; color:var(--text-faint); }
+  .th-rail-new{ margin-top:6px; display:flex; align-items:center; justify-content:center; gap:6px;
+    border:1px dashed var(--border); background:transparent; border-radius:var(--r-md);
+    padding:9px; font:inherit; font-size:12.5px; font-weight:600; color:var(--text-muted); cursor:pointer; }
+  .th-rail-new:hover{ color:var(--accent-ink); border-color:var(--accent); }
+  .th-rail-new svg{ width:15px; height:15px; }
+
+  .th-main{ flex:1; min-width:0; display:flex; flex-direction:column;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    padding:14px 16px 0; }
+
+  /* The opening screen of a new thread. It has to answer "what is this for" without
+     a tour, because the people arriving next did not watch it get built. */
+  .th-start{ max-width:640px; margin:8px auto; text-align:left; }
+  .th-start h3{ font-size:17px; margin-bottom:6px; }
+  .th-start p{ font-size:13.5px; color:var(--text-muted); line-height:1.6; margin:0 0 18px; max-width:56ch; }
+  .th-start-group{ margin-bottom:16px; }
+  .th-start-label{ font-size:11px; font-weight:700; text-transform:uppercase;
+    color:var(--text-faint); margin-bottom:7px; }
+  .th-start-items{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; }
+  .th-start-btn{ display:block; width:100%; text-align:left; border:1px solid var(--border);
+    background:var(--surface); border-radius:var(--r-md); padding:9px 12px;
+    cursor:pointer; font:inherit; }
+  @media (max-width:620px){ .th-start-items{ grid-template-columns:1fr; } }
+  .th-start-btn:hover{ border-color:var(--accent); background:var(--accent-soft); }
+  .th-start-btn b{ display:block; font-size:13px; font-weight:650; color:var(--text); }
+  .th-start-btn span{ display:block; font-size:12px; color:var(--text-faint); margin-top:1px; }
+
+  @media (max-width:900px){
+    .th-screen{ height:auto; }
+    .th-body-wrap{ flex-direction:column; }
+    .th-rail{ width:auto; flex-direction:row; flex-wrap:wrap; }
+    .th-rail-new{ margin-top:0; }
+  }
+
   /* ---------- Threads ---------- */
   /* A transcript in the same bubble language as the rest of the app: the student's
      turns are accent-tinted and sit right, Vesta's are a plain surface and sit left. */
@@ -1786,6 +1862,15 @@
   .th-srcwarn{ width:100%; font-size:11.5px; color:var(--text-faint); }
   .th-scroll{ flex:1; overflow:auto; display:flex; flex-direction:column; gap:14px;
     padding:4px 2px 14px; min-height:220px; }
+  /* Cap the measure. The pane grows with the window; a line of prose should not.
+     Each turn takes the full 760px column and aligns its own bubble inside it, so
+     the left and right sides of the conversation survive the centring. */
+  .th-main .th-scroll > *{ max-width:760px; width:100%; margin-left:auto; margin-right:auto; }
+  .th-main .th-msg{ align-self:auto; }
+  .th-main .th-msg.th-user{ align-items:flex-end; }
+  .th-main .th-msg.th-assistant{ align-items:flex-start; }
+  .th-main .th-msg .th-text{ max-width:88%; }
+  .th-main .th-composer{ max-width:760px; width:100%; margin-left:auto; margin-right:auto; }
   .th-msg{ max-width:82%; display:flex; flex-direction:column; gap:5px; }
   .th-msg.th-user{ align-self:flex-end; align-items:flex-end; }
   .th-msg.th-assistant{ align-self:flex-start; }
@@ -4362,6 +4447,9 @@
   var HS_NEEDS_TEXT = { revise:true, refine:true };
 
   var hsThreads = [];        // continuing conversations, newest first
+  // null means the Headstart home screen; otherwise {kind:'thread', id} and the page
+  // is given over to that piece of work.
+  var hsScreen = null;
   var hsClassId = null;      // null means every class
   var HS_VIEW_KEY = 'vesta_headstart_view';
   var hsView = (function(){
@@ -4490,7 +4578,33 @@
       + '</div>';
   }
 
-  function hsStudyStripHtml(c){
+  /* Three labelled rows instead of one flat strip. The strip mixed assignments,
+     threads, generator buttons and saved quizzes at the same visual weight, which is
+     readable once you know the product and opaque before that. */
+  function hsThreadRowHtml(c){
+    var mine = hsThreads.filter(function(t){ return t.classId===c.id; });
+    var shown = mine.slice(0, 4).map(function(t){
+      return '<button type="button" class="hs-saved" data-action="hs-open-thread" data-id="'+t.id+'">'
+        + '<b>'+escapeHtml(t.title||'Thread')+'</b>'
+        + '<span class="hs-saved-sub">'+t.messageCount+' message'+(t.messageCount===1?'':'s')
+        + (t.lastMessageAt ? ' · '+relTimeAgo(t.lastMessageAt) : ' · not started')+'</span></button>';
+    }).join('');
+    return '<div class="hs-row">'
+      + '<div class="hs-row-label">Threads</div>'
+      + '<div class="hs-row-items">'
+      + '<button type="button" class="hs-study-btn primary-ish" data-action="hs-new-thread" data-class="'+c.id+'">'
+        + iconSvg('plus')+'New thread</button>'
+      + shown
+      + (mine.length > 4
+          ? '<button type="button" class="hs-study-btn" data-action="hs-all-threads" data-class="'+c.id+'">'
+            + (mine.length - 4) + ' more</button>'
+          : '')
+      + (mine.length ? '' : '<span class="hs-row-hint">Ask Vesta about this class. It reads your '
+          + 'files and notes, and remembers the conversation.</span>')
+      + '</div></div>';
+  }
+
+  function hsStudyRowHtml(c){
     var decks = hsDecks.filter(function(d){ return d.classId===c.id; });
     var quizzes = hsQuizzes.filter(function(q){ return q.classId===c.id; });
     var saved = decks.slice(0,3).map(function(d){
@@ -4504,30 +4618,15 @@
         + '<span class="hs-saved-sub">'+q.questionCount+' question'+(q.questionCount===1?'':'s')
         + (q.bestScore!=null ? ' · best '+q.bestScore+'%' : ' · not taken yet')+'</span></button>';
     }).join('');
-    // Threads first: a conversation you already started is more likely to be what
-    // you came back for than a new one-shot run.
-    var mine = hsThreads.filter(function(t){ return t.classId===c.id; });
-    var threads = mine.slice(0, 3).map(function(t){
-      return '<button type="button" class="hs-saved" data-action="hs-open-thread" data-id="'+t.id+'">'
-        + '<b>'+escapeHtml(t.title||'Thread')+'</b>'
-        + '<span class="hs-saved-sub">'+t.messageCount+' message'+(t.messageCount===1?'':'s')
-        + (t.lastMessageAt ? ' · '+relTimeAgo(t.lastMessageAt) : ' · not started')+'</span></button>';
-    }).join('');
-    var more = mine.length > 3
-      ? '<button type="button" class="hs-study-btn" data-action="hs-all-threads" data-class="'+c.id+'">'
-        + (mine.length - 3) + ' more</button>'
-      : '';
-    return '<div class="hs-study">'
-      + '<button type="button" class="hs-study-btn" data-action="hs-new-thread" data-class="'+c.id+'">'
-        + iconSvg('plus')+'New thread</button>'
-      + threads + more
-      + '<button type="button" class="hs-study-btn" data-action="hs-open-class" data-id="'+c.id+'">'
-        + iconSvg('zap')+'Work on class material</button>'
+    return '<div class="hs-row">'
+      + '<div class="hs-row-label">Study</div>'
+      + '<div class="hs-row-items">'
       + '<button type="button" class="hs-study-btn" data-action="hs-new-cards" data-class="'+c.id+'">'
         + iconSvg('notes')+'Make flashcards</button>'
       + '<button type="button" class="hs-study-btn" data-action="hs-new-quiz" data-class="'+c.id+'">'
         + iconSvg('check')+'Quiz me</button>'
-      + saved + '</div>';
+      + saved
+      + '</div></div>';
   }
 
   function hsSectionHtml(c){
@@ -4540,16 +4639,23 @@
       + '<span class="hs-sec-count">'+(open.length ? open.length+' open' : 'nothing open')+'</span>'
       + '</div>'
       + (shown.length
-          ? (hsView === 'list'
-              ? '<div class="hs-list">'+shown.map(hsRowHtml).join('')+'</div>'
-              : '<div class="hs-grid">'+shown.map(hsCardHtml).join('')+'</div>')
+          ? '<div class="hs-row"><div class="hs-row-label">Due</div>'
+            + (hsView === 'list'
+                ? '<div class="hs-list">'+shown.map(hsRowHtml).join('')+'</div>'
+                : '<div class="hs-grid">'+shown.map(hsCardHtml).join('')+'</div>')
+            + '</div>'
           : '')
-      + hsStudyStripHtml(c)
+      + hsThreadRowHtml(c)
+      + hsStudyRowHtml(c)
       + '</section>';
   }
 
   function viewHeadstart(){
     if(!hsSideLoaded) hsLoadSide();
+    // Working on something takes over the page. Browsing and working were both
+    // happening on one screen with panels stacked over it, which is why a thread
+    // ended up with a fifth of the window.
+    if(hsScreen && hsScreen.kind === 'thread') return threadScreenHtml();
     if(classes.length===0){
       return '<div class="empty">Add a class first. Headstart works from your own material, '
            + 'so it needs somewhere to read from.</div>';
@@ -10326,7 +10432,15 @@
   var TH = null;   // the open thread
 
   function openThread(tid){
-    TH = { id: tid, loading: true, data: null, draft: '', busy: false, confirm: null, picking: false, ctx: null };
+    // Close first, then build: closeModal clears every open workspace including TH, so
+    // setting up the thread before it would wipe the thread we are opening.
+    closeModal();            // a thread may have been reached from a modal; leave it behind
+    TH = { id: tid, loading: true, data: null, draft: '', busy: false, confirm: null,
+           picking: false, ctx: null, srcOpen: false };
+    hsScreen = { kind: 'thread', id: tid };
+    // A thread can be opened from an assignment, which lives on another tab. Opening
+    // one is navigation, so it moves you to Headstart rather than rendering nothing.
+    if(activeTab !== 'headstart'){ activeTab = 'headstart'; render(); }
     renderThread();
     apiGet('/api/threads/'+tid).then(function(d){
       if(!TH || TH.id !== tid) return;
@@ -10410,6 +10524,15 @@
 
   function renderThread(){
     if(!TH) return;
+    if(hsScreen && hsScreen.kind === 'thread'){
+      renderView();
+      paintIcons();
+      var sc0 = document.getElementById('th-scroll');
+      if(sc0 && TH.data && (TH.data.messages||[]).length) sc0.scrollTop = sc0.scrollHeight;
+      var ta0 = document.getElementById('th-draft');
+      if(ta0 && !TH.busy){ ta0.focus(); ta0.setSelectionRange(ta0.value.length, ta0.value.length); }
+      return;
+    }
     var d = TH.data;
     var body;
     if(TH.loading){
@@ -10493,6 +10616,93 @@
       + '<div class="hs-actions" style="margin-top:14px;">'
       + '<button type="button" class="btn primary" data-action="th-pick-done">Done</button></div>'
       + '</div>';
+  }
+
+  /** Open the thread about an assignment, making it the first time round.
+   *
+   * Assignments used to open a one-shot run that was thrown away when you closed it.
+   * They open a conversation now, so the work survives and can be carried on.
+   */
+  function openItemThread(itemId){
+    var it = items.find(function(i){ return i.id===itemId; });
+    if(!it) return;
+    var existing = hsThreads.find(function(t){ return t.itemId === itemId; });
+    if(existing){ openThread(existing.id); return; }
+    apiPost('/api/threads', { classId: it.classId, itemId: itemId,
+                              title: it.title || 'Untitled assignment' })
+      .then(function(th){ return hsLoadSide().then(function(){ openThread(th.id); }); })
+      .catch(reportError);
+  }
+
+  /** The whole page, given over to one conversation. */
+  function threadScreenHtml(){
+    if(!TH || TH.loading || !TH.data){
+      return '<div class="th-screen"><div class="hs-thinking"><i></i>Opening the thread…</div></div>';
+    }
+    var d = TH.data;
+    var siblings = hsThreads.filter(function(t){ return t.classId === d.classId; });
+    var rail = '<aside class="th-rail">'
+      + '<div class="th-rail-head">Threads</div>'
+      + siblings.map(function(t){
+          return '<button type="button" class="th-rail-item'+(t.id===d.id?' active':'')+'"'
+            + ' data-action="hs-open-thread" data-id="'+t.id+'">'
+            + '<span class="th-rail-name">'+escapeHtml(t.title||'Thread')+'</span>'
+            + '<span class="th-rail-sub">'+t.messageCount+' message'+(t.messageCount===1?'':'s')+'</span>'
+            + '</button>';
+        }).join('')
+      + '<button type="button" class="th-rail-new" data-action="hs-new-thread" data-class="'+d.classId+'">'
+      + iconSvg('plus')+'New thread</button>'
+      + '</aside>';
+
+    var msgs = (d.messages||[]).map(threadBubbleHtml).join('');
+    var main = '<div class="th-main">'
+      + threadSourcesHtml()
+      + '<div class="th-scroll" id="th-scroll">'
+      + (msgs || threadEmptyHtml())
+      + (TH.busy ? '<div class="hs-thinking"><i></i>Working through your material. This can take a minute.</div>' : '')
+      + '</div>'
+      + (TH.confirm ? threadConfirmHtml() : '')
+      + '<div class="th-composer">'
+      + '<textarea id="th-draft" data-action="th-draft" rows="2" placeholder="Ask for anything, or say what to change…"'
+      + (TH.busy ? ' disabled' : '')+'>'+escapeHtml(TH.draft||'')+'</textarea>'
+      + '<button type="button" class="btn primary" data-action="th-send"'+(TH.busy?' disabled':'')+'>Send</button>'
+      + '</div></div>';
+
+    return '<div class="th-screen">'
+      + '<div class="th-screen-head">'
+      + '<button type="button" class="th-back" data-action="hs-home">‹ Headstart</button>'
+      + '<div class="th-screen-title">'
+      + '<span class="dot" style="--c:'+(classColor(d.classId)||'var(--none)')+'"></span>'
+      + '<h2>'+escapeHtml(d.title||'Thread')+'</h2>'
+      + '<span class="type-badge">'+escapeHtml(classLabel(d.classId))+'</span></div>'
+      + '<div class="th-screen-acts">'+hsSpendChipHtml()
+      + '<button type="button" class="btn" data-action="th-rename">Rename</button>'
+      + '<button type="button" class="btn ghost danger" data-action="th-delete">Delete</button></div>'
+      + '</div>'
+      + (TH.picking ? '<div class="th-body-wrap">'+threadPickerHtml()+'</div>'
+                    : '<div class="th-body-wrap">'+rail+main+'</div>')
+      + '</div>';
+  }
+
+  /** The first thing someone sees in a new thread, so it has to say what to do. */
+  function threadEmptyHtml(){
+    return '<div class="th-start">'
+      + '<h3>What do you want to get done?</h3>'
+      + '<p>Attach the readings and notes this is about, then ask. Vesta works from your '
+      + 'material, and remembers this conversation, so you can keep going without '
+      + 'setting it all up again.</p>'
+      + '<div class="th-start-tools">'
+      + HS_TOOL_GROUPS.map(function(g){
+          return '<div class="th-start-group"><div class="th-start-label">'+escapeHtml(g.label)+'</div>'
+            + '<div class="th-start-items">'
+            + g.tools.map(function(k){
+                return '<button type="button" class="th-start-btn" data-action="th-tool" data-tool="'+k+'">'
+                  + '<b>'+escapeHtml(HS_TOOLS[k].label)+'</b>'
+                  + '<span>'+escapeHtml(HS_TOOLS[k].blurb)+'</span></button>';
+              }).join('')
+            + '</div></div>';
+        }).join('')
+      + '</div></div>';
   }
 
   /** Every thread in a class, for when the strip only had room for three. */
@@ -11845,7 +12055,10 @@
       if(!keepShare && !keepMenu && !onMenuControl) closeNoteMenus();
     }
     if(action==='toggle-sidebar'){ setSidebarCollapsed(!sidebarCollapsed); return; }
-    if(action==='switch-tab'){ activeTab = t.dataset.tab; render(); return; }
+    if(action==='switch-tab'){
+      if(t.dataset.tab !== 'headstart'){ hsScreen = null; TH = null; }
+      activeTab = t.dataset.tab; render(); return;
+    }
     if(action==='set-theme'){ setTheme(t.dataset.themeChoice); return; }
     if(action==='rte-cmd'){
       var rteEditor = rteEditorFor(t);
@@ -12881,19 +13094,13 @@
       if(wantHs) hsShowSaved(wantHs);
       return;
     }
-    if(action==='hs-open-item'){
-      // opened from inside an assignment card, so offer a way back to it
-      hsBackItemId = document.querySelector('.ac-modal') ? t.dataset.id : null;
-      openHeadstartWorkspace({ itemId:t.dataset.id });
-      return;
-    }
+    if(action==='hs-open-item'){ openItemThread(t.dataset.id); return; }
     if(action==='hs-back'){
       var backTo = hsBackItemId;
       closeModal();                 // this clears hsBackItemId too
       openItemDetailModal(backTo);
       return;
     }
-    if(action==='hs-open-class'){ hsBackItemId = null; openHeadstartWorkspace({ classId:t.dataset.id }); return; }
     if(action==='hs-pick-tool'){ hsSetTool(t.dataset.tool); return; }
     if(action==='hs-pick-src'){ HW.picking = true; hsPaintSources(); return; }
     if(action==='hs-auto-src'){
@@ -12913,6 +13120,7 @@
     if(action==='hs-view-saved'){ hsShowSaved(t.dataset.id); return; }
     // ---- threads ----
     if(action==='hs-open-thread'){ openThread(t.dataset.id); return; }
+    if(action==='hs-home'){ hsScreen = null; TH = null; renderView(); paintIcons(); return; }
     if(action==='hs-new-thread'){
       var ncid = t.dataset.class;
       askForText('New thread', { label:'What is it about?', placeholder:'Discussions',
@@ -12968,7 +13176,8 @@
       confirmAction('Delete this thread?', 'Its whole conversation goes with it.').then(function(ok){
         if(!ok) return;
         return apiDelete('/api/threads/'+TH.id).then(function(){
-          closeModal(); return hsLoadSide();
+          hsScreen = null; TH = null; closeModal();
+          return hsLoadSide().then(function(){ renderView(); paintIcons(); });
         });
       }).catch(reportError);
       return;
