@@ -230,6 +230,7 @@
     transition:border-color .12s ease, background .12s ease, box-shadow .12s ease; text-decoration:none;
     box-shadow:var(--shadow-card);
   }
+  .btn svg{ width:15px; height:15px; flex:none; }
   .btn:hover{ border-color:var(--text-faint); background:var(--surface-2); }
   .btn.primary{ background:var(--accent-solid); border-color:var(--accent-solid); color:#fff; }
   .btn.primary:hover{ background:var(--accent-solid-ink); border-color:var(--accent-solid-ink); color:#fff; }
@@ -1540,6 +1541,7 @@
   .nt-iconbtn{ flex:none; width:32px; height:32px; border-radius:var(--r-md);
     border:1px solid var(--border); background:var(--surface); color:var(--text-muted);
     cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .nt-iconbtn svg{ width:16px; height:16px; }
   .nt-iconbtn:hover{ background:var(--surface-2); color:var(--text); }
   /* folder rows: controls appear on hover, as in the mockup */
   .nt-folder-head .nt-folder-x{ opacity:0; }
@@ -5010,7 +5012,8 @@
         + escapeHtml(notesSearch||'') + '"></span>'
       + '<button type="button" class="btn primary" data-action="notes-new-in" data-class="'+INBOX_ID+'"'
         + ' title="Write it now, file it under a class later">＋ Quick note</button>'
-      + '<button type="button" class="btn ghost" data-action="note-trash-open" title="Trash">🗑 Trash</button>'
+      + '<button type="button" class="btn ghost" data-action="note-trash-open" title="Trash">'
+        + iconSvg('trash')+'Trash</button>'
       + '</div>';
 
     if(q){
@@ -6725,7 +6728,8 @@
       + '<div class="nt-classhead-name">'+escapeHtml(c.name||'')+'</div></div></div>'
       + '<div class="nt-head">'
       + '<button type="button" class="nt-link-action" data-action="note-new" data-class="'+c.id+'">＋ New note</button>'
-      + '<button type="button" class="nt-iconbtn" data-action="note-trash-open" title="Trash">🗑</button>'
+      + '<button type="button" class="nt-iconbtn" data-action="note-trash-open" title="Trash"'
+        + ' aria-label="Trash">'+iconSvg('trash')+'</button>'
       + '</div>'
       + '<div class="nt-toolrow">'
       + '<span class="nt-search-box"><span class="ic">'+iconSvg('search')+'</span>'
