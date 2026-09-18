@@ -1770,6 +1770,42 @@
     .hs-row-label{ width:auto; padding-top:0; }
   }
 
+  /* A section per time bucket. The heading carries the count, so the size of what is
+     coming is legible before you read a single row. */
+  .hs-bucket{ margin-bottom:22px; }
+  .hs-bucket-head{ display:flex; align-items:center; gap:9px; margin:0 0 9px; }
+  .hs-bucket-head h3{ font-size:14px; font-weight:700; }
+  .hs-bucket-count{ font-size:11.5px; font-weight:700; color:var(--text-faint);
+    background:var(--surface-2); border-radius:var(--r-pill); padding:2px 8px; }
+  .hs-bucket-toggle{ margin-left:auto; border:none; background:transparent; font:inherit;
+    font-size:12.5px; font-weight:600; color:var(--accent); cursor:pointer; padding:2px 6px;
+    border-radius:6px; }
+  .hs-bucket-toggle:hover{ background:var(--accent-soft); }
+
+  /* One line per item. The old row gave a title and a date the full page width and left
+     about 900px of it empty; this fills the line instead of stretching across it. */
+  .hs-due-list{ display:flex; flex-direction:column; gap:4px; }
+  .hs-due-row{ display:flex; align-items:center; gap:10px; padding:9px 14px;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md);
+    cursor:pointer; }
+  .hs-due-row:hover{ border-color:var(--accent); }
+  .hs-due-class{ font-size:11.5px; font-weight:700; color:var(--text-faint); flex:none;
+    min-width:62px; }
+  /* The type belongs to the title, not to the metadata: letting the title stretch to
+     fill left "Quiz 02" alone with a thousand pixels of gap before its own badge. The
+     pair sits together and the empty space goes after them. */
+  .hs-due-title{ font-size:13.5px; font-weight:600; color:var(--text); flex:0 1 auto;
+    min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hs-due-row .type-badge{ flex:none; margin-right:auto; }
+  .hs-due-row .due-label{ flex:none; }
+  .hs-due-row .hs-open{ flex:none; font-size:12.5px; }
+  .hs-threads-sec .hs-row-items{ gap:8px; }
+  .hs-saved .dot{ margin-right:2px; }
+  @media (max-width:720px){
+    .hs-due-row{ flex-wrap:wrap; }
+    .hs-due-title{ flex-basis:100%; order:-1; white-space:normal; }
+  }
+
   /* ---------- The thread screen ---------- */
   /* A conversation is the work, so it gets the page. The rail keeps the other threads
      in the class one click away, which is what stops a full screen feeling like a
@@ -1783,6 +1819,7 @@
   .th-screen-title{ display:flex; align-items:center; gap:9px; min-width:0; flex:1; }
   .th-screen-title h2{ font-size:19px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .th-screen-acts{ display:flex; align-items:center; gap:8px; }
+  .th-draft-note{ font-size:11.5px; color:var(--text-faint); }
   .th-body-wrap{ display:flex; gap:14px; flex:1; min-height:0; }
 
   .th-rail{ width:196px; flex:none; display:flex; flex-direction:column; gap:4px;
@@ -4450,6 +4487,7 @@
   // null means the Headstart home screen; otherwise {kind:'thread', id} and the page
   // is given over to that piece of work.
   var hsScreen = null;
+  var hsShowLater = false;   // the long tail, counted but folded away
   var hsClassId = null;      // null means every class
   var HS_VIEW_KEY = 'vesta_headstart_view';
   var hsView = (function(){
@@ -4629,25 +4667,128 @@
       + '</div></div>';
   }
 
-  function hsSectionHtml(c){
-    var open = hsOpenItems(c.id);
-    var shown = open.slice(0, 6);
-    return '<section class="hs-section">'
-      + '<div class="hs-sec-head">'
-      + '<span class="dot" style="--c:'+(c.color||'var(--none)')+'"></span>'
-      + '<h3>'+escapeHtml(c.name || c.code || 'Class')+'</h3>'
-      + '<span class="hs-sec-count">'+(open.length ? open.length+' open' : 'nothing open')+'</span>'
-      + '</div>'
-      + (shown.length
-          ? '<div class="hs-row"><div class="hs-row-label">Due</div>'
-            + (hsView === 'list'
-                ? '<div class="hs-list">'+shown.map(hsRowHtml).join('')+'</div>'
-                : '<div class="hs-grid">'+shown.map(hsCardHtml).join('')+'</div>')
-            + '</div>'
+  /* Grouped by when, not by class.
+   *
+   * Class grouping is how the data is stored, not how the decision is made. With 28
+   * open items in one course, four of them landing on the same day, the cluster that
+   * matters is invisible inside a per-class list, and the class pills at the top
+   * already filter by class, so grouping by it as well spends the page's structure
+   * twice on one axis. Class survives as the dot and the code on every row.
+   */
+  var HS_BUCKETS = [
+    { key:'week',  label:'This week',      within:7 },
+    { key:'two',   label:'Next two weeks', within:21 },
+    { key:'later', label:'Later',          within:Infinity }
+  ];
+
+  function hsBucketOf(it){
+    if(!it.dueDate) return 'later';
+    var d = diffDaysFromToday(it.dueDate);
+    if(d <= 7) return 'week';
+    if(d <= 21) return 'two';
+    return 'later';
+  }
+
+  /** One row, carrying its class because the rows are no longer grouped by one. */
+  function hsDueRowHtml(it){
+    var c = classById(it.classId);
+    var col = classColor(it.classId) || 'var(--none)';
+    var st = statusOf(it);
+    var urgency = st==='overdue' ? 'overdue' : (st==='today' ? 'today' : '');
+    var done = (it.headstarts||[]).length;
+    return '<div class="hs-due-row" data-action="hs-open-item" data-id="'+it.id+'">'
+      + '<span class="dot" style="--c:'+col+'"></span>'
+      + '<span class="hs-due-class">'+escapeHtml(c ? (c.code || c.name || '') : '')+'</span>'
+      + '<span class="hs-due-title">'+escapeHtml(it.title||'Untitled')+'</span>'
+      + '<span class="type-badge">'+(TYPE_LABELS[it.type]||'Other')+'</span>'
+      + '<span class="due-label '+urgency+'">'+urgencyLabel(it.dueDate)+'</span>'
+      + (done ? '<span class="hs-done">'+iconSvg('check')+done+' saved</span>' : '')
+      + '<span class="hs-open">Open →</span>'
+      + '</div>';
+  }
+
+  function hsDueSectionsHtml(){
+    var open = hsOpenItems(hsClassId).slice().sort(function(a, b){
+      if(!a.dueDate) return 1;
+      if(!b.dueDate) return -1;
+      return a.dueDate < b.dueDate ? -1 : (a.dueDate > b.dueDate ? 1 : 0);
+    });
+    if(!open.length){
+      return '<div class="empty">Nothing open. Add an assignment, or import a syllabus.</div>';
+    }
+    var by = { week:[], two:[], later:[] };
+    open.forEach(function(it){ by[hsBucketOf(it)].push(it); });
+
+    return HS_BUCKETS.map(function(b){
+      var rows = by[b.key];
+      if(!rows.length) return '';
+      // "Later" is the long tail: counted and one click away rather than capped and
+      // silently cut, which is what used to happen to 22 of 28 items.
+      var collapsed = b.key === 'later' && !hsShowLater;
+      return '<section class="hs-bucket">'
+        + '<div class="hs-bucket-head">'
+        + '<h3>'+escapeHtml(b.label)+'</h3>'
+        + '<span class="hs-bucket-count">'+rows.length+'</span>'
+        + (b.key === 'later'
+            ? '<button type="button" class="hs-bucket-toggle" data-action="hs-toggle-later">'
+              + (hsShowLater ? 'Hide' : 'Show') + '</button>'
+            : '')
+        + '</div>'
+        + (collapsed ? '' : '<div class="hs-due-list">'+rows.map(hsDueRowHtml).join('')+'</div>')
+        + '</section>';
+    }).join('');
+  }
+
+  /** Every thread, across classes. One copy of the button, not one per course. */
+  function hsThreadsSectionHtml(){
+    var mine = hsClassId ? hsThreads.filter(function(t){ return t.classId===hsClassId; }) : hsThreads;
+    return '<section class="hs-bucket hs-threads-sec">'
+      + '<div class="hs-bucket-head"><h3>Threads</h3>'
+      + (mine.length ? '<span class="hs-bucket-count">'+mine.length+'</span>' : '')+'</div>'
+      + '<div class="hs-row-items">'
+      + '<button type="button" class="hs-study-btn primary-ish" data-action="hs-pick-thread-class">'
+        + iconSvg('plus')+'New thread</button>'
+      + mine.slice(0, 6).map(function(t){
+          return '<button type="button" class="hs-saved" data-action="hs-open-thread" data-id="'+t.id+'">'
+            + '<span class="dot" style="--c:'+(classColor(t.classId)||'var(--none)')+'"></span>'
+            + '<b>'+escapeHtml(t.title||'Thread')+'</b>'
+            + '<span class="hs-saved-sub">'+t.messageCount+' message'+(t.messageCount===1?'':'s')
+            + (t.lastMessageAt ? ' · '+relTimeAgo(t.lastMessageAt) : '')+'</span></button>';
+        }).join('')
+      + (mine.length > 6
+          ? '<button type="button" class="hs-study-btn" data-action="hs-all-threads" data-class="'
+            + (hsClassId||'') + '">'+(mine.length - 6)+' more</button>'
           : '')
-      + hsThreadRowHtml(c)
-      + hsStudyRowHtml(c)
-      + '</section>';
+      + (mine.length ? '' : '<span class="hs-row-hint">Ask Vesta about a course. It reads your '
+          + 'files and notes, and remembers the conversation.</span>')
+      + '</div></section>';
+  }
+
+  function hsStudySectionHtml(){
+    var decks = hsClassId ? hsDecks.filter(function(d){ return d.classId===hsClassId; }) : hsDecks;
+    var quizzes = hsClassId ? hsQuizzes.filter(function(q){ return q.classId===hsClassId; }) : hsQuizzes;
+    return '<section class="hs-bucket">'
+      + '<div class="hs-bucket-head"><h3>Study</h3></div>'
+      + '<div class="hs-row-items">'
+      + '<button type="button" class="hs-study-btn" data-action="hs-pick-study-class" data-mode="cards">'
+        + iconSvg('notes')+'Make flashcards</button>'
+      + '<button type="button" class="hs-study-btn" data-action="hs-pick-study-class" data-mode="quiz">'
+        + iconSvg('check')+'Quiz me</button>'
+      + decks.slice(0,4).map(function(d){
+          return '<button type="button" class="hs-saved" data-action="hs-open-deck" data-id="'+d.id+'">'
+            + '<span class="dot" style="--c:'+(classColor(d.classId)||'var(--none)')+'"></span>'
+            + '<b>'+escapeHtml(d.name||'Deck')+'</b>'
+            + '<span class="hs-saved-sub">'+d.cardCount+' card'+(d.cardCount===1?'':'s')
+            + (d.dueCount ? ' · '+d.dueCount+' due' : '')+'</span></button>';
+        }).join('')
+      + quizzes.slice(0,4).map(function(q){
+          return '<button type="button" class="hs-saved" data-action="hs-open-quiz" data-id="'+q.id+'">'
+            + '<span class="dot" style="--c:'+(classColor(q.classId)||'var(--none)')+'"></span>'
+            + '<b>'+escapeHtml(q.title||'Quiz')+'</b>'
+            + '<span class="hs-saved-sub">'+q.questionCount+' question'+(q.questionCount===1?'':'s')
+            + (q.bestScore!=null ? ' · best '+q.bestScore+'%' : '')+'</span></button>';
+        }).join('')
+      + '</div></section>';
   }
 
   function viewHeadstart(){
@@ -4660,12 +4801,13 @@
       return '<div class="empty">Add a class first. Headstart works from your own material, '
            + 'so it needs somewhere to read from.</div>';
     }
-    var list = hsClassId ? classes.filter(function(c){ return c.id===hsClassId; }) : hsClassOrder();
     // The page header already says what this is for, so the only chrome here is the
     // class filter and what the day has cost so far.
     return '<div class="hs-bar">' + hsClassPillsHtml()
-      + '<div class="hs-bar-right">' + hsViewToggleHtml() + hsSpendChipHtml() + '</div></div>'
-      + list.map(hsSectionHtml).join('');
+      + '<div class="hs-bar-right">' + hsSpendChipHtml() + '</div></div>'
+      + hsThreadsSectionHtml()
+      + hsDueSectionsHtml()
+      + hsStudySectionHtml();
   }
 
   // ---------------- Notes (global) ----------------
@@ -10628,10 +10770,28 @@
     if(!it) return;
     var existing = hsThreads.find(function(t){ return t.itemId === itemId; });
     if(existing){ openThread(existing.id); return; }
-    apiPost('/api/threads', { classId: it.classId, itemId: itemId,
-                              title: it.title || 'Untitled assignment' })
-      .then(function(th){ return hsLoadSide().then(function(){ openThread(th.id); }); })
-      .catch(reportError);
+    openDraftThread({ classId: it.classId, itemId: itemId,
+                      title: it.title || 'Untitled assignment' });
+  }
+
+  /** A thread that exists on screen but not yet in the database.
+   *
+   * Nothing is written until the first message, so looking at an assignment does not
+   * leave an empty thread behind it. `threadSend` promotes it on the way past.
+   */
+  function openDraftThread(seed){
+    closeModal();
+    TH = { id: null, draftThread: seed, loading: false, busy: false, confirm: null,
+           picking: false, ctx: null, srcOpen: false, draft: '',
+           data: { id: null, title: seed.title, classId: seed.classId, itemId: seed.itemId,
+                   messages: [], pinned: [], sources: [], selection: null } };
+    hsScreen = { kind: 'thread', id: null };
+    if(activeTab !== 'headstart'){ activeTab = 'headstart'; render(); }
+    renderThread();
+    if(seed.classId){
+      apiGet('/api/ai/context/'+seed.classId)
+        .then(function(ctx){ if(TH) TH.ctx = ctx; }).catch(function(){});
+    }
   }
 
   /** The whole page, given over to one conversation. */
@@ -10676,8 +10836,13 @@
       + '<h2>'+escapeHtml(d.title||'Thread')+'</h2>'
       + '<span class="type-badge">'+escapeHtml(classLabel(d.classId))+'</span></div>'
       + '<div class="th-screen-acts">'+hsSpendChipHtml()
-      + '<button type="button" class="btn" data-action="th-rename">Rename</button>'
-      + '<button type="button" class="btn ghost danger" data-action="th-delete">Delete</button></div>'
+      // A drafted thread has nothing to rename or delete yet: it is written the first
+      // time you say something, so both would be acting on a row that does not exist.
+      + (TH.id
+          ? '<button type="button" class="btn" data-action="th-rename">Rename</button>'
+            + '<button type="button" class="btn ghost danger" data-action="th-delete">Delete</button>'
+          : '<span class="th-draft-note">Saved when you send the first message</span>')
+      + '</div>'
       + '</div>'
       + (TH.picking ? '<div class="th-body-wrap">'+threadPickerHtml()+'</div>'
                     : '<div class="th-body-wrap">'+rail+main+'</div>')
@@ -10703,6 +10868,39 @@
             + '</div></div>';
         }).join('')
       + '</div></div>';
+  }
+
+  /** Ask which class, unless the answer is already obvious. */
+  function pickClassThen(preset, question, go){
+    if(preset){ go(preset); return; }
+    if(classes.length === 1){ go(classes[0].id); return; }
+    document.getElementById('modal-root').innerHTML =
+      '<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop">'
+      + '<div class="modal-head"><h2>'+escapeHtml(question)+'</h2></div>'
+      + '<div class="modal-body">'
+      + classes.map(function(c){
+          return '<button type="button" class="hs-saved" style="width:100%;margin-bottom:6px;"'
+            + ' data-action="hs-class-chosen" data-id="'+c.id+'">'
+            + '<span class="dot" style="--c:'+(c.color||'var(--none)')+'"></span>'
+            + '<b>'+escapeHtml(c.code || c.name || 'Class')+'</b>'
+            + '<span class="hs-saved-sub">'+escapeHtml(c.name||'')+'</span></button>';
+        }).join('')
+      + '</div>'
+      + '<div class="modal-foot"><span></span><div class="right">'
+      + '<button class="btn" data-action="modal-close">Cancel</button></div></div>'
+      + '</div></div>';
+    paintIcons();
+    pendingClassPick = go;
+  }
+  var pendingClassPick = null;
+
+  function startNamedThread(cid){
+    askForText('New thread', { label:'What is it about?', placeholder:'Discussions',
+                               confirmLabel:'Create' }).then(function(name){
+      if(name === null) return;
+      return apiPost('/api/threads', { classId: cid, title: (name||'').trim() || 'New thread' })
+        .then(function(th){ return hsLoadSide().then(function(){ openThread(th.id); }); });
+    }).catch(reportError);
   }
 
   /** Every thread in a class, for when the strip only had room for three. */
@@ -10735,6 +10933,26 @@
 
   function threadSend(toolKey, confirmed){
     if(!TH || TH.busy) return;
+    if(!TH.id && TH.draftThread){
+      // First thing said in a drafted thread: write the thread, then send into it.
+      var seed = TH.draftThread, ta0 = document.getElementById('th-draft');
+      if(ta0) TH.draft = ta0.value;
+      if(!toolKey && !(TH.draft||'').trim()) return;
+      TH.busy = true; renderThread();
+      apiPost('/api/threads', { classId: seed.classId, itemId: seed.itemId, title: seed.title })
+        .then(function(th){
+          if(!TH) return;
+          TH.id = th.id;
+          TH.draftThread = null;
+          TH.data.id = th.id;
+          hsScreen = { kind: 'thread', id: th.id };
+          TH.busy = false;
+          threadSend(toolKey, confirmed);
+          return hsLoadSide();
+        })
+        .catch(function(err){ if(TH){ TH.busy = false; renderThread(); } reportError(err); });
+      return;
+    }
     var ta = document.getElementById('th-draft');
     if(ta) TH.draft = ta.value;
     var text = (TH.draft||'').trim();
@@ -13121,6 +13339,29 @@
     // ---- threads ----
     if(action==='hs-open-thread'){ openThread(t.dataset.id); return; }
     if(action==='hs-home'){ hsScreen = null; TH = null; renderView(); paintIcons(); return; }
+    if(action==='hs-toggle-later'){ hsShowLater = !hsShowLater; renderView(); paintIcons(); return; }
+    // Threads and study tools are no longer inside a class block, so they have to ask
+    // which class they are for. With one class there is nothing to ask.
+    if(action==='hs-pick-thread-class'){
+      pickClassThen(hsClassId, 'Which class is this about?', function(cid){
+        startNamedThread(cid);
+      });
+      return;
+    }
+    if(action==='hs-pick-study-class'){
+      var mode = t.dataset.mode;
+      pickClassThen(hsClassId, 'Which class?', function(cid){
+        openHeadstartMaker(mode === 'quiz' ? 'quiz' : 'cards', { classId: cid });
+      });
+      return;
+    }
+    if(action==='hs-class-chosen'){
+      var chosen = t.dataset.id, go = pendingClassPick;
+      pendingClassPick = null;
+      closeModal();
+      if(go) go(chosen);
+      return;
+    }
     if(action==='hs-new-thread'){
       var ncid = t.dataset.class;
       askForText('New thread', { label:'What is it about?', placeholder:'Discussions',
