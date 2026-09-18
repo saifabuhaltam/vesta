@@ -578,8 +578,14 @@
   .hs-card-title{ font-size:13.5px; font-weight:650; line-height:1.35; }
   .hs-card-meta{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; font-size:11.5px; color:var(--text-muted); }
   .hs-card-foot{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:auto; padding-top:4px; }
+  /* A pill inside a flex row: without flex:none it gets shrunk below its own content
+     and "2 saved" wraps onto two lines, stacking inside the pill. The icon needs an
+     explicit size for the same reason every other icon in here does; unsized, it is
+     squeezed to whatever is left. */
   .hs-done{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700;
-    padding:3px 8px; border-radius:var(--r-pill); background:var(--success-soft); color:var(--success); }
+    padding:3px 8px; border-radius:var(--r-pill); background:var(--success-soft);
+    color:var(--success); flex:none; white-space:nowrap; }
+  .hs-done svg{ width:12px; height:12px; flex:none; }
   .hs-open{ font-size:11.5px; font-weight:650; color:var(--accent); }
 
   .hs-study{ display:flex; gap:9px; flex-wrap:wrap; align-items:stretch; margin-top:12px; }
