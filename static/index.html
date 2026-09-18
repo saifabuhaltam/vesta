@@ -1806,6 +1806,58 @@
     .hs-due-title{ flex-basis:100%; order:-1; white-space:normal; }
   }
 
+  /* ---------- Study ---------- */
+  .study-summary{ font-size:13.5px; color:var(--text-muted); }
+  .study-summary b{ color:var(--text); font-weight:700; }
+  .set-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(232px, 1fr)); gap:12px; }
+  .set-card{ display:flex; flex-direction:column; gap:3px; align-items:flex-start; text-align:left;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    padding:14px 16px; cursor:pointer; font:inherit; box-shadow:var(--shadow-card); }
+  .set-card:hover{ border-color:var(--accent); }
+  .set-card-class{ font-size:11px; font-weight:700; color:var(--text-faint);
+    text-transform:uppercase; letter-spacing:.04em; }
+  .set-card-name{ font-size:14.5px; font-weight:650; color:var(--text); }
+  .set-card-meta{ font-size:12px; color:var(--text-faint); }
+  .set-card-meta b{ color:var(--accent-ink); font-weight:700; }
+  .set-card .dot{ margin-bottom:4px; }
+
+  .set-screen{ display:flex; flex-direction:column; gap:16px; }
+  /* Three ways into the same terms, side by side, so it is obvious they are modes
+     rather than three different things you have to create. */
+  .set-modes{ display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:10px; }
+  .set-mode{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; text-align:left;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    padding:14px 16px; cursor:pointer; font:inherit; }
+  .set-mode:hover{ border-color:var(--accent); background:var(--accent-soft); }
+  .set-mode svg{ width:20px; height:20px; color:var(--accent); margin-bottom:6px; }
+  .set-mode b{ font-size:14px; font-weight:650; color:var(--text); }
+  .set-mode span{ font-size:12.5px; color:var(--text-faint); }
+  .set-mode.is-soon{ opacity:.72; }
+  .set-mode.is-soon svg{ color:var(--text-faint); }
+
+  .set-terms-head{ display:flex; align-items:center; gap:9px; margin-bottom:10px; }
+  .set-terms-head h3{ font-size:14px; font-weight:700; }
+  .set-term-list{ display:flex; flex-direction:column; gap:4px; }
+  /* Term and definition in two columns, the way a set reads on paper. */
+  .set-term{ display:grid; grid-template-columns:minmax(140px, 1fr) 2fr auto auto auto;
+    align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r-md); padding:10px 14px; }
+  .set-term-front{ font-size:13.5px; font-weight:650; color:var(--text); }
+  .set-term-back{ font-size:13px; color:var(--text-muted); }
+  .set-term-due{ font-size:11.5px; color:var(--text-faint); white-space:nowrap; }
+  /* Row actions stay quiet until the row is pointed at. A red Delete on every one of
+     27 terms makes the destructive action the loudest thing on a study screen, which
+     is the wall of red the old deck modal had. */
+  .set-term .btn{ opacity:0; transition:opacity .12s ease; }
+  .set-term:hover .btn, .set-term:focus-within .btn{ opacity:1; }
+  @media (hover:none){ .set-term .btn{ opacity:1; } }
+  .set-mode-body{ background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r-card); padding:20px; }
+  @media (max-width:720px){
+    .set-term{ grid-template-columns:1fr auto; }
+    .set-term-back{ grid-column:1 / -1; }
+  }
+
   /* ---------- The thread screen ---------- */
   /* A conversation is the work, so it gets the page. The rail keeps the other threads
      in the class one click away, which is what stops a full screen feeling like a
@@ -2299,6 +2351,7 @@
       <button class="tab-btn" data-action="switch-tab" data-tab="files"><span class="ic" data-icon="files"></span><span class="lbl">Files</span></button>
       <div class="side-divider" role="separator"></div>
       <button class="tab-btn" data-action="switch-tab" data-tab="headstart"><span class="ic" data-icon="zap"></span><span class="lbl">Headstart</span></button>
+      <button class="tab-btn" data-action="switch-tab" data-tab="study"><span class="ic" data-icon="cards"></span><span class="lbl">Study</span></button>
       <button class="tab-btn" data-action="switch-tab" data-tab="focus"><span class="ic" data-icon="focus"></span><span class="lbl">Focus</span></button>
     </nav>
     <div class="side-stats" id="side-stats"></div>
@@ -2397,6 +2450,8 @@
     upload: '<path d="M12 16V4.6"/><path d="m7.6 9 4.4-4.4L16.4 9"/><path d="M4.5 15.5V19a1.5 1.5 0 0 0 1.5 1.5h12A1.5 1.5 0 0 0 19.5 19v-3.5"/>',
     chart: '<path d="M3.2 20.4h17.6"/><path d="M6.6 20.4v-5.8M11.6 20.4V6.6M16.6 20.4v-8.8"/>',
     alert: '<path d="M12 4.2 2.8 20h18.4L12 4.2Z"/><path d="M12 10v4.2"/><path d="M12 17.4h.01"/>',
+    cards: '<rect x="3" y="7.4" width="13" height="13" rx="2.4"/>'
+         + '<path d="M7.6 7.4V5.8a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1.6"/>',
     info: '<circle cx="12" cy="12" r="8.8"/><path d="M12 11.2v5"/><path d="M12 7.9h.01"/>'
   };
   function iconSvg(name){
@@ -3707,6 +3762,7 @@
       classes:['Classes','Your courses and everything attached to them.'],
       assignments:['Assignments','All your assignments, deadlines, and exams.'],
       headstart:['Headstart','Get ahead on what\'s coming up.'],
+      study:['Study','Flashcards and practice, built from your own terms.'],
       notes:['Notes','Every note across your classes, in one place.'],
       files:['Files','Store and organize your course materials, notes, and resources.'],
       grades:['Grades','Track your academic progress across all courses.'],
@@ -3733,6 +3789,7 @@
     else if(activeTab==='classes') view.innerHTML = viewClasses();
     else if(activeTab==='calendar') view.innerHTML = viewCalendar();
     else if(activeTab==='headstart') view.innerHTML = viewHeadstart();
+    else if(activeTab==='study') view.innerHTML = viewStudy();
     else if(activeTab==='notes') view.innerHTML = viewNotesPage();
     else if(activeTab==='files') view.innerHTML = viewFilesPage();
     else if(activeTab==='grades') view.innerHTML = viewGradesPage();
@@ -4541,7 +4598,9 @@
       hsQuizzes = r[2] || [];
       hsThreads = r[3] || [];
       hsSideLoaded = true;
-      if(activeTab==='headstart'){ renderView(); paintIcons(); }
+      // Study reads the same sets, so it needs the repaint too; without it the section
+      // renders its empty state once and never corrects itself.
+      if(activeTab==='headstart' || activeTab==='study'){ renderView(); paintIcons(); }
     });
   }
 
@@ -4767,33 +4826,6 @@
       + '</div></section>';
   }
 
-  function hsStudySectionHtml(){
-    var decks = hsClassId ? hsDecks.filter(function(d){ return d.classId===hsClassId; }) : hsDecks;
-    var quizzes = hsClassId ? hsQuizzes.filter(function(q){ return q.classId===hsClassId; }) : hsQuizzes;
-    return '<section class="hs-bucket">'
-      + '<div class="hs-bucket-head"><h3>Study</h3></div>'
-      + '<div class="hs-row-items">'
-      + '<button type="button" class="hs-study-btn" data-action="hs-pick-study-class" data-mode="cards">'
-        + iconSvg('notes')+'Make flashcards</button>'
-      + '<button type="button" class="hs-study-btn" data-action="hs-pick-study-class" data-mode="quiz">'
-        + iconSvg('check')+'Quiz me</button>'
-      + decks.slice(0,4).map(function(d){
-          return '<button type="button" class="hs-saved" data-action="hs-open-deck" data-id="'+d.id+'">'
-            + '<span class="dot" style="--c:'+(classColor(d.classId)||'var(--none)')+'"></span>'
-            + '<b>'+escapeHtml(d.name||'Deck')+'</b>'
-            + '<span class="hs-saved-sub">'+d.cardCount+' card'+(d.cardCount===1?'':'s')
-            + (d.dueCount ? ' · '+d.dueCount+' due' : '')+'</span></button>';
-        }).join('')
-      + quizzes.slice(0,4).map(function(q){
-          return '<button type="button" class="hs-saved" data-action="hs-open-quiz" data-id="'+q.id+'">'
-            + '<span class="dot" style="--c:'+(classColor(q.classId)||'var(--none)')+'"></span>'
-            + '<b>'+escapeHtml(q.title||'Quiz')+'</b>'
-            + '<span class="hs-saved-sub">'+q.questionCount+' question'+(q.questionCount===1?'':'s')
-            + (q.bestScore!=null ? ' · best '+q.bestScore+'%' : '')+'</span></button>';
-        }).join('')
-      + '</div></section>';
-  }
-
   function viewHeadstart(){
     if(!hsSideLoaded) hsLoadSide();
     // Working on something takes over the page. Browsing and working were both
@@ -4809,8 +4841,120 @@
     return '<div class="hs-bar">' + hsClassPillsHtml()
       + '<div class="hs-bar-right">' + hsSpendChipHtml() + '</div></div>'
       + hsThreadsSectionHtml()
-      + hsDueSectionsHtml()
-      + hsStudySectionHtml();
+      + hsDueSectionsHtml();
+  }
+
+  // ---------------- Study ----------------
+  // Its own section, because drilling and talking to your material are different
+  // activities with different session shapes. A set is just terms; Flashcards, Learn
+  // and Test are three ways to study the same set rather than three things you make.
+
+  var studyScreen = null;    // null is the list of sets; {kind:'set', id} is one of them
+
+  function studySets(){
+    return hsDecks.slice().sort(function(a, b){
+      return (b.dueCount||0) - (a.dueCount||0);
+    });
+  }
+
+  function viewStudy(){
+    if(!hsSideLoaded) hsLoadSide();
+    if(studyScreen && studyScreen.kind === 'set') return setScreenHtml();
+    var sets = studySets();
+    if(!sets.length){
+      return '<div class="empty">No sets yet. Make one from a class\'s material in '
+           + 'Headstart, or start an empty set here.'
+           + '<div style="margin-top:14px;">'
+           + '<button type="button" class="btn" data-action="study-generate">Build from my material</button> '
+           + '<button type="button" class="btn primary" data-action="study-new-set">New set</button>'
+           + '</div></div>';
+    }
+    var due = sets.reduce(function(t, d){ return t + (d.dueCount||0); }, 0);
+    return '<div class="hs-bar">'
+      + '<div class="study-summary">'
+      + (due ? '<b>'+due+'</b> card'+(due===1?'':'s')+' ready to review'
+             : 'Nothing due right now. Everything is scheduled ahead.')
+      + '</div>'
+      + '<div class="hs-bar-right">'
+      + '<button type="button" class="btn" data-action="study-generate">Build from my material</button>'
+      + '<button type="button" class="btn primary" data-action="study-new-set">New set</button>'
+      + '</div></div>'
+      + '<div class="set-grid">'
+      + sets.map(function(d){
+          var c = classById(d.classId);
+          return '<button type="button" class="set-card" data-action="study-open-set" data-id="'+d.id+'">'
+            + '<span class="dot" style="--c:'+(classColor(d.classId)||'var(--none)')+'"></span>'
+            + '<span class="set-card-class">'+escapeHtml(c ? (c.code||c.name||'') : 'No class')+'</span>'
+            + '<span class="set-card-name">'+escapeHtml(d.name||'Untitled set')+'</span>'
+            + '<span class="set-card-meta">'+d.cardCount+' term'+(d.cardCount===1?'':'s')
+            + (d.dueCount ? ' · <b>'+d.dueCount+' due</b>' : '')+'</span>'
+            + '</button>';
+        }).join('')
+      + '</div>';
+  }
+
+  /** One set: the modes across the top, the terms underneath. */
+  function setScreenHtml(){
+    if(!FC || !FC.deck){
+      return '<div class="th-screen"><div class="hs-thinking"><i></i>Opening the set…</div></div>';
+    }
+    var d = FC.deck;
+    var c = classById(d.classId);
+    var today = todayIso();
+    var due = (d.cards||[]).filter(function(x){ return !x.suspended && (!x.due || x.due <= today); }).length;
+
+    if(FC.mode === 'review'){
+      return '<div class="set-screen">'
+        + setHeadHtml(d, c, due)
+        + '<div class="set-mode-body">'+fcReviewHtml()+'</div>'
+        + '</div>';
+    }
+    return '<div class="set-screen">'
+      + setHeadHtml(d, c, due)
+      + '<div class="set-modes">'
+      + '<button type="button" class="set-mode" data-action="fc-review">'
+        + iconSvg('cards')+'<b>Flashcards</b><span>Flip through them and grade yourself.</span></button>'
+      + '<button type="button" class="set-mode is-soon" data-action="study-soon" data-mode="Learn">'
+        + iconSvg('check')+'<b>Learn</b><span>Multiple choice built from these terms.</span></button>'
+      + '<button type="button" class="set-mode is-soon" data-action="study-soon" data-mode="Test">'
+        + iconSvg('assignments')+'<b>Test</b><span>A scored run through the whole set.</span></button>'
+      + '</div>'
+      + '<div class="set-terms">'
+      + '<div class="set-terms-head"><h3>Terms in this set</h3>'
+      + '<span class="hs-bucket-count">'+(d.cards||[]).length+'</span>'
+      + '<button type="button" class="btn" style="margin-left:auto;" data-action="fc-add">Add a term</button></div>'
+      + ((d.cards||[]).length
+          ? '<div class="set-term-list">'+(d.cards||[]).map(setTermRowHtml).join('')+'</div>'
+          : '<div class="empty">This set is empty. Add a term to get going.</div>')
+      + '</div></div>';
+  }
+
+  function setHeadHtml(d, c, due){
+    return '<div class="th-screen-head">'
+      + '<button type="button" class="th-back" data-action="study-home">‹ Study</button>'
+      + '<div class="th-screen-title">'
+      + '<span class="dot" style="--c:'+(classColor(d.classId)||'var(--none)')+'"></span>'
+      + '<h2>'+escapeHtml(d.name||'Untitled set')+'</h2>'
+      + '<span class="type-badge">'+escapeHtml(c ? (c.code||c.name||'') : 'No class')+'</span>'
+      + (due ? '<span class="type-badge">'+due+' due</span>' : '')
+      + '</div>'
+      + '<div class="th-screen-acts">'
+      + (FC.mode === 'review'
+          ? '<button type="button" class="btn" data-action="fc-list">Back to the set</button>'
+          : '<button type="button" class="btn ghost danger" data-action="fc-delete-deck" data-id="'+d.id+'">Delete set</button>')
+      + '</div></div>';
+  }
+
+  function setTermRowHtml(card){
+    var today = todayIso();
+    var when = (!card.due || card.due <= today) ? 'due now' : relTimeAgo(card.due);
+    return '<div class="set-term">'
+      + '<div class="set-term-front">'+escapeHtml(card.front||'')+'</div>'
+      + '<div class="set-term-back">'+escapeHtml(card.back||'')+'</div>'
+      + '<span class="set-term-due">'+escapeHtml(when)+'</span>'
+      + '<button type="button" class="btn ghost" data-action="fc-edit" data-id="'+card.id+'">Edit</button>'
+      + '<button type="button" class="btn ghost danger" data-action="fc-delete" data-id="'+card.id+'">Delete</button>'
+      + '</div>';
   }
 
   // ---------------- Notes (global) ----------------
@@ -10509,6 +10653,11 @@
 
   function renderDeck(){
     if(!FC) return;
+    if(activeTab === 'study' && studyScreen && studyScreen.kind === 'set'){
+      renderView();
+      paintIcons();
+      return;
+    }
     var today = new Date().toISOString().slice(0,10);
     var due = FC.deck.cards.filter(function(c){ return !c.suspended && (!c.due || c.due <= today); }).length;
     paintModal(
@@ -10614,6 +10763,19 @@
   // starting from nothing. The tools still exist here, as one-click ways to open.
 
   var TH = null;   // the open thread
+
+  /** Open a set in the Study section, as a screen rather than a panel. */
+  function openStudySet(did){
+    closeModal();
+    studyScreen = { kind: 'set', id: did };
+    if(activeTab !== 'study'){ activeTab = 'study'; render(); }
+    apiGet('/api/decks/'+did).then(function(deck){
+      FC = { deck: deck, mode: 'list', queue: [], at: 0, flipped: false, done: 0,
+             pick: FC_DEFAULT_PICK };
+      renderView();
+      paintIcons();
+    }).catch(function(err){ studyScreen = null; renderView(); reportError(err); });
+  }
 
   function openThread(tid){
     // Close first, then build: closeModal clears every open workspace including TH, so
@@ -12319,6 +12481,7 @@
     if(action==='toggle-sidebar'){ setSidebarCollapsed(!sidebarCollapsed); return; }
     if(action==='switch-tab'){
       if(t.dataset.tab !== 'headstart'){ hsScreen = null; TH = null; }
+      if(t.dataset.tab !== 'study'){ studyScreen = null; }
       activeTab = t.dataset.tab; render(); return;
     }
     if(action==='set-theme'){ setTheme(t.dataset.themeChoice); return; }
@@ -13518,7 +13681,32 @@
     }
 
     // ---- flashcards ----
-    if(action==='hs-open-deck'){ hsBackItemId = null; openDeck(t.dataset.id); return; }
+    if(action==='hs-open-deck'){ hsBackItemId = null; openStudySet(t.dataset.id); return; }
+    if(action==='study-open-set'){ openStudySet(t.dataset.id); return; }
+    if(action==='study-home'){ studyScreen = null; FC = null; renderView(); paintIcons(); return; }
+    if(action==='study-soon'){
+      notify(t.dataset.mode + ' is next',
+             'Flashcards works now. ' + t.dataset.mode + ' is the next thing being built, '
+             + 'and it will run off these same terms.');
+      return;
+    }
+    if(action==='study-generate'){
+      pickClassThen(null, 'Build a set from which class?', function(cid){
+        openHeadstartMaker('cards', { classId: cid });
+      });
+      return;
+    }
+    if(action==='study-new-set'){
+      pickClassThen(null, 'Which class is this set for?', function(cid){
+        askForText('New set', { label:'Name', placeholder:'Propositional logic',
+                                confirmLabel:'Create' }).then(function(nm){
+          if(nm === null) return;
+          return apiPost('/api/decks', { classId: cid, name: (nm||'').trim() || 'Untitled set' })
+            .then(function(d){ return hsLoadSide().then(function(){ openStudySet(d.id); }); });
+        }).catch(reportError);
+      });
+      return;
+    }
     if(action==='fc-review'){ fcStartReview(); return; }
     if(action==='fc-list'){ FC.mode = 'list'; renderDeck(); return; }
     if(action==='fc-flip'){ FC.flipped = !FC.flipped; FC.pick = FC_DEFAULT_PICK; renderDeck(); return; }
