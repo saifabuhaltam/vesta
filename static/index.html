@@ -1873,20 +1873,23 @@
      turns are accent-tinted and sit right, Vesta's are a plain surface and sit left. */
   .th-modal{ max-width:760px; }
   .th-body{ max-height:70vh; display:flex; flex-direction:column; gap:0; padding-bottom:0; }
-  .th-srcbar{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; padding:8px 12px;
+  .th-srcbar{ display:flex; flex-direction:column; gap:8px; padding:8px 12px;
     background:var(--surface-2); border-radius:var(--r-md); margin-bottom:12px; font-size:12px; }
+  .th-srchead{ display:flex; align-items:center; gap:9px; }
   /* The list of sources is reference material, not the conversation, so it stays one
      line until asked for. Hover opens it; click pins it open, which is what makes it
      reachable on a touchscreen and from the keyboard. */
-  .th-srcbar .th-srcfull{ display:none; width:100%; }
+  .th-srcbar .th-srcfull{ display:none; }
   .th-srcbar:hover .th-srcfull,
   .th-srcbar:focus-within .th-srcfull,
   .th-srcbar.th-open .th-srcfull{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-  .th-srcbar:hover .th-srcsummary,
-  .th-srcbar:focus-within .th-srcsummary,
-  .th-srcbar.th-open .th-srcsummary{ display:none; }
   .th-srcsummary{ flex:1; min-width:0; color:var(--text-faint); overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; }
+  /* The summary is what collapses, not the row: hiding it would let the buttons slide
+     left the moment the list opens, which is the same problem in the other direction. */
+  .th-srcbar:hover .th-srcsummary,
+  .th-srcbar:focus-within .th-srcsummary,
+  .th-srcbar.th-open .th-srcsummary{ visibility:hidden; }
   .th-srctoggle{ border:none; background:transparent; color:var(--text-faint); cursor:pointer;
     font:inherit; font-size:11px; padding:2px 6px; border-radius:6px; }
   .th-srctoggle:hover{ color:var(--text); background:var(--surface); }
@@ -5738,6 +5741,45 @@
   }
 
   // ---------------- Modals ----------------
+  /** Repaint a modal without losing the reader's place.
+   *
+   * `innerHTML = ...` destroys the scrolling elements, so their scrollTop goes with
+   * them, and the caret goes too. Reading a layout property before restoring forces
+   * the reflow that innerHTML defers; without it the element is not scrollable yet
+   * and the assignment silently clamps to 0.
+   */
+  function paintModal(html){
+    var root = document.getElementById('modal-root');
+    var oldBody = root.querySelector('.modal-body');
+    var oldOverlay = root.querySelector('.overlay');
+    var keepBody = oldBody ? oldBody.scrollTop : 0;
+    var keepOverlay = oldOverlay ? oldOverlay.scrollTop : 0;
+    var act = document.activeElement;
+    var keepFocus = (act && act.dataset && act.dataset.action)
+      ? { action: act.dataset.action, id: act.dataset.id || '',
+          start: (typeof act.selectionStart === 'number') ? act.selectionStart : null,
+          end: (typeof act.selectionEnd === 'number') ? act.selectionEnd : null }
+      : null;
+
+    root.innerHTML = html;
+
+    var body = root.querySelector('.modal-body');
+    if(body && keepBody){ void body.scrollHeight; body.scrollTop = keepBody; }
+    var overlay = root.querySelector('.overlay');
+    if(overlay && keepOverlay){ void overlay.scrollHeight; overlay.scrollTop = keepOverlay; }
+    if(keepFocus){
+      var sel = '[data-action="'+keepFocus.action+'"]'
+              + (keepFocus.id ? '[data-id="'+keepFocus.id+'"]' : '');
+      var back = root.querySelector(sel);
+      if(back){
+        back.focus();
+        if(keepFocus.start != null && back.setSelectionRange){
+          try{ back.setSelectionRange(keepFocus.start, keepFocus.end); }catch(e){}
+        }
+      }
+    }
+  }
+
   function closeModal(){
     if(SI && SI.returnAfterSettings){
       SI.returnAfterSettings = false;
@@ -10469,7 +10511,7 @@
     if(!FC) return;
     var today = new Date().toISOString().slice(0,10);
     var due = FC.deck.cards.filter(function(c){ return !c.suspended && (!c.due || c.due <= today); }).length;
-    document.getElementById('modal-root').innerHTML =
+    paintModal(
       '<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide" data-action="modal-stop">'
       + '<div class="modal-head"><h2>'+escapeHtml(FC.deck.name||'Deck')+'</h2>'
       + '<div class="row-meta" style="margin-top:6px;">'
@@ -10490,7 +10532,7 @@
           : '<button class="btn" data-action="fc-add">Add a card</button>'
             + '<button class="btn primary" data-action="fc-review">Review'+(due?' '+due:'')+'</button>')
       + '<button class="btn" data-action="modal-close">Close</button></div></div>'
-      + '</div></div>';
+      + '</div></div>');
   }
 
   // The four grade buttons, left to right, so the arrow keys and the number keys
@@ -10639,8 +10681,13 @@
         + (unreadable ? ' · ' + unreadable + ' unreadable' : '')
       : 'Nothing pinned yet';
     return '<div class="th-srcbar'+(TH.srcOpen?' th-open':'')+'">'
+      + '<div class="th-srchead">'
       + '<span class="th-srclabel">Reads</span>'
       + '<span class="th-srcsummary">'+escapeHtml(summary)+'</span>'
+      + '<button type="button" class="th-srctoggle" data-action="th-src-open">'
+      + (TH.srcOpen ? 'Hide' : 'Show') + '</button>'
+      + '<button type="button" class="btn ghost" data-action="th-pick">Change</button>'
+      + '</div>'
       + '<span class="th-srcfull">'
       + (pinned.length
           ? pinned.map(function(s){
@@ -10658,9 +10705,6 @@
             + ' Scanned PDFs and images have no text layer.</span>'
           : '')
       + '</span>'
-      + '<button type="button" class="th-srctoggle" data-action="th-src-open">'
-      + (TH.srcOpen ? 'Hide' : 'Show') + '</button>'
-      + '<button type="button" class="btn ghost" data-action="th-pick">Change</button>'
       + '</div>';
   }
 
