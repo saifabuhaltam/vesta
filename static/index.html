@@ -697,17 +697,39 @@
     color:var(--text-muted); padding:5px 0; }
 
   /* ---------- Flashcards ---------- */
-  .fc-stage{ display:flex; flex-direction:column; align-items:center; gap:16px; padding:10px 0 4px; }
+  .fc-stage{ display:flex; flex-direction:column; align-items:center; gap:16px; padding:10px 0 4px;
+    /* without a perspective the rotation reads as a flat mirror rather than a turn */
+    perspective:1400px; }
   .fc-card{
-    width:100%; max-width:540px; min-height:210px; border-radius:20px; border:1px solid var(--border);
-    background:var(--surface); box-shadow:var(--shadow-card); padding:30px 32px; cursor:pointer;
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
-    text-align:center; font-size:17px; line-height:1.45;
+    position:relative; width:100%; max-width:540px; min-height:210px; cursor:pointer;
+    transform-style:preserve-3d; transition:transform .42s cubic-bezier(.2,.7,.3,1);
   }
-  .fc-card:hover{ border-color:var(--accent); }
+  .fc-stage.is-flipped .fc-card{ transform:rotateY(180deg); }
+  .fc-card:focus-visible{ outline:2px solid var(--accent); outline-offset:4px; border-radius:20px; }
+  /* Both faces are always in the DOM; the back is pre-turned so it reads the right way
+     round once the card has rotated. */
+  .fc-face{
+    position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    border-radius:20px; border:1px solid var(--border); background:var(--surface);
+    box-shadow:var(--shadow-card); padding:30px 32px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    text-align:center; font-size:17px; line-height:1.45; overflow:auto;
+  }
+  .fc-back-face{ transform:rotateY(180deg); }
+  .fc-card:hover .fc-face{ border-color:var(--accent); }
   .fc-side{ font-size:10.5px; font-weight:700; color:var(--text-faint); }
-  .fc-back{ font-size:14.5px; line-height:1.6; border-top:1px solid var(--border);
-    padding-top:14px; width:100%; color:var(--text-muted); }
+  .fc-back-text{ font-size:15.5px; line-height:1.6; color:var(--text-muted); }
+  /* The grade row is present from the start so the flip does not reflow the page
+     under the pointer; it simply becomes usable once the answer is showing. */
+  .fc-grade{ opacity:0; pointer-events:none; transition:opacity .2s ease .18s; }
+  .fc-stage.is-flipped .fc-grade{ opacity:1; pointer-events:auto; }
+  .fc-hint-back{ display:none; }
+  .fc-stage.is-flipped .fc-hint-front{ display:none; }
+  .fc-stage.is-flipped .fc-hint-back{ display:block; }
+  @media (prefers-reduced-motion: reduce){
+    .fc-card{ transition:none; }
+    .fc-grade{ transition:none; }
+  }
   .fc-grade{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
   /* which grade the keyboard would commit; shown so the arrow keys are not invisible */
   .fc-grade .btn{ display:inline-flex; align-items:center; gap:7px; }
@@ -10609,15 +10631,19 @@
         + '<div class="qz-sub">card'+(FC.done===1?'':'s')+' reviewed. Come back when the next ones are due.</div>'
         + '<div style="margin-top:16px;"><button type="button" class="btn" data-action="fc-list">Back to the deck</button></div></div>';
     }
-    return '<div class="fc-stage">'
+    var label = card.kind==='question' ? 'Question' : (card.kind==='concept' ? 'Concept' : 'Term');
+    return '<div class="fc-stage'+(FC.flipped?' is-flipped':'')+'" id="fc-stage">'
       + '<div class="qz-progress">'+(FC.at+1)+' of '+FC.queue.length+'</div>'
-      + '<div class="fc-card" data-action="fc-flip">'
-      + '<div class="fc-side">'+escapeHtml(card.kind==='question'?'Question':card.kind==='concept'?'Concept':'Term')+'</div>'
-      + '<div>'+escapeHtml(card.front||'')+'</div>'
-      + (FC.flipped ? '<div class="fc-back">'+escapeHtml(card.back||'')+'</div>' : '')
+      + '<div class="fc-card" data-action="fc-flip" tabindex="0" role="button"'
+      + ' aria-label="Show the answer">'
+      + '<div class="fc-face fc-front">'
+      + '<div class="fc-side">'+escapeHtml(label)+'</div>'
+      + '<div>'+escapeHtml(card.front||'')+'</div></div>'
+      + '<div class="fc-face fc-back-face">'
+      + '<div class="fc-side">Answer</div>'
+      + '<div class="fc-back-text">'+escapeHtml(card.back||'')+'</div></div>'
       + '</div>'
-      + (FC.flipped
-          ? '<div class="fc-grade">'
+      + '<div class="fc-grade">'
             + FC_GRADES.map(function(gr, i){
                 var picked = (typeof FC.pick === 'number' ? FC.pick : FC_DEFAULT_PICK) === i;
                 return '<button type="button" class="btn'
@@ -10626,10 +10652,31 @@
                   + '" data-action="fc-grade" data-g="'+gr.g+'">'
                   + escapeHtml(gr.label) + '<span class="fc-key">'+(i+1)+'</span></button>';
               }).join('')
-            + '</div>'
-            + '<div class="fc-hint">Arrow keys choose, space or enter confirms, 1-4 pick directly.</div>'
-          : '<div class="fc-hint">Click the card, or press space, to see the answer.</div>')
+      + '</div>'
+      + '<div class="fc-hint fc-hint-front">Click the card, or press space, to see the answer.</div>'
+      + '<div class="fc-hint fc-hint-back">Arrow keys choose, space or enter confirms, 1-4 pick directly.</div>'
       + '</div>';
+  }
+
+  /** Flip without re-rendering, so the card has something to animate between. */
+  function fcSetFlipped(on){
+    if(!FC) return;
+    FC.flipped = on;
+    FC.pick = FC_DEFAULT_PICK;
+    var stage = document.getElementById('fc-stage');
+    if(stage) stage.classList.toggle('is-flipped', on);
+    else renderDeck();
+    if(on) fcPaintPick();
+  }
+
+  /** Move the armed grade without rebuilding the card mid-flip. */
+  function fcPaintPick(){
+    var stage = document.getElementById('fc-stage');
+    if(!stage) return;
+    var pick = typeof FC.pick === 'number' ? FC.pick : FC_DEFAULT_PICK;
+    Array.prototype.forEach.call(stage.querySelectorAll('.fc-grade .btn'), function(b, i){
+      b.classList.toggle('fc-picked', i === pick);
+    });
   }
 
   function fcListHtml(){
@@ -10709,9 +10756,7 @@
       // Face down there is only one thing to do, so every obvious key does it.
       if(key === ' ' || key === 'Spacebar' || key === 'Enter' || key === 'ArrowRight' || key === 'ArrowDown'){
         e.preventDefault();
-        FC.flipped = true;
-        FC.pick = FC_DEFAULT_PICK;
-        renderDeck();
+        fcSetFlipped(true);
         return true;
       }
       return false;
@@ -10721,7 +10766,7 @@
       e.preventDefault();
       if(typeof FC.pick !== 'number') FC.pick = FC_DEFAULT_PICK;
       FC.pick = Math.max(0, Math.min(FC_GRADES.length - 1, FC.pick + (key === 'ArrowRight' ? 1 : -1)));
-      renderDeck();
+      fcPaintPick();
       return true;
     }
     if(key === ' ' || key === 'Spacebar' || key === 'Enter'){
@@ -13709,7 +13754,7 @@
     }
     if(action==='fc-review'){ fcStartReview(); return; }
     if(action==='fc-list'){ FC.mode = 'list'; renderDeck(); return; }
-    if(action==='fc-flip'){ FC.flipped = !FC.flipped; FC.pick = FC_DEFAULT_PICK; renderDeck(); return; }
+    if(action==='fc-flip'){ fcSetFlipped(!FC.flipped); return; }
     if(action==='fc-grade'){ fcGrade(parseInt(t.dataset.g,10)); return; }
     if(action==='fc-add'){
       askForFields('Add a card', [
@@ -13748,9 +13793,17 @@
       return;
     }
     if(action==='fc-delete-deck'){
-      confirmAction('Delete this deck?', 'Every card in it goes too.').then(function(ok){
-        if(ok) apiDelete('/api/decks/'+t.dataset.id).then(function(){ closeModal(); hsLoadSide(); }).catch(reportError);
-      });
+      confirmAction('Delete this set?', 'Every term in it goes too.').then(function(ok){
+        if(!ok) return;
+        return apiDelete('/api/decks/'+t.dataset.id).then(function(){
+          // In Study the set is a screen, not a modal: closeModal alone clears FC and
+          // leaves the page rendering "Opening the set…" for a set that no longer
+          // exists. Leave the screen as well as the modal.
+          studyScreen = null;
+          closeModal();
+          return hsLoadSide().then(function(){ renderView(); paintIcons(); });
+        });
+      }).catch(reportError);
       return;
     }
     if(action==='open-focus'){ openFocusOverlay(); return; }
