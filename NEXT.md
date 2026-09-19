@@ -931,6 +931,17 @@ Still modals, and the obvious next pass:
 - [ ] **Google Calendar sync**: written and tested, but its transport has never
       executed against Google. Decide whether to finish it or park it.
 - [ ] **Amend the bad commit message** on `7b5d88f`, which needs a force-push.
+- [ ] **Settings: account features in the mockup that do not exist yet.** The Settings
+      redesign (2026-09-18) follows `reference/settings inspo.png` but leaves out
+      delete account, two-factor sign-in, profile photo, and a list of other signed-in
+      devices, because none of them are built. Say which, if any, are worth building.
+- [ ] **Syllabus supplement: new items land with no category.** A document added later
+      to an existing class (2026-09-18) can add new assignments and fill blank dates,
+      but it never touches grading, so a brand-new item from a schedule-only document
+      arrives uncategorised. Add a category picker on new rows in the supplement review,
+      defaulting to an existing category whose name matches the item's type.
+- [ ] **Old headstarts vs threads.** The Study "saved" badge still counts the legacy
+      `headstarts` table. Decide: migrate those rows into threads, or repoint the badge.
 
 ## Documentation (deferred by Saif, 2026-09-13)
 

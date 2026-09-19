@@ -43,6 +43,10 @@ DEFAULTS = {
     # Appearance
     "theme": "light",
     "sidebarCollapsed": False,
+    # Grades and Focus can come off the sidebar to keep it short. The pages stay: they
+    # are still reached from search, the dashboard and Start Focus Session.
+    "sidebarShowGrades": True,
+    "sidebarShowFocus": True,
     # Calendar
     "calendarDefaultView": "month",
     "calendarDetail": "detailed",

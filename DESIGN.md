@@ -708,6 +708,28 @@ cannot be reassigned, `anon` granted nothing, and `allowed_emails` invisible to 
 client role). But the cloud schema is well behind the local app, so Google sync is being
 finished locally first rather than built twice against a moving target.
 
+### Settings
+
+The Sidebar card in Preferences can hide Grades and Focus from the nav. Only the button
+goes; the pages keep working and stay reachable from ⌘K search (every page is listed
+there), the dashboard's Current Average tile, and Start Focus Session.
+
+Follows `reference/settings inspo.png`: sections down the left, each with an icon and a
+one-line summary, and each section a stack of `.st-card` cards on `--bg`, so the window
+reads like the app (nav column beside content). The body has a fixed height so switching
+sections never makes the window jump. Card and grid classes are `.st-*`, not `.set-*`,
+because `.set-card` and `.set-grid` already belong to flashcard sets on the Study page.
+
+**Settings only holds what cannot be set anywhere else.** If a page has its own control
+for something (calendar view and detail, Files layout, Focus, Headstart spend, the
+sidebar's collapsed state), that control is where it lives and it remembers the choice
+itself. It does not get a second copy in Settings. Four sections: Account (profile,
+password, this device, export), Semester (terms, default grading scale), Preferences
+(theme, which optional pages the sidebar shows, note editor, notifications), Integrations (Google Calendar). The mockup's
+eleven tabs, 2FA, photo upload and delete account are left out: the tabs would be
+duplicates and the rest is not built, and a button for a missing feature is worse than
+no button.
+
 ## Class color palette
 
 Friendly, saturated, distinct hues (not muted "ink" tones) — this is what reads as "bubbly"

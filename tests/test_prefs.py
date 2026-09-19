@@ -133,3 +133,11 @@ def test_export_carries_the_rows_it_should(signed_in):
     body = signed_in.get("/api/export").get_json()
     keys = [r["key"] for r in body["tables"]["app_settings"]]
     assert "prefs" in keys
+
+
+def test_sidebar_pages_default_on_and_can_be_hidden(signed_in):
+    body = signed_in.get("/api/prefs").get_json()
+    assert body["sidebarShowGrades"] is True and body["sidebarShowFocus"] is True
+    body = signed_in.put("/api/prefs", json={"sidebarShowFocus": False}).get_json()
+    assert body["sidebarShowFocus"] is False
+    assert body["sidebarShowGrades"] is True           # untouched

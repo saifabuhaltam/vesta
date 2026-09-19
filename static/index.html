@@ -1013,6 +1013,8 @@
 
   /* ---------- Dashboard ---------- */
   .tiles.icon-tiles .tile{ display:flex; align-items:center; gap:14px; }
+  .tile-link{ cursor:pointer; transition:border-color .12s ease; }
+  .tile-link:hover{ border-color:var(--accent); }
   .tile-icon{
     width:42px; height:42px; border-radius:var(--r-md); flex:none; display:flex; align-items:center; justify-content:center;
     font-size:17px; background:var(--tint-bg, var(--surface-2)); color:var(--tint-fg, var(--text-muted));
@@ -2336,37 +2338,117 @@
     padding:10px 0 4px; border-bottom:1px solid var(--border); margin-bottom:6px; }
   .gpa-cume .gc-val{ font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; }
   .gpa-cume .gc-lbl{ font-size:12px; color:var(--text-muted); font-weight:600; }
-  /* ---- Settings: sections down the side, one pane at a time ---- */
-  .settings-modal{ max-width:920px; width:min(92vw,920px); }
-  .settings-body{ display:flex; min-height:420px; max-height:68vh; }
-  .set-nav{ flex:0 0 210px; border-right:1px solid var(--border); padding:12px 8px;
-            overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
-  .set-nav-btn{ text-align:left; padding:9px 11px; border-radius:9px; border:none;
-                background:transparent; cursor:pointer; font:inherit; font-size:13px;
-                color:var(--text); white-space:nowrap; }
+  /* ---- Settings: follows reference/settings inspo.png ----
+     Sections down the side with an icon and a one-line summary, and each section a
+     stack of cards on the page background, so the modal reads like the app itself:
+     a nav column beside a content area. The body has a fixed height so switching
+     sections never makes the window jump. */
+  .settings-modal{ max-width:1000px; width:min(94vw,1000px); overflow:hidden; }
+  .settings-body{ display:flex; height:min(680px, calc(100vh - 170px)); }
+  .set-nav{ flex:0 0 264px; border-right:1px solid var(--border); padding:22px 12px 14px;
+            overflow-y:auto; display:flex; flex-direction:column; gap:3px; }
+  .set-nav-head{ padding:0 10px 16px; }
+  .set-nav-head h2{ font-size:22px; font-weight:800; margin:0; }
+  .set-nav-head p{ font-size:13px; color:var(--text-muted); margin:4px 0 0; }
+  .set-nav-btn{ display:flex; align-items:flex-start; gap:12px; text-align:left; padding:11px 12px;
+                border-radius:12px; border:none; background:transparent; cursor:pointer; font:inherit;
+                color:var(--text); transition:background .12s ease; }
   .set-nav-btn:hover{ background:var(--surface-2); }
-  .set-nav-btn.active{ background:var(--accent-soft); color:var(--accent); font-weight:600; }
-  .set-pane{ flex:1 1 auto; padding:14px 18px 20px; overflow-y:auto; }
-  .set-pane h3{ margin:0 0 4px; font-size:16px; }
-  .set-pane .set-intro{ color:var(--text-muted); font-size:12px; margin:0 0 12px; }
+  .set-nav-btn.active{ background:var(--accent-soft); }
+  .set-nav-ic{ flex:none; width:20px; height:20px; margin-top:1px; color:var(--text-muted); }
+  .set-nav-ic svg{ width:20px; height:20px; }
+  .set-nav-btn.active .set-nav-ic, .set-nav-btn.active .set-nav-lbl{ color:var(--accent); }
+  .set-nav-lbl{ display:block; font-size:13.5px; font-weight:600; }
+  .set-nav-sub{ display:block; font-size:12px; color:var(--text-muted); margin-top:2px; line-height:1.35; }
+  .set-pane{ flex:1 1 auto; min-width:0; padding:24px 26px 28px; overflow-y:auto; background:var(--bg); }
+  .set-pane-head{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
+  .set-pane-head h3{ margin:0; font-size:22px; font-weight:800; }
+  .set-pane-head p{ color:var(--text-muted); font-size:13.5px; margin:4px 0 0; }
+  .set-avatar{ width:56px; height:56px; border-radius:50%; flex:none; display:flex; align-items:center;
+               justify-content:center; background:var(--accent-soft); color:var(--accent);
+               font-size:19px; font-weight:800; letter-spacing:.02em; }
+
+  .st-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+             box-shadow:var(--shadow-card); padding:18px 20px; }
+  .st-card + .st-card{ margin-top:14px; }
+  .st-card-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  .st-card-title{ font-size:15px; font-weight:700; }
+  .st-card-sub{ font-size:12.5px; color:var(--text-muted); margin-top:2px; }
+  .st-card-head:last-child{ margin-bottom:0; }
+  .st-card-head > .btn{ flex:none; white-space:nowrap; }
+  .set-sub{ font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+            color:var(--text-muted); margin:18px 0 8px; }
+
+  .st-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:14px; }
+  .set-field{ display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:var(--text); min-width:0; }
+  .set-field .hint{ font-weight:400; }
+  .set-input{ position:relative; }
+  .set-input input{ padding-right:38px; }
+  .set-input-btn{ position:absolute; right:4px; top:50%; transform:translateY(-50%); width:30px; height:30px;
+                  display:flex; align-items:center; justify-content:center; border:none; background:transparent;
+                  color:var(--text-faint); border-radius:8px; cursor:pointer; padding:0; }
+  .set-input-btn:hover{ color:var(--text); background:var(--surface-2); }
+  .set-input-btn svg, .set-input-lock svg{ width:16px; height:16px; }
+  .set-input-lock{ position:absolute; right:12px; top:50%; transform:translateY(-50%); color:var(--text-faint);
+                   display:flex; pointer-events:none; }
+  .set-input input[readonly]{ background:var(--surface-2); color:var(--text-muted); cursor:default; }
+  .set-actions{ display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  .set-msg{ margin-bottom:14px; }
+
   .set-row{ display:flex; align-items:center; justify-content:space-between; gap:18px;
-            padding:11px 0; border-bottom:1px solid var(--border); }
-  .set-row:last-child{ border-bottom:none; }
+            padding:12px 0; border-bottom:1px solid var(--border); }
+  .set-row:first-child{ padding-top:0; }
+  .set-row:last-child{ border-bottom:none; padding-bottom:0; }
   .set-label{ font-weight:600; font-size:13px; }
-  .set-help{ font-size:12px; color:var(--text-muted); margin-top:2px; max-width:46ch; }
+  .set-help{ font-size:12px; color:var(--text-muted); margin-top:2px; max-width:50ch; }
   .set-control{ flex:0 0 auto; display:flex; align-items:center; gap:8px; }
   .set-control input[type=number]{ width:84px; }
-  .set-control input[type=text], .set-control input[type=password]{ width:220px; }
-  .set-adv{ margin-top:16px; border-top:1px solid var(--border); padding-top:10px; }
-  .set-adv summary{ cursor:pointer; font-size:12px; color:var(--text-muted); }
-  .set-scale-row{ display:flex; gap:8px; align-items:center; margin-bottom:6px; }
-  .set-scale-row input[type=number]{ width:80px; }
-  .set-scale-row input[type=text]{ width:70px; }
+
+  /* A switch, built on the real checkbox so the change-to-save wiring stays as it was. */
+  input[type=checkbox].set-switch{ -webkit-appearance:none; appearance:none; margin:0; flex:none; cursor:pointer;
+    width:42px; height:24px; border-radius:var(--r-pill); background:var(--surface-3); position:relative;
+    transition:background .15s ease; }
+  input[type=checkbox].set-switch::after{ content:""; position:absolute; top:3px; left:3px; width:18px; height:18px;
+    border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(16,24,40,.25); transition:transform .15s ease; }
+  input[type=checkbox].set-switch:checked{ background:var(--accent); }
+  input[type=checkbox].set-switch:checked::after{ transform:translateX(18px); }
+  input[type=checkbox].set-switch:disabled{ opacity:.45; cursor:default; }
+
+  /* Theme picked from a small picture of each, rather than from two words. */
+  .set-themes{ display:grid; grid-template-columns:repeat(2, minmax(0, 170px)); gap:12px; }
+  .set-theme{ border:2px solid var(--border); border-radius:14px; padding:8px; background:var(--surface);
+              cursor:pointer; font:inherit; text-align:left; color:var(--text); }
+  .set-theme:hover{ border-color:var(--text-faint); }
+  .set-theme.active{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .set-theme-pic{ display:flex; gap:5px; height:64px; border-radius:9px; padding:6px; margin-bottom:8px; }
+  .set-theme-pic i{ display:block; border-radius:5px; }
+  .set-theme-pic .sb{ width:24%; }
+  .set-theme-pic .main{ flex:1; display:flex; flex-direction:column; gap:5px; }
+  .set-theme-pic .main i{ flex:1; }
+  .set-theme-pic.light{ background:#F4F5F7; } .set-theme-pic.light .sb{ background:#E7E8EC; }
+  .set-theme-pic.light .main i{ background:#FFFFFF; }
+  .set-theme-pic.dark{ background:#17171D; } .set-theme-pic.dark .sb{ background:#24252F; }
+  .set-theme-pic.dark .main i{ background:#1E1F27; }
+  .set-theme-lbl{ font-size:13px; font-weight:600; padding:0 2px 2px; }
+
+  .set-device{ display:flex; align-items:center; gap:14px; }
+  .set-device-ic{ width:38px; height:38px; border-radius:10px; background:var(--surface-2); color:var(--text-muted);
+                  display:flex; align-items:center; justify-content:center; flex:none; }
+  .set-device-ic svg{ width:19px; height:19px; }
+  .set-device-main{ flex:1; min-width:0; }
+  .set-device-name{ font-size:13.5px; font-weight:600; }
+  .set-device-meta{ font-size:12px; color:var(--success); margin-top:2px; }
+  .set-scale{ display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); column-gap:18px; }
   .nt-body{ font-size:var(--editor-font-size, 16px); }
   @media (max-width:720px){
-    .settings-body{ flex-direction:column; max-height:78vh; }
-    .set-nav{ flex:0 0 auto; flex-direction:row; overflow-x:auto;
+    .settings-body{ flex-direction:column; height:auto; max-height:calc(100vh - 150px); }
+    .set-nav{ flex:0 0 auto; flex-direction:row; overflow-x:auto; padding:12px;
               border-right:none; border-bottom:1px solid var(--border); }
+    .set-nav-head, .set-nav-sub{ display:none; }
+    .set-nav-btn{ align-items:center; gap:8px; white-space:nowrap; padding:9px 12px; }
+    .set-pane{ padding:18px 16px 22px; }
+    .set-pane-head h3{ font-size:19px; }
+    .set-avatar{ width:44px; height:44px; font-size:16px; }
     .set-row{ flex-direction:column; align-items:flex-start; gap:8px; }
   }
 </style>
@@ -2495,7 +2577,15 @@
     alert: '<path d="M12 4.2 2.8 20h18.4L12 4.2Z"/><path d="M12 10v4.2"/><path d="M12 17.4h.01"/>',
     cards: '<rect x="3" y="7.4" width="13" height="13" rx="2.4"/>'
          + '<path d="M7.6 7.4V5.8a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1.6"/>',
-    info: '<circle cx="12" cy="12" r="8.8"/><path d="M12 11.2v5"/><path d="M12 7.9h.01"/>'
+    info: '<circle cx="12" cy="12" r="8.8"/><path d="M12 11.2v5"/><path d="M12 7.9h.01"/>',
+    user: '<circle cx="12" cy="8.2" r="3.9"/><path d="M4.6 20.2c.9-3.6 3.9-5.6 7.4-5.6s6.5 2 7.4 5.6"/>',
+    cap: '<path d="M12 4.6 2.6 9.2 12 13.8l9.4-4.6L12 4.6Z"/><path d="M6.4 11.2v4.6c1.4 1.5 3.4 2.3 5.6 2.3s4.2-.8 5.6-2.3v-4.6"/><path d="M21.4 9.2v5"/>',
+    sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/>',
+    lock: '<rect x="5" y="10.6" width="14" height="10" rx="2.4"/><path d="M8.2 10.6V7.8a3.8 3.8 0 0 1 7.6 0v2.8"/>',
+    eye: '<path d="M2.6 12S6 5.6 12 5.6 21.4 12 21.4 12 18 18.4 12 18.4 2.6 12 2.6 12Z"/><circle cx="12" cy="12" r="2.8"/>',
+    eye_off: '<path d="M4 4l16 16"/><path d="M9.9 6a9.6 9.6 0 0 1 2.1-.4c6 0 9.4 6.4 9.4 6.4a16 16 0 0 1-2.8 3.5M6.4 7.6A16 16 0 0 0 2.6 12S6 18.4 12 18.4a9 9 0 0 0 4.2-1"/>',
+    laptop: '<rect x="4.4" y="5" width="15.2" height="10.6" rx="1.8"/><path d="M2.4 19h19.2"/>',
+    download: '<path d="M12 4.6V16"/><path d="m7.6 11.6 4.4 4.4 4.4-4.4"/><path d="M4.5 15.5V19a1.5 1.5 0 0 0 1.5 1.5h12A1.5 1.5 0 0 0 19.5 19v-3.5"/>'
   };
   function iconSvg(name){
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
@@ -3297,7 +3387,7 @@
     try{ localStorage.setItem(THEME_KEY, theme); }catch(e){}
     if(PREFS && PREFS.theme !== theme) savePrefs({ theme: theme });
     applyTheme(theme);
-    document.querySelectorAll('.seg-btn[data-action="set-theme"]').forEach(function(b){
+    document.querySelectorAll('[data-action="set-theme"]').forEach(function(b){
       b.classList.toggle('active', b.dataset.themeChoice===theme);
     });
   }
@@ -3341,6 +3431,18 @@
       DEFAULT_GRADE_SCALE = PREFS.defaultGradeScale;
     }
     applyEditorPrefs();
+    applySidebarPages();
+  }
+
+  // Grades and Focus can come off the sidebar to keep it short. Only the nav button
+  // goes: the pages still work, and are reached from search (⌘K), the dashboard's
+  // Current Average tile, and Start Focus Session.
+  var OPTIONAL_SIDEBAR_PAGES = { grades:'sidebarShowGrades', focus:'sidebarShowFocus' };
+  function applySidebarPages(){
+    Object.keys(OPTIONAL_SIDEBAR_PAGES).forEach(function(tab){
+      var btn = document.querySelector('#tabs .tab-btn[data-tab="'+tab+'"]');
+      if(btn) btn.style.display = PREFS[OPTIONAL_SIDEBAR_PAGES[tab]] === false ? 'none' : '';
+    });
   }
 
   // Opening settings: these say where a view *starts*, so they are read once. Applying
@@ -3868,7 +3970,7 @@
       + iconTile('assignments', 'var(--accent-soft)', 'var(--accent)', totalAssignments, 'Total Assignments')
       + iconTile('calendar', 'var(--accent-soft)', 'var(--accent)', week, 'Due This Week')
       + iconTile('check', 'var(--success-soft)', 'var(--success)', completedTotal, 'Completed')
-      + iconTile('chart', '#EFE9FE', '#7C5BD8', avg!=null?avg.toFixed(0)+'%':'—', 'Current Average')
+      + iconTile('chart', '#EFE9FE', '#7C5BD8', avg!=null?avg.toFixed(0)+'%':'—', 'Current Average', 'grades')
       + '</div>';
 
     html += '<div class="dash-row">' + focusHighlightHtml() + upcomingWeekCardHtml() + '</div>';
@@ -3877,8 +3979,11 @@
     return html;
   }
 
-  function iconTile(iconName, tintBg, tintFg, n, label){
-    return '<div class="tile"><div class="tile-icon" style="--tint-bg:'+tintBg+';--tint-fg:'+tintFg+';">'+iconSvg(iconName)+'</div>'
+  /** @param {string=} tab a page the tile opens when clicked */
+  function iconTile(iconName, tintBg, tintFg, n, label, tab){
+    return '<div class="tile'+(tab?' tile-link':'')+'"'
+      + (tab?' data-action="switch-tab" data-tab="'+tab+'" role="link" title="Open '+escapeHtml(label)+'"':'')+'>'
+      + '<div class="tile-icon" style="--tint-bg:'+tintBg+';--tint-fg:'+tintFg+';">'+iconSvg(iconName)+'</div>'
       + '<div><div class="n">'+n+'</div><div class="l">'+label+'</div></div></div>';
   }
 
@@ -9131,8 +9236,10 @@
 
   function googleSectionHtml(){
     var g = googleStatus;
-    var head = '<div class="detail-section" id="g-cal">'
-             + '<div class="file-cat-title">Google Calendar</div>';
+    var head = '<div class="st-card" id="g-cal"><div class="st-card-head"><div>'
+             + '<div class="st-card-title">Google Calendar</div>'
+             + '<div class="st-card-sub">'+(g && g.connected ? 'Connected.' : 'Your deadlines in Google, and the Google calendars you pick in Vesta.')+'</div>'
+             + '</div></div>';
     if(!g) return head + '<div class="hint">Checking…</div></div>';
     if(!g.configured){
       return head
@@ -9156,12 +9263,12 @@
     if(g.pendingReview) notes += '<div class="hint" style="margin-top:8px;">'
       + g.pendingReview+' event group from Google is waiting on the Classes page for you to check.</div>';
     return head
-      + '<div class="hint">Connected. Last synced: '+escapeHtml(when)+'.</div>'
+      + '<div class="hint">Last synced: '+escapeHtml(when)+'.</div>'
       + notes
       + calendarPickerHtml()
-      + '<div style="display:flex;gap:8px;margin-top:12px;">'
-      + '<button type="button" class="btn primary" data-action="google-sync">Sync now</button>'
+      + '<div class="set-actions">'
       + '<button type="button" class="btn danger" data-action="google-disconnect">Disconnect</button>'
+      + '<button type="button" class="btn primary" data-action="google-sync">Sync now</button>'
       + '</div></div>';
   }
 
@@ -9176,7 +9283,7 @@
 
   function calendarPickerHtml(){
     var head = '<div id="g-feeds" style="margin-top:14px;">'
-      + '<div class="file-cat-title" style="margin-top:0;">Calendars to read</div>';
+      + '<div class="set-sub" style="margin-top:0;">Calendars to read</div>';
     if(googleFeeds === null) return head + '<div class="hint">Loading your calendars…</div></div>';
     if(!googleFeeds.length) return head + '<div class="hint">No calendars found on this account.</div></div>';
     return head
@@ -9333,8 +9440,8 @@
 
   function googleSync(){
     var host = document.getElementById('g-cal');
-    if(host) host.outerHTML = '<div class="detail-section" id="g-cal">'
-      + '<div class="file-cat-title">Google Calendar</div>'+siThinking('Syncing…')+'</div>';
+    if(host) host.outerHTML = '<div class="st-card" id="g-cal"><div class="st-card-head"><div>'
+      + '<div class="st-card-title">Google Calendar</div></div></div>'+siThinking('Syncing…')+'</div>';
     apiPostRaw('/api/calendar/google/sync', {}).then(function(r){
       if(!r.ok){
         googleStatus = Object.assign(googleStatus||{}, { lastError: r.body.error || 'Sync failed.' });
@@ -9348,20 +9455,23 @@
   }
 
   // ---------------- Settings ----------------
-  // One section at a time down the left, rather than one scrolling page. The old
-  // Settings was Appearance, Google and Terms stacked in a single column, which was
-  // fine at three sections and would not have survived eleven.
+  // Laid out after reference/settings inspo.png: sections down the left with an icon and
+  // a one-line summary, and each section a stack of cards.
+  //
+  // Only things that cannot be set anywhere else live here. Anything with its own control
+  // on the page it affects (calendar view and detail, Files layout, every Focus and
+  // Headstart setting, the sidebar's collapsed state) is set there and remembered there,
+  // so it does not get a second copy in this window. That leaves four sections, not the
+  // eleven the mockup shows.
   var SETTINGS_SECTIONS = [
-    { id:'account',       label:'Account & Profile' },
-    { id:'semester',      label:'Semester' },
-    { id:'calendar',      label:'Integrations' },
-    { id:'notifications', label:'Notifications' },
-    { id:'grades',        label:'Grades & Grading Scale' },
-    { id:'notes',         label:'Notes & Editor' },
-
-    { id:'appearance',    label:'Appearance' },
-    { id:'data',          label:'Data & Export' }
+    { id:'account',  label:'Account',      sub:'Profile, password and your data.',   icon:'user' },
+    { id:'semester', label:'Semester',     sub:'Terms and the grading scale.',       icon:'cap' },
+    { id:'prefs',    label:'Preferences',  sub:'Theme, sidebar, editor, alerts.',   icon:'sliders' },
+    { id:'calendar', label:'Integrations', sub:'Sync with Google Calendar.',         icon:'link' }
   ];
+  // Sections that were folded into the four above, so an old link still lands somewhere.
+  var SETTINGS_ALIASES = { notifications:'prefs', notes:'prefs', appearance:'prefs',
+                           grades:'semester', data:'account' };
   var settingsSection = 'account';
 
   // -- small builders, so every row in every section looks and behaves the same ----
@@ -9369,6 +9479,12 @@
     return '<div class="set-row"><div><div class="set-label">'+escapeHtml(label)+'</div>'
       + (help ? '<div class="set-help">'+escapeHtml(help)+'</div>' : '')
       + '</div><div class="set-control">'+control+'</div></div>';
+  }
+  function setCard(title, sub, body, headRight){
+    return '<div class="st-card"><div class="st-card-head"><div>'
+      + '<div class="st-card-title">'+escapeHtml(title)+'</div>'
+      + (sub ? '<div class="st-card-sub">'+escapeHtml(sub)+'</div>' : '')
+      + '</div>'+(headRight||'')+'</div>'+(body||'')+'</div>';
   }
   function prefValue(key){
     if(!PREFS) return null;
@@ -9383,39 +9499,42 @@
         + escapeHtml(o.label)+'</button>';
     }).join('') + '</div>';
   }
-  function prefCheck(key){
-    return '<input type="checkbox" data-pref="'+key+'"'+(prefValue(key)?' checked':'')+'>';
+  function prefCheck(key, disabled){
+    return '<input type="checkbox" class="set-switch" data-pref="'+key+'"'
+      + (prefValue(key)?' checked':'')+(disabled?' disabled':'')+'>';
   }
-  function prefNumber(key, min, max){
+  function prefNumber(key, min, max, disabled){
     return '<input type="number" data-pref="'+key+'" min="'+min+'" max="'+max+'" value="'
-      + escapeHtml(String(prefValue(key) == null ? '' : prefValue(key)))+'">';
-  }
-  function prefSelect(key, options){
-    var cur = prefValue(key);
-    return '<select data-pref="'+key+'">' + options.map(function(o){
-      return '<option value="'+escapeHtml(String(o.value))+'"'+(cur===o.value?' selected':'')+'>'
-        + escapeHtml(o.label)+'</option>';
-    }).join('') + '</select>';
+      + escapeHtml(String(prefValue(key) == null ? '' : prefValue(key)))+'"'+(disabled?' disabled':'')+'>';
   }
 
   function openSettingsModal(section){
     if(section) settingsSection = section;
+    settingsSection = SETTINGS_ALIASES[settingsSection] || settingsSection;
     var nav = SETTINGS_SECTIONS.map(function(s){
       return '<button type="button" class="set-nav-btn'+(s.id===settingsSection?' active':'')+'"'
-        + ' data-action="settings-section" data-section="'+s.id+'">'+escapeHtml(s.label)+'</button>';
+        + ' data-action="settings-section" data-section="'+s.id+'">'
+        + '<span class="set-nav-ic">'+iconSvg(s.icon)+'</span>'
+        + '<span><span class="set-nav-lbl">'+escapeHtml(s.label)+'</span>'
+        + '<span class="set-nav-sub">'+escapeHtml(s.sub)+'</span></span></button>';
     }).join('');
+    // Keep the reader's place when a control repaints the section they are in.
+    var oldPane = document.querySelector('#modal-root .set-pane');
+    var keepScroll = oldPane && oldPane.dataset.section === settingsSection ? oldPane.scrollTop : 0;
     var html = '<div class="overlay" data-action="modal-backdrop">'
       + '<div class="modal settings-modal" data-action="modal-stop">'
-      + '<div class="modal-head"><h2>Settings</h2></div>'
       + '<div class="settings-body">'
-      + '<nav class="set-nav">'+nav+'</nav>'
-      + '<div class="set-pane">'+settingsSectionHtml(settingsSection)+'</div>'
+      + '<nav class="set-nav"><div class="set-nav-head"><h2>Settings</h2>'
+      + '<p>Make Vesta work the way you do.</p></div>'+nav+'</nav>'
+      + '<div class="set-pane" data-section="'+settingsSection+'">'+settingsSectionHtml(settingsSection)+'</div>'
       + '</div>'
       + '<div class="modal-foot"><span></span><div class="right">'
       + '<button class="btn" data-action="modal-close">Close</button></div></div>'
       + '</div></div>';
     var root = document.getElementById('modal-root');
     root.innerHTML = html;
+    var pane = root.querySelector('.set-pane');
+    if(pane && keepScroll) pane.scrollTop = keepScroll;
     wireSettingsInputs(root);
     paintIcons(root);
   }
@@ -9455,130 +9574,159 @@
   }
 
   function settingsSectionHtml(id){
-    var fn = {
-      account: secAccount, semester: secSemester, calendar: secCalendar,
-      notifications: secNotifications, grades: secGrades, notes: secNotes,
-      appearance: secAppearance,
-      data: secData
-    }[id] || secAccount;
+    var fn = { account: secAccount, semester: secSemester, prefs: secPrefs, calendar: secCalendar }[id]
+      || secAccount;
     return fn();
   }
 
-  function secHead(title, intro){
-    return '<h3>'+escapeHtml(title)+'</h3><p class="set-intro">'+escapeHtml(intro)+'</p>';
+  function secHead(title, intro, right){
+    return '<div class="set-pane-head"><div><h3>'+escapeHtml(title)+'</h3>'
+      + '<p>'+escapeHtml(intro)+'</p></div>'+(right||'')+'</div>';
   }
 
-  // -- Account & Profile ----------------------------------------------------------
+  // -- Account --------------------------------------------------------------------
+  /** Up to two letters for the big avatar: first and last name, or the email's first. */
+  function accountInitials(){
+    var name = (vestaProfile.displayName || '').trim();
+    if(!name) return accountInitial();
+    var parts = name.split(/\s+/);
+    return (parts[0].charAt(0) + (parts.length > 1 ? parts[parts.length-1].charAt(0) : '')).toUpperCase();
+  }
+  /** "Mac · Chrome", read from this browser. Only ever describes the device you are on. */
+  function thisDeviceLabel(){
+    var ua = navigator.userAgent || '';
+    var os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android'
+           : /Mac OS X|Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows'
+           : /CrOS/.test(ua) ? 'Chromebook' : /Linux/.test(ua) ? 'Linux' : 'This device';
+    var br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox'
+           : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : '';
+    return br ? os + ' · ' + br : os;
+  }
+  function pwField(id, label, placeholder, autocomplete){
+    return '<label class="set-field">'+escapeHtml(label)
+      + '<span class="set-input"><input type="password" id="'+id+'" autocomplete="'+autocomplete+'"'
+      + ' placeholder="'+escapeHtml(placeholder)+'">'
+      + '<button type="button" class="set-input-btn" data-action="toggle-pw-visible" data-for="'+id+'"'
+      + ' title="Show password" aria-label="Show password">'+iconSvg('eye')+'</button></span></label>';
+  }
+
+  function secData(){
+    return setCard('Your data', 'Everything Vesta holds for you, in one JSON file: classes, '
+        + 'assignments, notes, file details, grades, calendar, Headstart history and settings.', '',
+        '<button type="button" class="btn" data-action="export-data">'+iconSvg('download')+'Download my data</button>');
+  }
+
   function secAccount(){
-    var head = secHead('Account & Profile', 'Who you are signed in as, and the way out.');
     if(!authState.accounts){
-      return head + '<div class="hint">This copy of Vesta runs without accounts, so there '
-        + 'is no profile to manage. Accounts switch on where the app is deployed with '
-        + 'Supabase configured.</div>';
+      return secHead('Account', 'This copy of Vesta runs without accounts.')
+        + setCard('No account here', 'Accounts switch on where Vesta is deployed with Supabase '
+            + 'configured, so there is no profile or password to manage on this copy.')
+        + secData();
     }
     var msg = accountMsg
-      ? '<div class="'+(accountMsg.kind==='err'?'auth-error':'auth-note')+'" style="margin-bottom:10px;">'
+      ? '<div class="set-msg '+(accountMsg.kind==='err'?'auth-error':'auth-note')+'">'
         + escapeHtml(accountMsg.text)+'</div>' : '';
-    return head + msg
-      + setRow('Signed in as', null, '<span class="hint">'+escapeHtml(accountEmail())+'</span>')
-      + setRow('Display name', 'Shown on your avatar.',
-          '<input type="text" id="f-profile-name" maxlength="80" value="'
+    var busy = accountBusy ? ' disabled' : '';
+    return secHead('Account', 'Your profile, your password and your data.',
+          '<div class="set-avatar">'+escapeHtml(accountInitials())+'</div>')
+      + msg
+      + setCard('Profile', 'How you appear in Vesta.',
+          '<div class="st-grid">'
+          + '<label class="set-field">Display name'
+          + '<input type="text" id="f-profile-name" maxlength="80" placeholder="Your name" value="'
           + escapeHtml(vestaProfile.displayName||'')+'">'
-          + '<button type="button" class="btn" data-action="save-profile"'
-          + (accountBusy?' disabled':'')+'>Save</button>')
-      + '<div class="set-adv" style="border-top:1px solid var(--border);padding-top:12px;">'
-      + '<div class="set-label" style="margin-bottom:6px;">Change password</div>'
-      + setRow('Current password', null, '<input type="password" id="f-pw-current" autocomplete="current-password">')
-      + setRow('New password', 'At least 8 characters.', '<input type="password" id="f-pw-new" autocomplete="new-password">')
-      + setRow('Confirm new password', null, '<input type="password" id="f-pw-confirm" autocomplete="new-password">')
-      + setRow('', null, '<button type="button" class="btn" data-action="submit-password"'
-          + (accountBusy?' disabled':'')+'>'+(accountBusy?'Working…':'Change password')+'</button>')
-      + '</div>'
-      + setRow('Session', 'Signs you out on this device.',
-          '<button type="button" class="btn danger" data-action="sign-out">Sign out</button>');
+          + '<span class="hint">Shown on your avatar.</span></label>'
+          + '<label class="set-field">Email address'
+          + '<span class="set-input"><input type="email" readonly tabindex="-1" value="'+escapeHtml(accountEmail())+'">'
+          + '<span class="set-input-lock">'+iconSvg('lock')+'</span></span>'
+          + '<span class="hint">Your sign-in email can’t be changed here.</span></label>'
+          + '</div>'
+          + '<div class="set-actions"><button type="button" class="btn primary" data-action="save-profile"'+busy+'>Save name</button></div>')
+      + setCard('Password', 'Use at least 8 characters.',
+          '<div class="st-grid">'
+          + pwField('f-pw-current', 'Current password', 'Enter current password', 'current-password')
+          + pwField('f-pw-new', 'New password', 'At least 8 characters', 'new-password')
+          + pwField('f-pw-confirm', 'Confirm new password', 'Re-enter new password', 'new-password')
+          + '</div>'
+          + '<div class="set-actions"><button type="button" class="btn primary" data-action="submit-password"'+busy+'>'
+          + (accountBusy?'Working…':'Change password')+'</button></div>')
+      + setCard('Session', 'Where you are signed in right now.',
+          '<div class="set-device"><div class="set-device-ic">'+iconSvg('laptop')+'</div>'
+          + '<div class="set-device-main"><div class="set-device-name">'+escapeHtml(thisDeviceLabel())+'</div>'
+          + '<div class="set-device-meta">This device</div></div>'
+          + '<button type="button" class="btn danger" data-action="sign-out">Sign out</button></div>')
+      + secData();
   }
 
   // -- Semester -------------------------------------------------------------------
   function secSemester(){
     return secHead('Semester', 'The open term is the one Vesta shows everywhere. Opening another switches the whole app to it.')
-      + termsSectionHtml();
+      + termsSectionHtml()
+      + secGradeScale();
   }
 
-  // -- Calendar & Integrations ----------------------------------------------------
-  // Month/Week/List and Simple/Detailed both live on the calendar's own toolbar and
-  // both remember what you pick, so this section is only about what it reads from.
-  function secCalendar(){
-    return secHead('Integrations', 'What the calendar reads from.')
-      + googleSectionHtml();
+  // The scale a class uses until it is given its own. Each class can override it from
+  // its Grading scale button, so this is only the starting point, and it sits with the
+  // term rather than in a section of its own.
+  function secGradeScale(){
+    var rows = DEFAULT_GRADE_SCALE.map(function(r){ return scaleRowHtml(r.letter, r.min); }).join('');
+    return '<div class="st-card" style="margin-top:14px;"><div class="st-card-head"><div>'
+      + '<div class="st-card-title">Default grading scale</div>'
+      + '<div class="st-card-sub">The minimum percentage for each letter. Used by every class '
+      + 'without its own scale.</div></div></div>'
+      + '<div class="set-scale" id="scale-rows">'+rows+'</div>'
+      + '<div class="set-actions" style="justify-content:space-between;">'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      + '<button type="button" class="btn ghost" data-action="scale-add-row">+ Add row</button>'
+      + '<button type="button" class="btn ghost" data-action="default-scale-reset">Reset to standard</button></div>'
+      + '<button type="button" class="btn primary" data-action="default-scale-save">Save scale</button>'
+      + '</div></div>';
   }
 
-  // -- Notifications --------------------------------------------------------------
-  function secNotifications(){
+  // -- Preferences ----------------------------------------------------------------
+  function secPrefs(){
+    var theme = PREFS ? PREFS.theme : currentTheme();
+    var themeTile = function(value, label){
+      return '<button type="button" class="set-theme'+(theme===value?' active':'')+'"'
+        + ' data-action="set-theme" data-theme-choice="'+value+'">'
+        + '<span class="set-theme-pic '+value+'"><i class="sb"></i><span class="main"><i></i><i></i></span></span>'
+        + '<span class="set-theme-lbl">'+label+'</span></button>';
+    };
+
     var perm = (typeof Notification === 'undefined') ? 'unsupported' : Notification.permission;
     var permRow = perm === 'granted'
       ? '<span class="hint">Allowed in this browser.</span>'
       : perm === 'denied'
-        ? '<span class="hint">Blocked in this browser. Allow notifications for this site in your browser settings.</span>'
+        ? '<span class="hint">Blocked. Allow notifications for this site in your browser settings.</span>'
         : perm === 'unsupported'
           ? '<span class="hint">This browser does not support notifications.</span>'
           : '<button type="button" class="btn" data-action="ask-notify-permission">Allow notifications</button>';
-    return secHead('Notifications', 'Browser notifications only. Vesta sends no email.')
-      + setRow('Browser permission', 'Needed before either setting below can do anything.', permRow)
-      + setRow('Focus session ends', 'Tell me when a focus or break block finishes.', prefCheck('notifyFocusDone'))
-      + setRow('Work due soon', 'One notification per assignment, at most once a day.', prefCheck('notifyDueSoon'))
-      + setRow('How soon is "soon"', 'Hours ahead to look.', prefNumber('notifyDueSoonHours', 1, 168));
+    var off = perm !== 'granted';
+
+    return secHead('Preferences', 'How Vesta looks and behaves on every device you sign in on.')
+      + setCard('Theme', null, '<div class="set-themes">'
+          + themeTile('light', 'Light') + themeTile('dark', 'Dark') + '</div>')
+      + setCard('Sidebar', 'Hidden pages still work. Find them with search (\u2318K).',
+          setRow('Show Grades', 'Also opens from Current Average on the dashboard.', prefCheck('sidebarShowGrades'))
+          + setRow('Show Focus', 'Also opens when you start a focus session.', prefCheck('sidebarShowFocus')))
+      + setCard('Note editor', null,
+          setRow('Text size', 'Applies to the note editor only.',
+            prefSeg('editorFontSize', [
+              {value:'small', label:'Small'}, {value:'medium', label:'Medium'}, {value:'large', label:'Large'}]))
+          + setRow('Spell check', 'Underline misspelled words while writing.', prefCheck('editorSpellcheck')))
+      + setCard('Notifications', 'Browser notifications only. Vesta sends no email.',
+          setRow('Browser permission', off ? 'Needed before the settings below can do anything.' : null, permRow)
+          + setRow('Focus session ends', 'Tell me when a focus or break block finishes.', prefCheck('notifyFocusDone', off))
+          + setRow('Work due soon', 'One notification per assignment, at most once a day.', prefCheck('notifyDueSoon', off))
+          + setRow('How far ahead', 'Hours before the due time.', prefNumber('notifyDueSoonHours', 1, 168, off)));
   }
 
-  // -- Grades ---------------------------------------------------------------------
-  function secGrades(){
-    var scale = (PREFS && PREFS.defaultGradeScale) || [];
-    var rows = scale.map(function(r, i){
-      return '<div class="set-scale-row">'
-        + '<input type="number" min="0" max="100" value="'+escapeHtml(String(r.min))+'" data-scale-min="'+i+'">'
-        + '<span class="hint">% and above =</span>'
-        + '<input type="text" maxlength="4" value="'+escapeHtml(r.letter)+'" data-scale-letter="'+i+'">'
-        + '<button type="button" class="btn" data-action="scale-remove" data-idx="'+i+'">Remove</button>'
-        + '</div>';
-    }).join('');
-    return secHead('Grades & Grading Scale',
-        'The scale new classes start from. A class with its own scale keeps it.')
-      + rows
-      + '<div style="display:flex;gap:8px;margin-top:10px;">'
-      + '<button type="button" class="btn" data-action="scale-add">Add a row</button>'
-      + '<button type="button" class="btn primary" data-action="scale-save">Save scale</button>'
-      + '<button type="button" class="btn" data-action="scale-reset">Reset to default</button>'
-      + '</div>';
-  }
-
-  // -- Notes & Editor -------------------------------------------------------------
-  function secNotes(){
-    return secHead('Notes & Editor', 'How the note editor behaves.')
-      + setRow('Text size', 'Applies to the note editor only.',
-          prefSeg('editorFontSize', [
-            {value:'small', label:'Small'}, {value:'medium', label:'Medium'}, {value:'large', label:'Large'}]))
-      + setRow('Spell check', 'Underline misspelled words while writing.', prefCheck('editorSpellcheck'));
-  }
-
-  // -- Appearance -----------------------------------------------------------------
-  function secAppearance(){
-    var theme = PREFS ? PREFS.theme : currentTheme();
-    return secHead('Appearance', 'How Vesta looks on every device you sign in on.')
-      + setRow('Theme', null,
-          '<div class="seg" style="width:fit-content;">'
-          + '<button type="button" class="seg-btn'+(theme==='light'?' active':'')+'" data-action="set-theme" data-theme-choice="light">Light</button>'
-          + '<button type="button" class="seg-btn'+(theme==='dark'?' active':'')+'" data-action="set-theme" data-theme-choice="dark">Dark</button>'
-          + '</div>')
-      + setRow('Start with the sidebar collapsed', 'Narrow windows collapse it regardless.',
-          prefCheck('sidebarCollapsed'));
-  }
-
-  // -- Data & Export --------------------------------------------------------------
-  function secData(){
-    return secHead('Data & Export', 'Everything Vesta holds for this account.')
-      + setRow('Export everything', 'One JSON file: classes, assignments, notes, files metadata, grades, calendar, Headstart history and settings.',
-          '<button type="button" class="btn" data-action="export-data">Download my data</button>')
-      + '<div class="set-adv"><div class="set-help">Deleting your data is not built. '
-      + 'Say the word and it gets added, with a confirmation step.</div></div>';
+  // -- Integrations ---------------------------------------------------------------
+  // Month/Week/List and Simple/Detailed both live on the calendar's own toolbar and
+  // both remember what you pick, so this section is only about what it reads from.
+  function secCalendar(){
+    return secHead('Integrations', 'Connect Vesta to the calendar you already use.')
+      + googleSectionHtml();
   }
 
   // ---- assignment card ---------------------------------------------------
@@ -12036,9 +12184,8 @@
   var termList = null;
 
   function termsSectionHtml(){
-    var head = '<div class="detail-section" id="terms-section">'
-             + '<div class="file-cat-title">Terms</div>';
-    if(termList === null) return head + '<div class="hint">Loading…</div></div>';
+    var head = '<div id="terms-section">';
+    if(termList === null) return head + setCard('Your terms', null, '<div class="hint">Loading…</div>') + '</div>';
 
     var rows = termList.map(function(t){
       var c = t.counts || {};
@@ -12065,27 +12212,24 @@
     }).join('');
 
     return head
-      + rows
-      + '<div class="hint" style="margin-top:10px;">Opening a term points the whole app at it. '
-      + 'Archiving keeps one readable and searchable while locking it against edits, and a term '
-      + 'can only be deleted once it is empty.</div>'
-      + '<div class="file-cat-title" style="margin-top:18px;">Edit this term</div>'
-      + '<label class="field">Term name<input type="text" id="f-term-name" placeholder="Fall 2026" value="'+escapeHtml(termSettings.name||'')+'"></label>'
-      + '<div class="field-row" style="margin-top:10px;">'
-      + '<label class="field">Start date<input type="date" id="f-term-start" value="'+(termSettings.startDate||'')+'"></label>'
-      + '<label class="field">End date<input type="date" id="f-term-end" value="'+(termSettings.endDate||'')+'"></label>'
-      + '</div>'
-      + '<div class="hint" style="margin-top:8px;">These bound recurring lectures on the calendar and in exports, and set the default \u201crepeat until\u201d date for weekly items. Setting just one side still works: leave the other blank to leave it open-ended.</div>'
-      + '<div style="margin-top:10px;"><button type="button" class="btn" data-action="save-term">Save changes</button></div>'
-      + '<div class="file-cat-title" style="margin-top:18px;">Start a new term</div>'
-      + '<label class="field">Name<input type="text" id="f-newterm-name" placeholder="'+escapeHtml(nextTermGuess())+'" value=""></label>'
-      + '<div class="field-row" style="margin-top:10px;">'
-      + '<label class="field">Start date<input type="date" id="f-newterm-start"></label>'
-      + '<label class="field">End date<input type="date" id="f-newterm-end"></label>'
-      + '</div>'
-      + '<div class="hint" style="margin-top:8px;">Starting a term gives you an empty workspace and switches you into it. '
-      + 'Nothing from your other terms is touched: classes, files, notes and grades stay where they are.</div>'
-      + '<div style="margin-top:10px;"><button type="button" class="btn primary" data-action="create-term">Start term</button></div>'
+      + setCard('Your terms', 'Archiving keeps a term readable and searchable but locks it against '
+          + 'edits. A term can only be deleted once it is empty.', rows)
+      + setCard('This term', 'The dates bound recurring lectures on the calendar and in exports, and '
+          + 'set the default \u201crepeat until\u201d for weekly items. Either side can be left blank.',
+          '<div class="st-grid">'
+          + '<label class="set-field">Term name<input type="text" id="f-term-name" placeholder="Fall 2026" value="'+escapeHtml(termSettings.name||'')+'"></label>'
+          + '<label class="set-field">Start date<input type="date" id="f-term-start" value="'+(termSettings.startDate||'')+'"></label>'
+          + '<label class="set-field">End date<input type="date" id="f-term-end" value="'+(termSettings.endDate||'')+'"></label>'
+          + '</div>'
+          + '<div class="set-actions"><button type="button" class="btn primary" data-action="save-term">Save changes</button></div>')
+      + setCard('Start a new term', 'You get an empty workspace and switch into it. Classes, files, '
+          + 'notes and grades from other terms stay where they are.',
+          '<div class="st-grid">'
+          + '<label class="set-field">Name<input type="text" id="f-newterm-name" placeholder="'+escapeHtml(nextTermGuess())+'" value=""></label>'
+          + '<label class="set-field">Start date<input type="date" id="f-newterm-start"></label>'
+          + '<label class="set-field">End date<input type="date" id="f-newterm-end"></label>'
+          + '</div>'
+          + '<div class="set-actions"><button type="button" class="btn primary" data-action="create-term">Start term</button></div>')
       + '</div>';
   }
 
@@ -12171,6 +12315,12 @@
                  meta:(m.cls.code||'') + ' · ' + fileFolderLabel(m),
                  action:'preview-file', id:m.id,
                  text:((name||'')+' '+(m.cls.code||'')+' '+fileFolderLabel(m)+' '+fileTypeLabel(m)).toLowerCase() });
+    });
+    // Pages go last, so they never push classes out of the empty-search list.
+    document.querySelectorAll('#tabs .tab-btn[data-tab]').forEach(function(b){
+      var label = b.textContent.trim();
+      idx.push({ type:'Pages', icon:'→', title:label, meta:'Page', action:'switch-tab',
+                 tab:b.dataset.tab, text:label.toLowerCase() });
     });
     return idx;
   }
@@ -13524,32 +13674,29 @@
       }
       return;
     }
-    if(action==='scale-add'){
-      var sc = (PREFS.defaultGradeScale||[]).slice();
-      sc.push({min:0, letter:'A'});
-      savePrefs({ defaultGradeScale: sc }).then(function(){ openSettingsModal(); });
+    // The default scale in Settings. Its own action names, because scale-save and
+    // scale-reset belong to the per-class scale editor and are handled before these.
+    if(action==='default-scale-save'){
+      var defRows = Array.prototype.slice.call(document.querySelectorAll('#scale-rows .scale-row')).map(function(row){
+        var inputs = row.querySelectorAll('input');
+        return { letter: inputs[0].value.trim(), min: Number(inputs[1].value)||0 };
+      }).filter(function(r){ return r.letter; });
+      savePrefs({ defaultGradeScale: defRows }).then(function(){ openSettingsModal(); renderView(); });
       return;
     }
-    if(action==='scale-remove'){
-      var sc2 = (PREFS.defaultGradeScale||[]).slice();
-      sc2.splice(Number(t.dataset.idx), 1);
-      savePrefs({ defaultGradeScale: sc2.length ? sc2 : null }).then(function(){ openSettingsModal(); });
-      return;
-    }
-    if(action==='scale-save'){
-      var rows = [];
-      document.querySelectorAll('[data-scale-min]').forEach(function(el){
-        var i = el.dataset.scaleMin;
-        var letterEl = document.querySelector('[data-scale-letter="'+i+'"]');
-        rows.push({ min: Number(el.value), letter: letterEl ? letterEl.value : '' });
-      });
-      savePrefs({ defaultGradeScale: rows }).then(function(){
-        openSettingsModal(); renderView();
-      });
-      return;
-    }
-    if(action==='scale-reset'){
+    if(action==='default-scale-reset'){
+      // An empty scale is stored as the standard one by the server.
       savePrefs({ defaultGradeScale: [] }).then(function(){ openSettingsModal(); renderView(); });
+      return;
+    }
+    if(action==='toggle-pw-visible'){
+      var pwEl = document.getElementById(t.dataset.for);
+      if(!pwEl) return;
+      var show = pwEl.type === 'password';
+      pwEl.type = show ? 'text' : 'password';
+      t.innerHTML = iconSvg(show ? 'eye_off' : 'eye');
+      t.title = show ? 'Hide password' : 'Show password';
+      t.setAttribute('aria-label', t.title);
       return;
     }
     if(action==='ai-save'){
