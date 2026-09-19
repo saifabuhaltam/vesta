@@ -2057,6 +2057,9 @@
   .cal-ev:hover{ background:var(--surface-3); }
   .cal-ev.done{ opacity:.55; }
   .cal-ev.done .cal-ev-title{ text-decoration:line-through; }
+  /* the time leads the chip, so it wraps the title in a baseline row rather than its own line */
+  .cal-ev-line{ display:flex; align-items:baseline; gap:4px; min-width:0; }
+  .cal-ev-time{ flex:none; font-size:10px; font-weight:500; color:var(--text-muted); font-variant-numeric:tabular-nums; }
   .cal-ev-title{ font-weight:600; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cal-ev-cls{ color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cal-ev-kind{ font-size:9px; font-weight:700; padding:1px 6px; border-radius:var(--r-pill); align-self:flex-start; }
@@ -2548,6 +2551,14 @@
     var parts=t.split(':'); var h=Number(parts[0]), m=Number(parts[1]);
     var period = h>=12 ? 'PM':'AM'; var hh = h%12; if(hh===0) hh=12;
     return hh+':'+String(m).padStart(2,'0')+' '+period;
+  }
+  // Chip-sized time: drops ":00" on the hour so a grid cell spends its width on the title.
+  function fmtTimeChip(t){
+    if(!t) return '';
+    var parts=t.split(':'); var h=Number(parts[0]), m=Number(parts[1]);
+    if(isNaN(h)||isNaN(m)) return '';
+    var period = h>=12 ? 'PM':'AM'; var hh = h%12; if(hh===0) hh=12;
+    return m===0 ? hh+' '+period : hh+':'+String(m).padStart(2,'0')+' '+period;
   }
   function fmtDate(iso){
     if(!iso) return '';
@@ -4128,13 +4139,16 @@
     var attrs = e.itemId ? ' data-action="open-item-detail" data-id="'+e.itemId+'"'
               : e.eventId ? ' data-action="open-event-modal" data-id="'+e.eventId+'"' : '';
     var simple = calDetail === 'simple';
+    var time = e.allDay ? '' : fmtTimeChip(e.start);
     // the tooltip still carries the full picture, so nothing is lost by simplifying
-    var full = e.title + (e.cls ? ' · ' + (e.cls.code||e.cls.name) : '')
+    var full = (time ? time + ' · ' : '') + e.title + (e.cls ? ' · ' + (e.cls.code||e.cls.name) : '')
              + ' · ' + eventKind(e.kind).label.replace(/s$/,'');
     return '<div class="cal-ev'+(e.done?' done':'')+(simple?' simple':'')+'"'
       + ' style="--c:'+(e.color||eventKind(e.kind).color)+'"'+attrs
       + ' title="'+escapeHtml(full)+'">'
-      + '<span class="cal-ev-title">'+escapeHtml(e.title)+'</span>'
+      + '<span class="cal-ev-line">'
+      + (time ? '<span class="cal-ev-time">'+escapeHtml(time)+'</span>' : '')
+      + '<span class="cal-ev-title">'+escapeHtml(e.title)+'</span></span>'
       + (simple ? '' :
           (e.cls ? '<span class="cal-ev-cls">'+escapeHtml(e.cls.code||e.cls.name)+'</span>' : '')
           + '<span class="cal-ev-kind" style="background:'+eventKind(e.kind).color+'22;color:'
