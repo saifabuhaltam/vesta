@@ -200,7 +200,12 @@ def estimate(conn, input_tokens):
 
 
 def read_syllabus(conn, block, input_tokens, context_note, confirmed):
-    """One paid call. Refuses before spending if the day's cap is reached or it is unconfirmed."""
+    """One paid call. Refuses before spending if the day's cap is reached or it is unconfirmed.
+
+    `block` may be a list of document blocks: a course outline and a separate assignment
+    schedule are read together in the one call, so the schedule's dates land on the
+    outline's grading categories instead of arriving as a second, disconnected draft.
+    """
     cfg = ai.settings(conn)
     est = estimate(conn, input_tokens)
     if cfg["daily_cap_usd"] and est["spentToday"] + est["estimateUsd"] > cfg["daily_cap_usd"]:
@@ -212,8 +217,7 @@ def read_syllabus(conn, block, input_tokens, context_note, confirmed):
     request = dict(
         model=IMPORT_MODEL, max_tokens=IMPORT_MAX_TOKENS, system=SYSTEM,
         output_config={"format": {"type": "json_schema", "schema": SCHEMA}},
-        messages=[{"role": "user", "content": [
-            block,
+        messages=[{"role": "user", "content": (block if isinstance(block, list) else [block]) + [
             {"type": "text", "text": "Extract this course's details." + (("\n\n" + context_note) if context_note else "")},
         ]}],
     )

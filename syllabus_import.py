@@ -83,25 +83,67 @@ def upload():
 # ---------------------------------------------------------------------------
 # 2. Read: one paid call, SFU's outline, then the review draft
 # ---------------------------------------------------------------------------
+def file_block(conn, r):
+    """One uploaded file as a document block, plus what it costs to read."""
+    path = os.path.join(UPLOAD_DIR, r["stored_name"])
+    extract = current_app.config["EXTRACT_TEXT"]
+    text = extract(path, r["filename"]) if S.ext_of(r["filename"]) not in ("pdf",) + tuple(S.IMAGE_TYPES) else None
+    return S.document_block(path, r["filename"], text)
+
+
 @bp.route("/api/syllabus/<sid>/read", methods=["POST"])
 def read(sid):
+    """Read one or more uploaded files into a single review draft.
+
+    `alsoRead` names further uploads to read in the same call. Course outlines often
+    leave the assignment schedule to a separate document, and reading them together
+    lets the schedule's dates land on the outline's grading categories.
+
+    `mode: "supplement"` is for a document added to a class that already exists. It is
+    read as additional material rather than a replacement syllabus, so the review only
+    ever adds and fills gaps: see compare().
+    """
     data = request.get_json(force=True) or {}
+    supplement = data.get("mode") == "supplement"
     conn = get_db()
     row = load(conn, sid)
-    path = os.path.join(UPLOAD_DIR, row["stored_name"])
-    extract = current_app.config["EXTRACT_TEXT"]
+    rows = [row]
+    for other in dict.fromkeys(data.get("alsoRead") or []):
+        if other == sid:
+            continue
+        r = conn.execute("SELECT * FROM syllabus_imports WHERE id=?", (other,)).fetchone()
+        if r:
+            rows.append(r)
     sem = active_semester(conn)
     term = {"name": sem["name"], "startDate": sem["start_date"], "endDate": sem["end_date"]}
+    class_id = data.get("classId") or row["class_id"]
     try:
-        text = extract(path, row["filename"]) if S.ext_of(row["filename"]) not in ("pdf",) + tuple(S.IMAGE_TYPES) else None
-        block, tokens = S.document_block(path, row["filename"], text)
-        # the file name often carries the course code and term the document itself leaves out
-        note = f'The uploaded file is named "{row["filename"]}".'
+        blocks, tokens = [], 0
+        for r in rows:
+            b, t = file_block(conn, r)
+            blocks.append(b)
+            tokens += t
+        # the file names often carry the course code and term the documents leave out
+        names = ", ".join(f'"{r["filename"]}"' for r in rows)
+        note = (f"The uploaded file is named {names}." if len(rows) == 1 else
+                f"These {len(rows)} files belong to the same course and are to be read as one: "
+                f"{names}. One is often the course outline and another the assignment schedule; "
+                "merge them into a single set of course details, and do not list an assignment "
+                "twice because it appears in both.")
+        if supplement and class_id:
+            cls = conn.execute("SELECT code, name FROM classes WHERE id=?", (class_id,)).fetchone()
+            if cls:
+                note += (f" This is additional material for {(cls['code'] or '').strip()} "
+                         f"{(cls['name'] or '').strip()}, a course the student has already set "
+                         "up. It may hold only part of the picture, such as the schedule of "
+                         "assignments; extract what it contains and leave the rest empty "
+                         "rather than guessing.")
         if term.get("name"):
             note += f" The student's current term is {term['name']}."
         elif term.get("startDate"):
             note += f" The student's current term starts {term['startDate']}."
-        raw, meta = S.read_syllabus(conn, block, tokens, note, bool(data.get("confirmed")))
+        raw, meta = S.read_syllabus(conn, blocks if len(blocks) > 1 else blocks[0], tokens,
+                                    note, bool(data.get("confirmed")))
     except ai.AiRefused as e:
         conn.close()
         return jsonify(e.payload), e.status
@@ -111,14 +153,19 @@ def read(sid):
     official, official_note = S.official_outline(c.get("code") or hint["code"], c.get("section"),
                                                  c.get("term") or hint["term"] or term.get("name"))
     draft = S.build_draft(raw, official, official_note, term, hint=row["filename"])
-    class_id = data.get("classId") or row["class_id"]
+    draft["files"] = [r["filename"] for r in rows]
+    if supplement:
+        draft["mode"] = "supplement"
     if class_id:
-        draft["diff"] = compare(conn, class_id, draft)
+        draft["diff"] = compare(conn, class_id, draft, supplement=supplement)
     draft["raw"] = raw
     conn.execute("UPDATE syllabus_imports SET class_id=?, draft=?, official=?, model=?, input_tokens=?, output_tokens=?, "
                  "status='review' WHERE id=?",
                  (class_id, json.dumps(draft, default=str), json.dumps(official, default=str) if official else None,
                   meta["model"], meta["inputTokens"], meta["outputTokens"], sid))
+    for r in rows[1:]:
+        conn.execute("UPDATE syllabus_imports SET class_id=?, status='merged' WHERE id=?",
+                     (class_id, r["id"]))
     conn.commit()
     row = load(conn, sid)
     out = summary(row, json.loads(row["draft"]))
@@ -149,7 +196,16 @@ def one(sid):
 # ---------------------------------------------------------------------------
 # Re-import: what would change in a class that already exists
 # ---------------------------------------------------------------------------
-def compare(conn, class_id, draft):
+def compare(conn, class_id, draft, supplement=False):
+    """Set a draft against a class that already exists.
+
+    Normally the draft is the syllabus, so a difference is a change to offer. A
+    supplementary document is different: a schedule on its own says nothing about
+    grading, so reading its silence as "no category" would propose stripping the
+    category and weight off every assignment it mentions, pre-ticked, and listing
+    everything it does not mention as removed. In that mode the review only adds new
+    items and fills fields that are empty; it never clears, recategorises or removes.
+    """
     cls = conn.execute("SELECT * FROM classes WHERE id=?", (class_id,)).fetchone()
     if not cls:
         return None
@@ -171,6 +227,21 @@ def compare(conn, class_id, draft):
         used.add(match["id"])
         it["existingId"] = match["id"]
         changes = []
+        if supplement:
+            # A gap is filled without asking. A different value is shown but left unticked:
+            # a later schedule is often the more current word on dates, so a moved quiz
+            # must not vanish silently, but it must not overwrite without a look either.
+            # Category, weight and type are never offered; a schedule says nothing of them.
+            for field, before, after in (
+                    ("dueDate", match["due_date"], it["dueDate"]), ("dueTime", match["due_time"], it["dueTime"]),
+                    ("location", match["location"] or "", it["location"] or "")):
+                if not after or (before or None) == (after or None):
+                    continue
+                changes.append({"field": field, "before": before, "after": after, "fill": not before})
+            it["change"] = "changed" if changes else "same"
+            it["changes"] = changes
+            it["include"] = bool(changes) and all(c["fill"] for c in changes)
+            continue
         for field, before, after in (
                 ("dueDate", match["due_date"], it["dueDate"]), ("dueTime", match["due_time"], it["dueTime"]),
                 ("type", match["type"], it["type"]), ("location", match["location"] or "", it["location"] or "")):
@@ -187,8 +258,10 @@ def compare(conn, class_id, draft):
         it["changes"] = changes
         it["include"] = bool(changes)           # nothing to do for an unchanged item
 
-    removed = [{"existingId": e["id"], "title": e["title"], "dueDate": e["due_date"], "include": False}
-               for e in existing if e["id"] not in used and e["import_key"]]
+    # a supplement is a partial document: what it does not mention has not been removed
+    removed = [] if supplement else [
+        {"existingId": e["id"], "title": e["title"], "dueDate": e["due_date"], "include": False}
+        for e in existing if e["id"] not in used and e["import_key"]]
 
     old_meet = sorted((m["kind"] or "lecture", m["day"], m["start"], m["end"], m["location"] or "")
                       for m in conn.execute("SELECT * FROM schedule_entries WHERE class_id=?", (class_id,)))
@@ -198,9 +271,13 @@ def compare(conn, class_id, draft):
         before, after = (cls[col] or "").strip(), (draft["course"].get(field) or "").strip()
         if after and before != after:
             course.append({"field": field, "before": before, "after": after, "include": not before})
+    if supplement:
+        # fill course details only where the class has none; never overwrite
+        course = [c for c in course if not c["before"]]
     return {"classId": class_id, "removed": removed, "course": course,
-            "meetingsChanged": old_meet != new_meet, "applyMeetings": old_meet != new_meet and not old_meet,
-            "existingScale": bool(cls["grade_scale"])}
+            "meetingsChanged": old_meet != new_meet and not (supplement and old_meet),
+            "applyMeetings": old_meet != new_meet and not old_meet,
+            "existingScale": bool(cls["grade_scale"]), "supplement": supplement}
 
 
 # ---------------------------------------------------------------------------
@@ -226,11 +303,14 @@ def do_import(sid):
                         "needsLook": pending}), 400
 
     c = draft.get("course") or {}
-    if not (c.get("code") or c.get("name")):
+    diff = draft.get("diff") or {}
+    # A supplementary document is added to a class that already has its details. A
+    # schedule on its own usually carries no course code at all, and that is fine.
+    supplement = bool(diff.get("supplement")) or draft.get("mode") == "supplement"
+    if not supplement and not (c.get("code") or c.get("name")):
         conn.close()
         return jsonify({"error": "Give the course a code or a name."}), 400
 
-    diff = draft.get("diff") or {}
     class_id = diff.get("classId") or body.get("classId")
     t = now()
     counts = {"items": 0, "updated": 0, "removed": 0, "kept": 0, "meetings": 0, "categories": 0, "topics": 0}
@@ -250,7 +330,9 @@ def do_import(sid):
                           body.get("color") or "", ("Instructor email: " + c["professorEmail"]) if c.get("professorEmail") else "",
                           None, c.get("website") or "", t))
 
-        if draft.get("applyScale", True) and draft.get("gradeScale"):
+        has_scale = bool(conn.execute("SELECT grade_scale FROM classes WHERE id=?",
+                                      (class_id,)).fetchone()["grade_scale"]) if class_id else False
+        if draft.get("applyScale", True) and draft.get("gradeScale") and not (supplement and has_scale):
             scale = [{"letter": s["letter"], "min": s["min"]} for s in draft["gradeScale"] if s.get("letter")]
             if scale:
                 conn.execute("UPDATE classes SET grade_scale=? WHERE id=?", (json.dumps(scale), class_id))
@@ -272,7 +354,9 @@ def do_import(sid):
                          for r in conn.execute("SELECT id, name FROM grade_categories WHERE class_id=?", (class_id,))}
         for i, g in enumerate(x for x in draft.get("categories", []) if x.get("include", True)):
             gid = existing_cats.get((g.get("name") or "").lower())
-            if gid:
+            if gid and supplement:
+                pass                     # an existing category's weight is not the supplement's to change
+            elif gid:
                 conn.execute("UPDATE grade_categories SET weight=?, drop_lowest=? WHERE id=?",
                              (g.get("weight"), int(g.get("dropLowest") or 0), gid))
             else:
@@ -288,7 +372,16 @@ def do_import(sid):
                 continue
             cat = cat_ids.get(it.get("categoryId"))
             weight = None if cat else it.get("weight")
-            if it.get("existingId"):
+            if it.get("existingId") and supplement:
+                # Fill only the fields the review offered, which compare() limited to ones
+                # that were empty. Category, weight, type and title stay exactly as they were.
+                for ch in it.get("changes") or []:
+                    col = {"dueDate": "due_date", "dueTime": "due_time", "location": "location"}.get(ch.get("field"))
+                    if col:
+                        conn.execute(f"UPDATE items SET {col}=? WHERE id=? AND class_id=?",
+                                     (ch.get("after"), it["existingId"], class_id))
+                counts["updated"] += 1
+            elif it.get("existingId"):
                 # only schedule and weighting; never status, score or subtasks
                 conn.execute("UPDATE items SET title=?, type=?, due_date=?, due_time=?, location=?, category_id=?, weight=?,"
                              " import_key=? WHERE id=? AND class_id=?",

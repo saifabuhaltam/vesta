@@ -789,6 +789,16 @@
   .si-file{ display:flex; align-items:center; gap:10px; padding:12px 14px; border:1px solid var(--border);
     border-radius:var(--r-md); font-size:13px; }
   .si-file svg{ width:16px; height:16px; }
+  .si-file + .si-file{ margin-top:6px; }
+  .si-add-more{ margin:8px 0 12px; display:inline-block; }
+  .si-adddoc{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    padding:10px 12px; border-radius:var(--r-md); background:var(--accent-soft);
+    font-size:12.5px; color:var(--accent-ink); margin-bottom:12px; }
+  .si-moved{ color:var(--warn); }
+  .si-keeps{ font-size:12px; color:var(--text-faint); white-space:nowrap; }
+  .si-keep{ padding:12px 14px; border-radius:var(--r-md); background:var(--surface);
+    border:1px solid var(--border); font-size:13px; color:var(--text-muted); margin-bottom:16px; }
+  .si-moved b{ font-weight:700; }
   .si-cost{ margin-top:12px; font-size:13px; line-height:1.6; color:var(--text-muted); }
   .si-cost b{ color:var(--text); }
   .si-error{ margin-top:12px; padding:10px 12px; border-radius:var(--r-md); background:var(--danger-soft);
@@ -7311,6 +7321,11 @@
 
   function syllabusTabHtml(c){
     var topics = c.syllabus || [];
+    var addDoc = '<div class="si-adddoc">'
+      + '<span>Is the assignment schedule in a separate document? Add it and anything new '
+      + 'is filled in.</span>'
+      + '<button type="button" class="btn" data-action="si-open" data-class="'+c.id+'" data-mode="supplement">'
+      + iconSvg('upload')+'Add a document</button></div>';
     var doneCount = topics.filter(function(t){ return t.done; }).length;
     var html = topics.length
       ? ('<div class="hint" style="margin-bottom:8px;">'+doneCount+' of '+topics.length+' covered</div>'
@@ -7318,6 +7333,7 @@
             return '<div class="topic-row"><label><input type="checkbox" data-action="toggle-topic" data-class="'+c.id+'" data-tid="'+t.id+'" '+(t.done?'checked':'')+'><span'+(t.done?' style="text-decoration:line-through;color:var(--text-faint);"':'')+'>'+escapeHtml(t.title)+'</span></label><button type="button" class="btn ghost" data-action="remove-topic" data-class="'+c.id+'" data-tid="'+t.id+'">✕</button></div>';
           }).join(''))
       : '<div class="hint">No topics yet. Add each week or unit from the syllabus.</div>';
+    html = addDoc + html;
     html += '<div class="material-add-row">'
       + '<input type="text" id="topic-title" placeholder="e.g. Week 4: Working memory">'
       + '<button type="button" class="btn" data-action="add-topic" data-class="'+c.id+'">Add</button>'
@@ -7834,9 +7850,15 @@
   function centsLabel(usd){ return usd < 1 ? Math.max(1, Math.round(usd*100))+'¢' : '$'+usd.toFixed(2); }
   function siThinking(text){ return '<div class="hs-thinking"><i></i>'+escapeHtml(text)+'</div>'; }
 
-  /** @param {string=} classId set when updating a class that already exists */
-  function openSyllabusImport(classId){
-    SI = { id:null, classId: classId || null, filename:'', estimate:null, stage:'pick', error:null, draft:null,
+  /**
+   * @param {string=} classId set when updating a class that already exists
+   * @param {string=} mode    'supplement' for a document added to a class later, such as
+   *                          an assignment schedule the outline left out. It is read as
+   *                          extra material: it adds and fills gaps, and never clears.
+   */
+  function openSyllabusImport(classId, mode){
+    SI = { id:null, classId: classId || null, mode: mode || null, files: [],
+           filename:'', estimate:null, stage:'pick', error:null, draft:null,
            showSame:false, openGroups:{}, returnAfterSettings:false,
            color: PALETTE[classes.length % PALETTE.length] };
     renderSyllabusUpload();
@@ -7849,20 +7871,32 @@
     if(SI.stage === 'pick'){
       body = '<div class="si-drop" id="si-drop">'
         + '<div class="fd-ic">'+iconSvg('upload')+'</div>'
-        + '<div class="fd-main">Drop the syllabus here</div>'
+        + '<div class="fd-main">'+(SI.mode === 'supplement' ? 'Drop the document here' : 'Drop the syllabus here')+'</div>'
         + '<div class="fd-sub">PDF, Word, text or a photo, or '
-        + '<button type="button" class="fd-browse" data-action="si-browse">browse</button></div>'
-        + '<input type="file" id="si-file" hidden accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp,.gif,.html">'
+        + '<button type="button" class="fd-browse" data-action="si-browse">browse</button>. '
+        + 'Several at once is fine.</div>'
+        + '<input type="file" id="si-file" hidden multiple accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp,.gif,.html">'
         + '</div>'
-        + '<div class="hint" style="margin-top:12px;">Vesta reads it, shows you everything it found, '
-        + 'and imports nothing until you have checked it.</div>';
+        + '<div class="hint" style="margin-top:12px;">'
+        + (SI.mode === 'supplement'
+            ? 'For something the syllabus left out, like a separate assignment schedule. '
+              + 'It only adds what is new and fills in what is missing; nothing already in '
+              + 'the class is removed or overwritten without you ticking it.'
+            : 'If the assignment schedule is in a separate document, add both: they are read '
+              + 'together. Vesta shows you everything it found and imports nothing until you '
+              + 'have checked it.')
+        + '</div>';
       foot = '<button class="btn" data-action="si-cancel">Cancel</button>';
     } else if(SI.stage === 'uploading'){
       body = siThinking('Uploading…');
     } else if(SI.stage === 'priced'){
       var e = SI.estimate;
       var over = e.dailyCap && (e.spentToday + e.estimateUsd > e.dailyCap);
-      body = '<div class="si-file">'+iconSvg('files')+'<b>'+escapeHtml(SI.filename)+'</b></div>'
+      body = SI.files.map(function(f){
+          return '<div class="si-file">'+iconSvg('files')+'<b>'+escapeHtml(f.filename)+'</b></div>';
+        }).join('')
+        + '<button type="button" class="fd-browse si-add-more" data-action="si-browse">+ Add another file</button>'
+        + '<input type="file" id="si-file" hidden multiple accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp,.gif,.html">'
         + '<div class="si-cost">Claude Opus 5 reads it for about <b>'+centsLabel(e.estimateUsd)+'</b>. '
         + 'Today so far: $'+Number(e.spentToday).toFixed(2)+' of your $'+Number(e.dailyCap).toFixed(2)+' daily limit.</div>'
         + (over
@@ -7871,7 +7905,9 @@
               + '<div class="hs-actions"><button type="button" class="btn" data-action="si-open-settings">Change the limit</button></div></div>'
             : '');
       foot = '<button class="btn" data-action="si-cancel">Cancel</button>'
-        + '<button class="btn primary" data-action="si-read"'+(over?' disabled':'')+'>Read syllabus</button>';
+        + '<button class="btn primary" data-action="si-read"'+(over?' disabled':'')+'>'
+        + (SI.files.length > 1 ? 'Read all '+SI.files.length : (SI.mode === 'supplement' ? 'Read document' : 'Read syllabus'))
+        + '</button>';
     } else if(SI.stage === 'reading'){
       body = siThinking('Reading the syllabus. This takes one to four minutes; you can leave this open.');
     }
@@ -7879,7 +7915,10 @@
 
     document.getElementById('modal-root').innerHTML =
       '<div class="overlay"><div class="modal" data-action="modal-stop">'
-      + '<div class="modal-head"><h2>'+(cls ? 'Update '+escapeHtml(cls.code||cls.name||'class')+' from its syllabus' : 'Import a syllabus')+'</h2></div>'
+      + '<div class="modal-head"><h2>'
+      + (SI.mode === 'supplement' && cls ? 'Add a document to '+escapeHtml(cls.code||cls.name||'class')
+         : cls ? 'Update '+escapeHtml(cls.code||cls.name||'class')+' from its syllabus' : 'Import a syllabus')
+      + '</h2></div>'
       + '<div class="modal-body">'+body+'</div>'
       + (foot ? '<div class="modal-foot"><span></span><div class="right">'+foot+'</div></div>' : '')
       + '</div></div>';
@@ -7892,32 +7931,65 @@
       zone.addEventListener('drop', function(ev){
         ev.preventDefault(); ev.stopPropagation();
         zone.classList.remove('over');
-        if(ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]) siUpload(ev.dataTransfer.files[0]);
+        if(ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files.length) siUpload(ev.dataTransfer.files);
       });
     }
   }
 
-  function siUpload(file){
+  /** Upload one or several files. Each is stored on its own; they are read together. */
+  function siUpload(fileList){
+    var files = Array.prototype.slice.call(fileList && fileList.length != null ? fileList : [fileList]);
+    if(!files.length) return;
+    var back = SI.files.length ? 'priced' : 'pick';
     SI.stage = 'uploading'; SI.error = null;
     renderSyllabusUpload();
-    var fd = new FormData();
-    fd.append('file', file);
-    if(SI.classId) fd.append('classId', SI.classId);
-    fetch('/api/syllabus', { method:'POST', body: fd })
-      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return { ok:r.ok, body:j }; }); })
-      .then(function(r){
+    var chain = Promise.resolve();
+    files.forEach(function(file){
+      chain = chain.then(function(){
         if(!SI) return;
-        if(!r.ok){ SI.stage = 'pick'; SI.error = r.body.error || 'That upload did not work.'; }
-        else { SI.id = r.body.id; SI.filename = r.body.filename; SI.estimate = r.body; SI.stage = 'priced'; }
-        renderSyllabusUpload();
-      })
-      .catch(function(){ if(SI){ SI.stage = 'pick'; SI.error = 'Could not reach Vesta.'; renderSyllabusUpload(); } });
+        var fd = new FormData();
+        fd.append('file', file);
+        if(SI.classId) fd.append('classId', SI.classId);
+        return fetch('/api/syllabus', { method:'POST', body: fd })
+          .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return { ok:r.ok, body:j }; }); })
+          .then(function(r){
+            if(!SI) return;
+            if(!r.ok) throw new Error((r.body.error || 'That upload did not work.') + ' (' + file.name + ')');
+            SI.files.push({ id: r.body.id, filename: r.body.filename, estimate: r.body });
+          });
+      });
+    });
+    chain.then(function(){
+      if(!SI) return;
+      siPriceAll();
+      SI.stage = SI.files.length ? 'priced' : back;
+      renderSyllabusUpload();
+    }).catch(function(err){
+      if(!SI) return;
+      siPriceAll();
+      SI.stage = SI.files.length ? 'priced' : 'pick';
+      SI.error = err && err.message ? err.message : 'Could not reach Vesta.';
+      renderSyllabusUpload();
+    });
+  }
+
+  /** The first file is the import; the others ride along. One read, so one combined price. */
+  function siPriceAll(){
+    if(!SI.files.length) return;
+    SI.id = SI.files[0].id;
+    SI.filename = SI.files.map(function(f){ return f.filename; }).join(', ');
+    var first = SI.files[0].estimate;
+    var usd = SI.files.reduce(function(t, f){ return t + (Number(f.estimate.estimateUsd) || 0); }, 0);
+    SI.estimate = Object.assign({}, first, { estimateUsd: usd });
   }
 
   function siRead(){
     SI.stage = 'reading'; SI.error = null;
     renderSyllabusUpload();
-    apiPostRaw('/api/syllabus/'+SI.id+'/read', { confirmed:true, classId: SI.classId }).then(function(r){
+    apiPostRaw('/api/syllabus/'+SI.id+'/read', {
+      confirmed: true, classId: SI.classId, mode: SI.mode || null,
+      alsoRead: SI.files.slice(1).map(function(f){ return f.id; })
+    }).then(function(r){
       if(!SI) return;
       if(!r.ok){
         SI.stage = 'priced';
@@ -8150,17 +8222,29 @@
       ? '<div class="hs-confirm" style="margin-bottom:16px;"><h4>Worth double-checking</h4>'
         + d.warnings.map(function(w){ return '<div>'+escapeHtml(w)+'</div>'; }).join('') + '</div>'
       : '';
+    var supplement = siIsSupplement();
+    var clsName = cls ? escapeHtml(cls.code||cls.name||'this class') : '';
     root.innerHTML = '<div class="si-panel"><div class="si-inner">'
-      + '<div class="si-top"><h1>'+(cls ? 'Here’s what changed in '+escapeHtml(cls.code||cls.name||'this class') : 'Here’s what Vesta found')+'</h1></div>'
-      + '<div class="si-sub">From '+escapeHtml(SI.filename||'the syllabus')+'. Check it, fix anything that is wrong, then '
-      + (cls ? 'update the class.' : 'import the course.')+' Highlighted rows are ones Vesta was not sure about.</div>'
+      + '<div class="si-top"><h1>'
+      + (supplement ? 'Here’s what this adds to '+clsName
+         : cls ? 'Here’s what changed in '+clsName : 'Here’s what Vesta found')
+      + '</h1></div>'
+      + '<div class="si-sub">From '+escapeHtml(SI.filename||'the syllabus')+'. '
+      + (supplement
+          ? 'New assignments are ticked. A date that differs from what you already have is '
+            + 'shown but left unticked, so nothing changes unless you tick it.'
+          : 'Check it, fix anything that is wrong, then '+(cls ? 'update the class.' : 'import the course.')
+            + ' Highlighted rows are ones Vesta was not sure about.')
+      + '</div>'
       + '<div class="si-chips" id="si-chips">'+siChipsHtml()+'</div>'
       + siLookPanelHtml()
       + warnings
-      + siCourseHtml() + siMeetingsHtml()
-      + (SI.onlyLook ? '' : siGradingHtml())
+      + (supplement
+          ? '<div class="si-keep">Course details, meeting times and grading in '+clsName
+            + ' stay exactly as they are. Only the assignments below are affected.</div>'
+          : siCourseHtml() + siMeetingsHtml() + (SI.onlyLook ? '' : siGradingHtml()))
       + siItemsHtml()
-      + (SI.onlyLook ? '' : siTopicsHtml())
+      + (SI.onlyLook || supplement ? '' : siTopicsHtml())
       + '</div></div>'
       + siFootHtml();
     paintIcons(root);
@@ -8260,10 +8344,24 @@
 
   function siChipsHtml(){
     var d = SI.draft, look = siLookCount();
-    return '<span class="si-chip">'+d.items.filter(function(i){ return i.include!==false; }).length+' items</span>'
-      + '<span class="si-chip">'+d.meetings.filter(function(m){ return m.include!==false; }).length+' meeting times</span>'
-      + '<span class="si-chip">'+d.categories.length+' grade categories</span>'
-      + (look ? '<span class="si-chip look">'+look+' need'+(look===1?'s':'')+' a look</span>' : '');
+    var nItems = d.items.filter(function(i){ return i.include!==false; }).length;
+    var itemsChip = '<span class="si-chip">'+nItems+' item'+(nItems===1?'':'s')+'</span>';
+    var lookChip = look ? '<span class="si-chip look">'+look+' need'+(look===1?'s':'')+' a look</span>' : '';
+    if(siIsSupplement()){
+      // "0 meeting times, 0 grade categories" would read as the class having none. A
+      // supplement leaves both alone, so the only counts that mean anything are these.
+      var moved = d.items.filter(function(i){
+        return (i.changes||[]).some(function(c){ return c.fill === false; });
+      }).length;
+      return itemsChip
+        + (moved ? '<span class="si-chip look">'+moved+' date'+(moved===1?'':'s')+' changed</span>' : '')
+        + lookChip;
+    }
+    var nMeet = d.meetings.filter(function(m){ return m.include!==false; }).length;
+    return itemsChip
+      + '<span class="si-chip">'+nMeet+' meeting time'+(nMeet===1?'':'s')+'</span>'
+      + '<span class="si-chip">'+d.categories.length+' grade categor'+(d.categories.length===1?'y':'ies')+'</span>'
+      + lookChip;
   }
 
   /** After an edit: footer and chips follow, the page under the cursor does not move. */
@@ -8286,13 +8384,23 @@
 
   var SI_FIELD_LABELS = { dueDate:'Due date', dueTime:'Time', type:'Type', location:'Room', category:'Category', weight:'Weight' };
 
+  /** A document added to a class that exists: read as extra material, never a replacement. */
+  function siIsSupplement(){
+    return !!(SI && SI.draft && (SI.draft.mode === 'supplement'
+      || (SI.draft.diff && SI.draft.diff.supplement)));
+  }
+
   function siItemRowHtml(it){
     var d = SI.draft;
+    // In a supplement the import never touches an existing assignment's category or
+    // weight, so a selector here would only suggest otherwise.
+    var keepsCategory = siIsSupplement() && it.existingId;
     var catSel = '<select data-si-kind="item" data-si-id="'+it.id+'" data-si-field="categoryId">'
       + '<option value="">Own weight</option>'
       + d.categories.map(function(g){ return '<option value="'+g.id+'"'+(it.categoryId===g.id?' selected':'')+'>'+escapeHtml(g.name)+'</option>'; }).join('')
       + '</select>';
-    var weight = it.categoryId ? catSel
+    var weight = keepsCategory ? '<span class="si-keeps">Keeps its category</span>'
+      : it.categoryId ? catSel
       : '<span style="display:flex;gap:4px;align-items:center;">'+catSel
         + '<input type="number" step="0.5" placeholder="%" style="width:64px;" data-si-kind="item" data-si-id="'+it.id+'" data-si-field="weight" value="'+(it.weight!=null?it.weight:'')+'"></span>';
     var badge = it.change==='new' ? '<span class="si-badge new">New</span>'
@@ -8300,7 +8408,9 @@
               : it.change==='same' ? '<span class="si-badge same">Unchanged</span>'
               : it.source==='official' ? '<span class="si-badge official">SFU</span>' : '<span></span>';
     var changes = (it.changes||[]).map(function(ch){
-      return '<span class="si-change">'+escapeHtml(SI_FIELD_LABELS[ch.field]||ch.field)+': <s>'+escapeHtml(ch.before==null?'none':String(ch.before))+'</s> → '
+      return '<span class="si-change'+(ch.fill === false ? ' si-moved' : '')+'">'
+        + (ch.fill === false ? '<b>Changed in this document.</b> ' : '')
+        + escapeHtml(SI_FIELD_LABELS[ch.field]||ch.field)+': <s>'+escapeHtml(ch.before==null?'none':String(ch.before))+'</s> → '
         + escapeHtml(ch.after==null?'none':String(ch.after))+'</span>';
     }).join('');
     var note = siNoteHtml('item', it);
@@ -8671,7 +8781,11 @@
     var tabBar = '<div class="cp-tabbar"><div class="cp-tabs">' + tabs.map(function(tb){
         return '<button type="button" class="cp-tab'+(classDetailTab===tb.key?' active':'')+'" data-action="class-tab" data-tab="'+tb.key+'" data-id="'+c.id+'">'+tb.label+'</button>';
       }).join('') + '</div>'
-      + '<div class="cp-tab-actions"><div class="cp-menu-wrap">'
+      + '<div class="cp-tab-actions">'
+      + '<button type="button" class="btn" data-action="si-open" data-class="'+c.id+'" data-mode="supplement"'
+      + ' title="Add a schedule or any other course document the syllabus left out">'
+      + iconSvg('upload')+'Add a document</button>'
+      + '<div class="cp-menu-wrap">'
       + '<button type="button" class="btn ghost cp-menu-btn" data-action="class-menu-toggle" data-id="'+c.id+'" title="More">'+DOTS+'</button>'
       + (openMenuId===c.id
           ? '<div class="cp-menu">'
@@ -12636,7 +12750,7 @@
       CAL.draft.removed[Number(t.dataset.idx)].include = t.checked;
       return;
     }
-    if(action==='si-open'){ openSyllabusImport(t.dataset.class || null); return; }
+    if(action==='si-open'){ openSyllabusImport(t.dataset.class || null, t.dataset.mode || null); return; }
     if(action==='si-browse'){ var sf = document.getElementById('si-file'); if(sf) sf.click(); return; }
     if(action==='si-cancel'){ siDiscard(); return; }
     if(action==='si-read'){ siRead(); return; }
@@ -13870,7 +13984,7 @@
       return;
     }
     if(t.id === 'si-file'){
-      if(t.files && t.files[0]) siUpload(t.files[0]);
+      if(t.files && t.files.length) siUpload(t.files);
       return;
     }
     if(t.id === 'files-drop-class'){
