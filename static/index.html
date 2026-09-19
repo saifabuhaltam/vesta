@@ -1900,6 +1900,115 @@
     .set-term-back{ grid-column:1 / -1; }
   }
 
+  /* ---------- Study: the Humanizer ---------- */
+  .study-tabs{ margin-bottom:18px; }
+  .hz-layout{ display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:16px; align-items:start; }
+  .hz-main{ display:flex; flex-direction:column; gap:14px; padding:20px 22px; }
+  .hz-intro h3{ font-size:17px; font-weight:700; margin-bottom:4px; }
+  .hz-intro p{ font-size:13px; color:var(--text-muted); line-height:1.55; max-width:640px; }
+  /* Four ways in, all on show: which one you want should never be behind a menu. */
+  .hz-sources{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; }
+  .hz-src{ display:flex; align-items:center; gap:8px; border:1px solid var(--border); background:var(--surface);
+    border-radius:var(--r-md); padding:10px 12px; font:inherit; font-size:12.5px; font-weight:600;
+    color:var(--text-muted); cursor:pointer; text-align:left; }
+  .hz-src svg{ width:16px; height:16px; flex:none; color:var(--text-faint); }
+  .hz-src:hover{ border-color:var(--accent); color:var(--text); }
+  .hz-src.active{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent-ink); }
+  .hz-src.active svg{ color:var(--accent); }
+  .hz-src:disabled{ opacity:.55; cursor:default; }
+  .hz-from{ display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--text-muted);
+    background:var(--surface-2); border-radius:var(--r-md); padding:8px 10px 8px 12px; }
+  .hz-from svg{ width:15px; height:15px; flex:none; color:var(--accent); }
+  .hz-from span{ flex:1; min-width:0; }
+  .hz-from b{ color:var(--text); }
+  .hz-text{ width:100%; min-height:300px; resize:vertical; border:1px solid var(--border);
+    border-radius:var(--r-md); background:var(--surface); color:var(--text); padding:14px 16px;
+    font:inherit; font-size:14px; line-height:1.65; }
+  .hz-text:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .hz-text:disabled{ background:var(--surface-2); color:var(--text-muted); }
+  .hz-foot{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .hz-meter{ display:flex; align-items:center; gap:10px; flex:1; min-width:0; font-size:12.5px; }
+  .hz-count{ color:var(--text-faint); font-weight:600; }
+  .hz-count.over{ color:var(--danger); }
+  .hz-over{ color:var(--danger); }
+  .hz-cost{ color:var(--text-faint); }
+  .hz-voice-toggle{ display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600;
+    color:var(--text-muted); cursor:pointer; }
+  .hz-voice-toggle.is-off{ color:var(--text-faint); cursor:default; }
+  .hz-side{ display:flex; flex-direction:column; gap:12px; }
+  .hz-card{ display:flex; flex-direction:column; gap:9px; align-items:flex-start; }
+  .hz-card-head{ display:flex; align-items:center; gap:8px; width:100%; }
+  .hz-card-head h4{ font-size:13.5px; font-weight:700; margin-right:auto; }
+  .hz-card p, .hz-intro p, .hz-questions p{ margin:0; }
+  .hz-muted{ font-size:12.5px; color:var(--text-faint); line-height:1.5; }
+  .hz-voice-preview{ font-size:12.5px; color:var(--text-muted); line-height:1.55; font-style:italic;
+    border-left:3px solid var(--surface-3); padding-left:10px; }
+  .hz-hist-list{ display:flex; flex-direction:column; gap:2px; width:100%; max-height:420px; overflow:auto; }
+  .hz-hist{ display:flex; flex-direction:column; gap:2px; text-align:left; border:none; background:transparent;
+    border-radius:var(--r-md); padding:8px 10px; margin:0 -10px; font:inherit; cursor:pointer; }
+  .hz-hist:hover{ background:var(--surface-2); }
+  .hz-hist-title{ font-size:13px; font-weight:650; color:var(--text); overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .hz-hist-meta{ font-size:11.5px; color:var(--text-faint); }
+  .hz-voice-input{ min-height:260px; }
+  .hz-pick-filter{ width:100%; margin-bottom:10px; }
+  .hz-pick-list{ display:flex; flex-direction:column; gap:6px; max-height:52vh; overflow:auto; }
+  .hz-pick{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; text-align:left; width:100%;
+    border:1px solid var(--border); background:var(--surface); border-radius:var(--r-md);
+    padding:10px 12px; font:inherit; cursor:pointer; }
+  .hz-pick:hover{ border-color:var(--accent); }
+  .hz-pick b{ font-size:13.5px; font-weight:650; color:var(--text); }
+  .hz-pick-sub{ font-size:12px; color:var(--text-faint); }
+  .hz-pick-msg{ flex-direction:column; align-items:flex-start; gap:4px; }
+  .hz-pick-preview{ font-size:12.5px; color:var(--text-muted); line-height:1.5; }
+
+  .hz-questions{ border:1px solid var(--warn); background:var(--warn-soft); border-radius:var(--r-card);
+    padding:14px 18px; font-size:13px; line-height:1.55; }
+  .hz-questions h4{ font-size:13.5px; font-weight:700; margin-bottom:3px; }
+  .hz-questions p{ color:var(--text-muted); margin-bottom:6px; }
+  .hz-questions ul, .hz-still ul{ padding-left:18px; display:flex; flex-direction:column; gap:3px; }
+  .hz-compare{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; align-items:start; }
+  .hz-pane{ display:flex; flex-direction:column; gap:10px; padding:18px 20px; }
+  .hz-pane-head{ display:flex; align-items:baseline; gap:8px; }
+  .hz-pane-head h4{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+    color:var(--text-muted); margin-right:auto; }
+  .hz-pane-head span{ font-size:11.5px; color:var(--text-faint); }
+  .hz-prose{ white-space:pre-wrap; font-size:14px; line-height:1.75; color:var(--text);
+    max-height:62vh; overflow:auto; overflow-wrap:anywhere; }
+  .hz-mark{ background:var(--warn-soft); color:inherit; border-radius:4px; padding:1px 2px;
+    box-shadow:inset 0 -2px 0 var(--warn); cursor:pointer; transition:background .12s; }
+  .hz-mark sup{ font-size:9.5px; font-weight:800; color:var(--warn); margin-left:2px; }
+  .hz-mark.is-hot{ background:var(--accent-soft); box-shadow:inset 0 -2px 0 var(--accent); }
+  .hz-mark.is-hot sup{ color:var(--accent); }
+  .hz-found-list{ display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:8px; }
+  .hz-tell{ display:flex; gap:11px; align-items:flex-start; background:var(--surface);
+    border:1px solid var(--border); border-radius:var(--r-md); padding:11px 13px; cursor:pointer;
+    transition:border-color .12s, background .12s; }
+  .hz-tell.is-hot{ border-color:var(--accent); background:var(--accent-soft); }
+  .hz-num{ flex:none; width:22px; height:22px; border-radius:50%; background:var(--warn-soft); color:var(--warn);
+    font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+  .hz-tell.is-hot .hz-num{ background:var(--accent); color:#fff; }
+  .hz-tell-body{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .hz-tell-name{ display:flex; align-items:baseline; gap:6px; font-size:13px; }
+  .hz-pat{ font-size:11px; color:var(--text-faint); font-weight:600; }
+  .hz-tell q{ font-size:12.5px; color:var(--text-muted); font-style:italic; overflow-wrap:anywhere; }
+  .hz-tell p{ font-size:12.5px; color:var(--text); line-height:1.5; }
+  .hz-still{ font-size:13px; color:var(--text-muted); line-height:1.55; }
+  .hz-still h4{ font-size:13.5px; font-weight:700; color:var(--text); }
+  .hz-by{ font-size:11.5px; color:var(--text-faint); }
+  @media (max-width:1000px){
+    .hz-layout, .hz-compare{ grid-template-columns:minmax(0,1fr); }
+    .hz-sources{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+  }
+  /* On a phone the rewrite's head stacks: back, then the title and its badges, then the
+     actions on their own row, rather than squeezing the title to nothing. */
+  @media (max-width:720px){
+    .hz-run .th-screen-title{ flex-basis:100%; flex-wrap:wrap; }
+    .hz-run .th-screen-title h2{ flex-basis:100%; white-space:normal; }
+    .hz-run .th-screen-acts{ flex-basis:100%; flex-wrap:wrap; }
+    .hz-run .th-screen-acts .btn{ flex:1 1 auto; }
+  }
+
   /* ---------- The thread screen ---------- */
   /* A conversation is the work, so it gets the page. The rail keeps the other threads
      in the class one click away, which is what stops a full screen feeling like a
@@ -2557,6 +2666,8 @@
     calendar: '<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.6v3.8M16 2.6v3.8"/>',
     classes: '<path d="M12 3 3 7.4l9 4.4 9-4.4L12 3Z"/><path d="M3 12.3 12 16.7l9-4.4"/><path d="M3 16.9 12 21.3l9-4.4"/>',
     assignments: '<rect x="5" y="4.2" width="14" height="16.6" rx="2.4"/><path d="M9.2 3.2h5.6v3.2H9.2z"/><path d="M9 11.6h6M9 15.4h4"/>',
+    pen: '<path d="M4 20h4L19.2 8.8a2.3 2.3 0 0 0 0-3.2l-.8-.8a2.3 2.3 0 0 0-3.2 0L4 16v4Z"/><path d="M13.6 6.4l4 4"/>',
+    chat: '<path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5Z"/>',
     zap: '<path d="M13.2 2.4 4.8 13.6h6.2l-1 8 8.2-11.2h-6.2l1.2-8Z"/>',
     notes: '<path d="M14 3.2H7.4a2.2 2.2 0 0 0-2.2 2.2v13.2a2.2 2.2 0 0 0 2.2 2.2h9.2a2.2 2.2 0 0 0 2.2-2.2V8.2L14 3.2Z"/><path d="M13.8 3.4v4.9h4.9"/><path d="M9 13.4h6M9 16.8h4"/>',
     files: '<path d="M14 3.2H7.4a2.2 2.2 0 0 0-2.2 2.2v13.2a2.2 2.2 0 0 0 2.2 2.2h9.2a2.2 2.2 0 0 0 2.2-2.2V8.2L14 3.2Z"/><path d="M13.8 3.4v4.9h4.9"/>',
@@ -3915,7 +4026,7 @@
       classes:['Classes','Your courses and everything attached to them.'],
       assignments:['Assignments','All your assignments, deadlines, and exams.'],
       headstart:['Headstart','Get ahead on what\'s coming up.'],
-      study:['Study','Flashcards and practice, built from your own terms.'],
+      study:['Study','Flashcards and practice from your own terms, and the Humanizer for your writing.'],
       notes:['Notes','Every note across your classes, in one place.'],
       files:['Files','Store and organize your course materials, notes, and resources.'],
       grades:['Grades','Track your academic progress across all courses.'],
@@ -5019,9 +5130,10 @@
   function viewStudy(){
     if(!hsSideLoaded) hsLoadSide();
     if(studyScreen && studyScreen.kind === 'set') return setScreenHtml();
+    if(studyPane === 'humanizer') return hzViewHtml();
     var sets = studySets();
     if(!sets.length){
-      return '<div class="empty">No sets yet. Make one from a class\'s material in '
+      return studyTabsHtml() + '<div class="empty">No sets yet. Make one from a class\'s material in '
            + 'Headstart, or start an empty set here.'
            + '<div style="margin-top:14px;">'
            + '<button type="button" class="btn" data-action="study-generate">Build from my material</button> '
@@ -5029,7 +5141,7 @@
            + '</div></div>';
     }
     var due = sets.reduce(function(t, d){ return t + (d.dueCount||0); }, 0);
-    return '<div class="hs-bar">'
+    return studyTabsHtml() + '<div class="hs-bar">'
       + '<div class="study-summary">'
       + (due ? '<b>'+due+'</b> card'+(due===1?'':'s')+' ready to review'
              : 'Nothing due right now. Everything is scheduled ahead.')
@@ -5050,6 +5162,457 @@
             + '</button>';
         }).join('')
       + '</div>';
+  }
+
+  // ---------------- Study: the Humanizer ----------------
+  // A second pane of Study beside the sets. It rewrites AI-sounding prose and marks each
+  // habit it removed on the original, so the rewrite comes with its reasons. The prompt
+  // is blader/humanizer (MIT), vendored in vendor/humanizer and sent by humanizer.py.
+
+  var studyPane = 'sets';     // 'sets' or 'humanizer', switched by the tabs at the top of Study
+  var HZ = { loaded:false, loading:false, voice:'', runs:[], maxWords:1500, promptTokens:7500,
+             prices:[2, 10], confirmOverUsd:0.05,
+             text:'', source:null, useVoice:true,
+             busy:false, extracting:false, confirm:null,
+             run:null, runLoading:false, copied:false, savedTo:null,
+             pick:null };      // an open picker: {kind:'note', filter} or {kind:'thread', thread}
+
+  var HZ_SOURCES = [['paste','Paste or type','pen'], ['note','From a note','notes'],
+                    ['thread','From a Headstart thread','chat'], ['file','Upload a file','upload']];
+
+  function hzLoad(){
+    if(HZ.loading) return;
+    HZ.loading = true;
+    apiGet('/api/humanizer').then(function(d){
+      HZ.voice = d.voice || '';
+      HZ.runs = d.runs || [];
+      HZ.maxWords = d.maxWords || HZ.maxWords;
+      HZ.promptTokens = d.promptTokens || HZ.promptTokens;
+      HZ.prices = d.prices || HZ.prices;
+      HZ.confirmOverUsd = d.confirmOverUsd;
+      HZ.loaded = true;
+    }).catch(reportError).then(function(){
+      HZ.loading = false;
+      if(activeTab === 'study' && studyPane === 'humanizer'){ renderView(); paintIcons(); }
+    });
+  }
+
+  function hzWords(text){ return (text||'').split(/\s+/).filter(Boolean).length; }
+
+  /** What a pass should cost, worked out the way humanizer.py works it out. */
+  function hzEstimate(text){
+    var tt = Math.max(1, Math.floor((text||'').length / 4));
+    var input = HZ.promptTokens + tt + Math.floor((HZ.useVoice ? HZ.voice.length : 0) / 4) + 50;
+    var output = Math.floor(tt * 2.5) + 1500;
+    return (input * HZ.prices[0] + output * HZ.prices[1]) / 1e6;
+  }
+
+  function studyTabsHtml(){
+    return '<div class="seg-tabs study-tabs">'
+      + [['sets','Sets'], ['humanizer','Humanizer']].map(function(p){
+          return '<button type="button" class="seg-tab'+(studyPane===p[0]?' active':'')+'"'
+            + ' data-action="study-pane" data-pane="'+p[0]+'">'+p[1]+'</button>';
+        }).join('')
+      + '</div>';
+  }
+
+  function hzViewHtml(){
+    if(!HZ.loaded){ hzLoad(); return studyTabsHtml() + '<div class="hs-thinking"><i></i>Opening the Humanizer…</div>'; }
+    if(HZ.run || HZ.runLoading) return hzRunHtml();
+    return studyTabsHtml() + hzHomeHtml();
+  }
+
+  function hzMeterHtml(){
+    var n = hzWords(HZ.text);
+    var over = n > HZ.maxWords;
+    return '<span class="hz-count'+(over?' over':'')+'">'+n.toLocaleString()+' / '
+      + HZ.maxWords.toLocaleString()+' words</span>'
+      + (over ? '<span class="hz-over">Too long for one pass. Run it a section at a time.</span>'
+              : (n ? '<span class="hz-cost">about $'+hzEstimate(HZ.text).toFixed(2)+'</span>' : ''));
+  }
+
+  /** Typing updates the count and the button, not the whole screen: that would take the caret. */
+  function hzPaintMeter(){
+    var m = document.getElementById('hz-meter');
+    if(m) m.innerHTML = hzMeterHtml();
+    var b = document.getElementById('hz-run');
+    var n = hzWords(HZ.text);
+    if(b) b.disabled = HZ.busy || HZ.extracting || !n || n > HZ.maxWords;
+  }
+
+  function hzHomeHtml(){
+    var kind = HZ.source ? HZ.source.kind : 'paste';
+    var n = hzWords(HZ.text);
+    var blocked = HZ.busy || HZ.extracting || !n || n > HZ.maxWords;
+    return '<div class="hz-layout">'
+      + '<section class="tile hz-main">'
+      + '<div class="hz-intro"><h3>Humanizer</h3>'
+      + '<p>Finds the habits that make writing read as AI-generated, marks each one on your text '
+      + 'with the reason, and rewrites it without them. It keeps what the text says and never '
+      + 'invents facts; where a sentence needs a detail only you have, it asks.</p></div>'
+      + '<div class="hz-sources">'
+      + HZ_SOURCES.map(function(s){
+          return '<button type="button" class="hz-src'+(kind===s[0]?' active':'')+'"'
+            + ' data-action="hz-source" data-kind="'+s[0]+'"'+(HZ.busy?' disabled':'')+'>'
+            + iconSvg(s[2])+'<span>'+s[1]+'</span></button>';
+        }).join('')
+      + '</div>'
+      + '<input type="file" id="hz-file" accept=".pdf,.docx,.txt,.md,.html,.htm" hidden>'
+      + (HZ.source && HZ.source.kind !== 'paste'
+          ? '<div class="hz-from">'+iconSvg(HZ_SOURCES.filter(function(s){ return s[0]===HZ.source.kind; })[0][2])
+            + '<span>From <b>'+escapeHtml(HZ.source.label||'')+'</b>. Edit it here before you run it if you like.</span>'
+            + '<button type="button" class="btn ghost" data-action="hz-clear"'+(HZ.busy?' disabled':'')+'>Clear</button></div>'
+          : '')
+      + (HZ.extracting ? '<div class="hs-thinking"><i></i>Reading the file…</div>' : '')
+      + '<textarea id="hz-text" class="hz-text" data-action="hz-text" spellcheck="true"'
+      + ' placeholder="Paste the writing here: a discussion post, an essay section, a cover letter…"'
+      + (HZ.busy ? ' disabled' : '')+'>'+escapeHtml(HZ.text)+'</textarea>'
+      + '<div class="hz-foot">'
+      + '<div class="hz-meter" id="hz-meter">'+hzMeterHtml()+'</div>'
+      + '<label class="hz-voice-toggle'+(HZ.voice?'':' is-off')+'"'
+      + (HZ.voice ? '' : ' title="Add a sample of your writing first, on the right."')+'>'
+      + '<input type="checkbox" data-action="hz-use-voice"'+(HZ.voice && HZ.useVoice ? ' checked' : '')
+      + (HZ.voice ? '' : ' disabled')+'> Match my voice</label>'
+      + '<button type="button" class="btn primary" data-action="hz-run" id="hz-run"'+(blocked?' disabled':'')+'>'
+      + (HZ.busy ? 'Rewriting…' : 'Rewrite')+'</button>'
+      + '</div>'
+      + (HZ.confirm ? hzConfirmHtml() : '')
+      + (HZ.busy ? '<div class="hs-thinking"><i></i>Marking the AI habits and rewriting. '
+                   + 'Short pieces take about 20 seconds, the longest about a minute.</div>' : '')
+      + '</section>'
+      + '<aside class="hz-side">' + hzVoiceCardHtml() + hzHistoryHtml() + '</aside>'
+      + '</div>';
+  }
+
+  function hzConfirmHtml(){
+    var c = HZ.confirm;
+    if(c.reason === 'confirm'){
+      return '<div class="hs-confirm"><b>This one is over your ask-first amount.</b>'
+        + '<div style="margin-top:6px;">It would cost roughly <b>$'+(c.estimateUsd||0).toFixed(3)+'</b>. '
+        + 'You have spent $'+(c.spentToday||0).toFixed(2)+' of $'+(c.dailyCap||0).toFixed(2)+' today.</div>'
+        + '<div class="hs-actions">'
+        + '<button type="button" class="btn primary" data-action="hz-run" data-confirmed="1">Rewrite it anyway</button>'
+        + '<button type="button" class="btn ghost" data-action="hz-dismiss">Cancel</button></div></div>';
+    }
+    return '<div class="hs-confirm capped"><b>'+escapeHtml(c.error||'Not now.')+'</b>'
+      + '<div class="hs-actions">'
+      + '<button type="button" class="btn" data-action="hs-open-settings">Change the limit</button>'
+      + '<button type="button" class="btn ghost" data-action="hz-dismiss">Not now</button></div></div>';
+  }
+
+  function hzVoiceCardHtml(){
+    var v = HZ.voice;
+    return '<div class="tile hz-card">'
+      + '<div class="hz-card-head"><h4>Your voice</h4>'
+      + (v ? '<span class="type-badge">'+hzWords(v)+' words</span>' : '<span class="type-badge">Not set</span>')
+      + '</div>'
+      + (v
+          ? '<p class="hz-voice-preview">'+escapeHtml(v.length > 240 ? v.slice(0, 240).trim()+'…' : v)+'</p>'
+            + '<p class="hz-muted">Rewrites follow this sample\'s sentence length, word choice and punctuation '
+            + 'when Match my voice is ticked.</p>'
+            + '<button type="button" class="btn" data-action="hz-edit-voice">Edit sample</button>'
+          : '<p class="hz-muted">Paste two or three paragraphs you wrote yourself, with no AI help. '
+            + 'Rewrites will then sound like you rather than like a generic careful writer.</p>'
+            + '<button type="button" class="btn primary" data-action="hz-edit-voice">Add a sample</button>')
+      + '</div>';
+  }
+
+  var HZ_KIND_LABEL = { paste:'Pasted', note:'Note', thread:'Thread', file:'File' };
+
+  function hzHistoryHtml(){
+    return '<div class="tile hz-card">'
+      + '<div class="hz-card-head"><h4>Past rewrites</h4>'
+      + '<span class="hs-bucket-count">'+HZ.runs.length+'</span></div>'
+      + (HZ.runs.length
+          ? '<div class="hz-hist-list">' + HZ.runs.map(function(r){
+              return '<button type="button" class="hz-hist" data-action="hz-open-run" data-id="'+r.id+'">'
+                + '<span class="hz-hist-title">'+escapeHtml(r.title)+'</span>'
+                + '<span class="hz-hist-meta">'+escapeHtml(HZ_KIND_LABEL[r.sourceKind]||'Pasted')
+                + ' · '+r.words.toLocaleString()+' words · '+r.tellCount+' habit'+(r.tellCount===1?'':'s')
+                + ' · '+escapeHtml(relTimeAgo(r.createdAt))+'</span></button>';
+            }).join('') + '</div>'
+          : '<p class="hz-muted">Nothing yet. Every rewrite is kept here so you can come back and copy it.</p>')
+      + '</div>';
+  }
+
+  /** The tells in reading order, numbered the same way in the text and in the list. */
+  function hzOrderedTells(run){
+    var found = (run.tells||[]).filter(function(t){ return t.start >= 0; })
+      .sort(function(a, b){ return a.start - b.start; });
+    var lost = (run.tells||[]).filter(function(t){ return !(t.start >= 0); });
+    return found.concat(lost);
+  }
+
+  /** The original with each habit wrapped in a numbered mark. Overlaps keep the first. */
+  function hzMarkedHtml(text, tells){
+    // A habit inside another's quote (a dash inside a not-X-but-Y) cannot have its own
+    // mark, so it borrows the one around it: hovering or jumping to it still lands.
+    var spans = [];
+    tells.forEach(function(t, i){
+      if(!(t.start >= 0)) return;
+      var end = t.start + t.quote.length;
+      var host = spans.filter(function(sp){ return t.start < sp.end && end > sp.start; })[0];
+      if(host) host.also.push(i);
+      else spans.push({ i:i, start:t.start, end:end, also:[] });
+    });
+    var out = '', at = 0;
+    spans.forEach(function(sp){
+      out += escapeHtml(text.slice(at, sp.start))
+        + '<mark class="hz-mark" data-action="hz-jump" data-hz-i="'+sp.i+'" data-to="tell"'
+        + (sp.also.length ? ' data-hz-also="'+sp.also.join(' ')+'"' : '')+'>'
+        + escapeHtml(text.slice(sp.start, sp.end))
+        + '<sup>'+[sp.i].concat(sp.also).map(function(k){ return k+1; }).join(',')+'</sup></mark>';
+      at = sp.end;
+    });
+    return out + escapeHtml(text.slice(at));
+  }
+
+  function hzRunHtml(){
+    var r = HZ.run;
+    if(!r){
+      return '<div class="set-screen"><div class="th-screen-head">'
+        + '<button type="button" class="th-back" data-action="hz-home">‹ Humanizer</button></div>'
+        + '<div class="hs-thinking"><i></i>Opening the rewrite…</div></div>';
+    }
+    var tells = hzOrderedTells(r);
+    var note = r.sourceKind === 'note' && r.sourceId
+      ? allNotes().filter(function(n){ return n.id === r.sourceId; })[0] : null;
+    return '<div class="set-screen hz-run">'
+      + '<div class="th-screen-head">'
+      + '<button type="button" class="th-back" data-action="hz-home">‹ Humanizer</button>'
+      + '<div class="th-screen-title"><h2>'+escapeHtml(r.title)+'</h2>'
+      + '<span class="type-badge">'+escapeHtml(HZ_KIND_LABEL[r.sourceKind]||'Pasted')+'</span>'
+      + '<span class="type-badge">'+tells.length+' habit'+(tells.length===1?'':'s')+' marked</span>'
+      + (r.usedVoice ? '<span class="type-badge">In your voice</span>' : '')
+      + '</div>'
+      + '<div class="th-screen-acts">'
+      + '<button type="button" class="btn ghost danger" data-action="hz-delete">Delete</button>'
+      + (note ? '<button type="button" class="btn" data-action="hz-replace-note">Replace the note\'s text</button>' : '')
+      + '<button type="button" class="btn" data-action="hz-save-note"'+(HZ.savedTo?' disabled':'')+'>'
+      + (HZ.savedTo ? 'Saved to '+escapeHtml(HZ.savedTo) : 'Save as a note')+'</button>'
+      + '<button type="button" class="btn primary" data-action="hz-copy">'+(HZ.copied ? 'Copied' : 'Copy rewrite')+'</button>'
+      + '</div></div>'
+      + ((r.questions||[]).length
+          ? '<div class="hz-questions"><h4>It needs these from you</h4>'
+            + '<p>The rewrite stays general in these places rather than guessing. Add the details yourself before you use it.</p>'
+            + '<ul>'+r.questions.map(function(q){ return '<li>'+escapeHtml(q)+'</li>'; }).join('')+'</ul></div>'
+          : '')
+      + '<div class="hz-compare">'
+      + '<section class="tile hz-pane"><div class="hz-pane-head"><h4>Original</h4>'
+      + '<span>'+hzWords(r.original).toLocaleString()+' words</span></div>'
+      + '<div class="hz-prose">'+hzMarkedHtml(r.original, tells)+'</div></section>'
+      + '<section class="tile hz-pane"><div class="hz-pane-head"><h4>Rewrite</h4>'
+      + '<span>'+hzWords(r.final).toLocaleString()+' words</span></div>'
+      + '<div class="hz-prose">'+escapeHtml(r.final)+'</div></section>'
+      + '</div>'
+      + '<section class="hz-found"><div class="set-terms-head"><h3>What it found</h3>'
+      + '<span class="hs-bucket-count">'+tells.length+'</span></div>'
+      + (tells.length
+          ? '<div class="hz-found-list">' + tells.map(function(t, i){
+              return '<div class="hz-tell" id="hz-tell-'+i+'" data-action="hz-jump" data-hz-i="'+i+'" data-to="mark">'
+                + '<span class="hz-num">'+(i+1)+'</span><div class="hz-tell-body">'
+                + '<div class="hz-tell-name"><b>'+escapeHtml(t.name||'Pattern')+'</b>'
+                + (t.pattern ? '<span class="hz-pat">#'+t.pattern+'</span>' : '')+'</div>'
+                + '<q>'+escapeHtml(t.quote)+'</q>'
+                + '<p>'+escapeHtml(t.why)+'</p></div></div>';
+            }).join('') + '</div>'
+          : '<div class="empty">It found nothing that reads as AI-generated, so the text is unchanged.</div>')
+      + '</section>'
+      + ((r.stillOff||[]).length
+          ? '<section class="tile hz-card hz-still"><h4>Left on purpose</h4><ul>'
+            + r.stillOff.map(function(s){ return '<li>'+escapeHtml(s)+'</li>'; }).join('')+'</ul></section>'
+          : '')
+      + '<p class="hz-by">The 25 patterns come from Wikipedia\'s "Signs of AI writing", by way of the open-source '
+      + 'humanizer skill (blader/humanizer, MIT).</p>'
+      + '</div>';
+  }
+
+  /** A note's HTML as plain paragraphs, which is what the rewrite works on. */
+  function hzNoteToPlain(html){
+    var d = document.createElement('div');
+    d.innerHTML = html || '';
+    d.querySelectorAll('br').forEach(function(el){ el.replaceWith('\n'); });
+    d.querySelectorAll('li').forEach(function(el){ el.insertAdjacentText('afterbegin', '- '); el.insertAdjacentText('beforeend', '\n'); });
+    d.querySelectorAll('p,div,h1,h2,h3,h4,h5,h6,blockquote,ul,ol,table').forEach(function(el){ el.insertAdjacentText('beforeend', '\n\n'); });
+    return (d.textContent || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  /** Plain paragraphs back into note HTML. */
+  function hzPlainToHtml(text){
+    return (text||'').split(/\n\s*\n/).map(function(p){
+      return p.trim() ? '<p>'+escapeHtml(p.trim()).replace(/\n/g, '<br>')+'</p>' : '';
+    }).join('');
+  }
+
+  /** Put new text in the box, asking first if it would replace something typed there. */
+  function hzLoadText(text, source){
+    var go = function(){
+      HZ.text = text; HZ.source = source; HZ.confirm = null;
+      renderView(); paintIcons();
+      var ta = document.getElementById('hz-text'); if(ta) ta.focus();
+    };
+    if(HZ.text.trim() && HZ.text.trim() !== (text||'').trim()){
+      return confirmAction('Replace the text in the box?', 'What is there now will be cleared.', 'Replace')
+        .then(function(ok){ if(ok) go(); });
+    }
+    go();
+  }
+
+  function hzOpenPicker(kind){
+    HZ.pick = { kind:kind, filter:'', thread:null };
+    hzPaintPicker();
+  }
+
+  function hzPaintPicker(){
+    var p = HZ.pick;
+    if(!p) return;
+    var body = '', title = '';
+    if(p.kind === 'note'){
+      title = 'Which note?';
+      var q = (p.filter||'').toLowerCase();
+      var notes = allNotes().filter(function(n){
+        return !q || (noteDisplayTitle(n)+' '+(n.cls.code||'')).toLowerCase().indexOf(q) >= 0;
+      });
+      body = '<input type="text" id="hz-pick-filter" data-action="hz-pick-filter" class="hz-pick-filter" placeholder="Filter by title or class"'
+        + ' value="'+escapeHtml(p.filter||'')+'">'
+        + (notes.length
+            ? '<div class="hz-pick-list">' + notes.slice(0, 80).map(function(n){
+                var words = hzWords(stripHtml(n.text));
+                return '<button type="button" class="hz-pick" data-action="hz-pick-note" data-id="'+n.id+'">'
+                  + '<span class="dot" style="--c:'+(n.cls.color||'var(--none)')+'"></span>'
+                  + '<b>'+escapeHtml(noteDisplayTitle(n))+'</b>'
+                  + '<span class="hz-pick-sub">'+escapeHtml(n.cls.code||n.cls.name||'')+' · '+words.toLocaleString()+' words</span>'
+                  + '</button>';
+              }).join('') + '</div>'
+            : '<div class="hs-none">'+(allNotes().length ? 'No notes match that.' : 'You have no notes yet.')+'</div>');
+    } else if(!p.thread){
+      title = 'Which thread?';
+      body = hsThreads.length
+        ? '<div class="hz-pick-list">' + hsThreads.map(function(th){
+            return '<button type="button" class="hz-pick" data-action="hz-pick-thread" data-id="'+th.id+'">'
+              + '<span class="dot" style="--c:'+(classColor(th.classId)||'var(--none)')+'"></span>'
+              + '<b>'+escapeHtml(th.title||'Untitled thread')+'</b>'
+              + '<span class="hz-pick-sub">'+escapeHtml(classLabel(th.classId))+' · '
+              + (th.messageCount||0)+' message'+(th.messageCount===1?'':'s')+'</span></button>';
+          }).join('') + '</div>'
+        : '<div class="hs-none">You have no Headstart threads yet.</div>';
+    } else if(p.thread === 'loading'){
+      title = 'Which reply?';
+      body = '<div class="hs-thinking"><i></i>Opening the thread…</div>';
+    } else {
+      title = 'Which reply from "'+(p.thread.title||'Thread')+'"?';
+      var replies = (p.thread.messages||[]).map(function(m, i){ return { m:m, i:i }; })
+        .filter(function(x){ return x.m.role === 'assistant'; }).reverse();
+      body = replies.length
+        ? '<div class="hz-pick-list">' + replies.map(function(x){
+            var txt = x.m.content || '';
+            return '<button type="button" class="hz-pick hz-pick-msg" data-action="hz-pick-msg" data-i="'+x.i+'">'
+              + '<span class="hz-pick-sub">'+escapeHtml(relTimeAgo(x.m.createdAt))+' · '
+              + hzWords(txt).toLocaleString()+' words</span>'
+              + '<span class="hz-pick-preview">'+escapeHtml(txt.slice(0, 220))+(txt.length > 220 ? '…' : '')+'</span>'
+              + '</button>';
+          }).join('') + '</div>'
+        : '<div class="hs-none">This thread has no replies yet.</div>';
+    }
+    paintModal('<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop">'
+      + '<div class="modal-head"><h2>'+escapeHtml(title)+'</h2></div>'
+      + '<div class="modal-body">'+body+'</div>'
+      + '<div class="modal-foot">'
+      + (p.kind === 'thread' && p.thread && p.thread !== 'loading'
+          ? '<button class="btn" data-action="hz-pick-back">‹ Other threads</button>' : '<span></span>')
+      + '<div class="right"><button class="btn" data-action="hz-pick-close">Cancel</button></div></div>'
+      + '</div></div>');
+    paintIcons();
+  }
+
+  function hzPickClose(){ HZ.pick = null; closeModal(); }
+
+  function hzOpenVoiceEditor(){
+    paintModal('<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide" data-action="modal-stop">'
+      + '<div class="modal-head"><h2>Your writing sample</h2>'
+      + '<div class="row-meta" style="margin-top:6px;">Two or three paragraphs you wrote yourself, with no AI help. '
+      + 'A discussion post or a paper you were happy with works well. The more it sounds like you, the better.</div></div>'
+      + '<div class="modal-body">'
+      + '<textarea id="hz-voice-input" class="hz-text hz-voice-input" placeholder="Paste your own writing here">'
+      + escapeHtml(HZ.voice)+'</textarea>'
+      + '<div class="hz-muted" id="hz-voice-count">'+hzWords(HZ.voice)+' words</div></div>'
+      + '<div class="modal-foot">'
+      + (HZ.voice ? '<button class="btn ghost danger" data-action="hz-voice-clear">Remove sample</button>' : '<span></span>')
+      + '<div class="right"><button class="btn" data-action="modal-close">Cancel</button>'
+      + '<button class="btn primary" data-action="hz-voice-save">Save</button></div></div>'
+      + '</div></div>');
+    var ta = document.getElementById('hz-voice-input'); if(ta) ta.focus();
+  }
+
+  function hzSaveVoice(text){
+    return apiPut('/api/humanizer/voice', { text:text }).then(function(d){
+      HZ.voice = d.voice || '';
+      if(HZ.voice) HZ.useVoice = true;
+      closeModal(); renderView(); paintIcons();
+    }).catch(reportError);
+  }
+
+  function hzRun(confirmed){
+    if(HZ.busy) return;
+    var ta = document.getElementById('hz-text');
+    if(ta) HZ.text = ta.value;
+    if(!hzWords(HZ.text)) return;
+    HZ.busy = true; HZ.confirm = null;
+    renderView(); paintIcons();
+    apiPostRaw('/api/humanizer/run', {
+      text: HZ.text, source: HZ.source || { kind:'paste' },
+      useVoice: !!(HZ.voice && HZ.useVoice), confirmed: !!confirmed
+    }).then(function(res){
+      HZ.busy = false;
+      if(res.ok){
+        var run = res.body;
+        HZ.runs.unshift({ id:run.id, title:run.title, sourceKind:run.sourceKind, sourceLabel:run.sourceLabel,
+                          words:run.words, tellCount:run.tellCount, createdAt:run.createdAt });
+        HZ.run = run; HZ.copied = false; HZ.savedTo = null;
+        HZ.text = ''; HZ.source = null;
+        if(hsSideLoaded) hsLoadSide();       // the spend chip should reflect this pass
+      } else if(res.status === 409 || res.status === 402){
+        HZ.confirm = res.body;
+      } else {
+        reportError(new Error(res.body.error || ('The rewrite failed ('+res.status+').')));
+      }
+      if(activeTab === 'study' && studyPane === 'humanizer'){ renderView(); paintIcons(); window.scrollTo(0, 0); }
+    }).catch(function(err){
+      HZ.busy = false;
+      if(activeTab === 'study' && studyPane === 'humanizer'){ renderView(); paintIcons(); }
+      reportError(err);
+    });
+  }
+
+  function hzOpenRun(id){
+    HZ.run = null; HZ.runLoading = true; HZ.copied = false; HZ.savedTo = null;
+    renderView(); paintIcons();
+    apiGet('/api/humanizer/runs/'+id).then(function(run){
+      HZ.run = run;
+    }).catch(reportError).then(function(){
+      HZ.runLoading = false;
+      renderView(); paintIcons(); window.scrollTo(0, 0);
+    });
+  }
+
+  function hzUpload(file){
+    if(!file) return;
+    HZ.extracting = true; renderView(); paintIcons();
+    var fd = new FormData();
+    fd.append('file', file);
+    fetch('/api/humanizer/extract', { method:'POST', body:fd }).then(checkOk).then(function(d){
+      HZ.extracting = false;
+      hzLoadText(d.text, { kind:'file', label:d.filename });
+    }).catch(function(err){
+      HZ.extracting = false; renderView(); paintIcons(); reportError(err);
+    });
+  }
+
+  /** Highlight a habit in the text and in the list together. */
+  function hzHot(i, on){
+    document.querySelectorAll('.hz-run [data-hz-i="'+i+'"], .hz-run [data-hz-also~="'+i+'"]').forEach(function(el){
+      el.classList.toggle('is-hot', on);
+    });
   }
 
   /** One set: the modes across the top, the terms underneath. */
@@ -12322,6 +12885,9 @@
       idx.push({ type:'Pages', icon:'→', title:label, meta:'Page', action:'switch-tab',
                  tab:b.dataset.tab, text:label.toLowerCase() });
     });
+    // not a sidebar page, but it should be findable by name
+    idx.push({ type:'Pages', icon:'→', title:'Humanizer', meta:'Study', action:'hz-open',
+               text:'humanizer rewrite ai writing study' });
     return idx;
   }
   function openSearch(){
@@ -12435,8 +13001,24 @@
     if(document.visibilityState === 'hidden') flushFocusTime();
   });
 
+  // A marked habit and its entry in the list light up together.
+  document.addEventListener('mouseover', function(e){
+    var el = e.target.closest && e.target.closest('.hz-run [data-hz-i]');
+    if(el) hzHot(el.dataset.hzI, true);
+  });
+  document.addEventListener('mouseout', function(e){
+    var el = e.target.closest && e.target.closest('.hz-run [data-hz-i]');
+    if(el) hzHot(el.dataset.hzI, false);
+  });
   document.addEventListener('input', function(e){
     if(TH && e.target && e.target.id === 'th-draft'){ TH.draft = e.target.value; return; }
+    if(e.target && e.target.id === 'hz-text'){ HZ.text = e.target.value; hzPaintMeter(); return; }
+    if(e.target && e.target.id === 'hz-pick-filter' && HZ.pick){ HZ.pick.filter = e.target.value; hzPaintPicker(); return; }
+    if(e.target && e.target.id === 'hz-voice-input'){
+      var hzVc = document.getElementById('hz-voice-count');
+      if(hzVc) hzVc.textContent = hzWords(e.target.value) + ' words';
+      return;
+    }
     if(QZ && e.target && e.target.dataset && e.target.dataset.action === 'qz-write'){
       QZ.answers[e.target.dataset.id] = e.target.value;
       qzPaintProgress();   // not a full render: that would take the caret with it
@@ -12758,7 +13340,7 @@
     if(action==='toggle-sidebar'){ setSidebarCollapsed(!sidebarCollapsed); return; }
     if(action==='switch-tab'){
       if(t.dataset.tab !== 'headstart'){ hsScreen = null; TH = null; }
-      if(t.dataset.tab !== 'study'){ studyScreen = null; }
+      if(t.dataset.tab !== 'study'){ studyScreen = null; HZ.run = null; }
       activeTab = t.dataset.tab; render(); return;
     }
     if(action==='set-theme'){ setTheme(t.dataset.themeChoice); return; }
@@ -13963,6 +14545,136 @@
       return;
     }
 
+    // ---- Study: Humanizer ----
+    if(action==='study-pane'){
+      studyPane = t.dataset.pane; studyScreen = null; FC = null; HZ.run = null;
+      renderView(); paintIcons(); return;
+    }
+    if(action==='hz-open'){
+      activeTab = 'study'; studyPane = 'humanizer'; studyScreen = null; HZ.run = null;
+      render(); return;
+    }
+    if(action==='hz-source'){
+      var hzKind = t.dataset.kind;
+      if(hzKind === 'paste'){
+        HZ.source = null; renderView(); paintIcons();
+        var hzTa = document.getElementById('hz-text'); if(hzTa) hzTa.focus();
+        return;
+      }
+      if(hzKind === 'file'){
+        var hzFile = document.getElementById('hz-file');
+        if(hzFile){ hzFile.value = ''; hzFile.click(); }
+        return;
+      }
+      hzOpenPicker(hzKind);
+      return;
+    }
+    if(action==='hz-clear'){ HZ.source = null; HZ.text = ''; HZ.confirm = null; renderView(); paintIcons(); return; }
+    if(action==='hz-pick-note'){
+      var hzNote = allNotes().filter(function(n){ return n.id === t.dataset.id; })[0];
+      hzPickClose();
+      if(hzNote) hzLoadText(hzNoteToPlain(hzNote.text), { kind:'note', id:hzNote.id, label:noteDisplayTitle(hzNote) });
+      return;
+    }
+    if(action==='hz-pick-thread'){
+      if(!HZ.pick) return;
+      HZ.pick.thread = 'loading'; hzPaintPicker();
+      apiGet('/api/threads/'+t.dataset.id).then(function(d){
+        if(HZ.pick){ HZ.pick.thread = d; hzPaintPicker(); }
+      }).catch(function(err){ hzPickClose(); reportError(err); });
+      return;
+    }
+    if(action==='hz-pick-back'){ if(HZ.pick){ HZ.pick.thread = null; hzPaintPicker(); } return; }
+    if(action==='hz-pick-msg'){
+      var hzTh = HZ.pick && HZ.pick.thread;
+      var hzMsg = hzTh && hzTh.messages ? hzTh.messages[Number(t.dataset.i)] : null;
+      hzPickClose();
+      if(hzMsg) hzLoadText(hzMsg.content || '', { kind:'thread', id:hzTh.id, label:hzTh.title || 'Thread' });
+      return;
+    }
+    if(action==='hz-pick-close'){ hzPickClose(); return; }
+    if(action==='hz-edit-voice'){ hzOpenVoiceEditor(); return; }
+    if(action==='hz-voice-save'){
+      var hzVi = document.getElementById('hz-voice-input');
+      hzSaveVoice(hzVi ? hzVi.value.trim() : '');
+      return;
+    }
+    if(action==='hz-voice-clear'){
+      confirmAction('Remove your writing sample?',
+                    'Rewrites stop matching your voice until you add one again.', 'Remove')
+        .then(function(ok){ if(ok) hzSaveVoice(''); });
+      return;
+    }
+    if(action==='hz-run'){ hzRun(t.dataset.confirmed === '1'); return; }
+    if(action==='hz-dismiss'){ HZ.confirm = null; renderView(); paintIcons(); return; }
+    if(action==='hz-open-run'){ hzOpenRun(t.dataset.id); return; }
+    if(action==='hz-home'){ HZ.run = null; HZ.runLoading = false; renderView(); paintIcons(); return; }
+    if(action==='hz-copy'){
+      if(!HZ.run) return;
+      // The button changes in place: a full render here would move the page under you.
+      navigator.clipboard.writeText(HZ.run.final).then(function(){
+        HZ.copied = true; t.textContent = 'Copied';
+        setTimeout(function(){ HZ.copied = false; t.textContent = 'Copy rewrite'; }, 1800);
+      }).catch(function(){
+        reportError(new Error('Your browser blocked copying. Select the rewrite and copy it by hand.'));
+      });
+      return;
+    }
+    if(action==='hz-save-note'){
+      var hzRunNow = HZ.run;
+      if(!hzRunNow) return;
+      var hzSaveTo = function(cid){
+        var hzCls = cid === INBOX_ID ? null : classById(cid);
+        addNote(cid, { title: hzRunNow.title + ' (rewritten)', text: hzPlainToHtml(hzRunNow.final) }).then(function(){
+          HZ.savedTo = hzCls ? (hzCls.code || hzCls.name || 'notes') : 'Inbox';
+          // saving reloads state, which may have repainted the screen, so look it up again
+          var hzBtn = document.querySelector('[data-action="hz-save-note"]');
+          if(hzBtn){ hzBtn.textContent = 'Saved to ' + HZ.savedTo; hzBtn.disabled = true; }
+        }).catch(reportError);
+      };
+      if(!classes.length) hzSaveTo(INBOX_ID);
+      else pickClassThen(null, 'Save the rewrite to which class?', hzSaveTo);
+      return;
+    }
+    if(action==='hz-replace-note'){
+      var hzR = HZ.run;
+      if(!hzR) return;
+      confirmAction('Replace the note\'s text with the rewrite?',
+                    'The note becomes plain paragraphs, so headings, lists and formatting in it go. '
+                    + 'Its version history keeps the old text.', 'Replace')
+        .then(function(ok){
+          if(!ok) return;
+          updateNote(hzR.sourceId, { text: hzPlainToHtml(hzR.final) }).then(function(){
+            notify('Note updated', 'The rewrite is in the note now. The old text is in its version history.');
+          }).catch(reportError);
+        });
+      return;
+    }
+    if(action==='hz-delete'){
+      var hzD = HZ.run;
+      if(!hzD) return;
+      confirmAction('Delete this rewrite?', 'It comes off your list of past rewrites. Nothing else changes.')
+        .then(function(ok){
+          if(!ok) return;
+          apiDelete('/api/humanizer/runs/'+hzD.id).then(function(){
+            HZ.runs = HZ.runs.filter(function(x){ return x.id !== hzD.id; });
+            HZ.run = null; renderView(); paintIcons();
+          }).catch(reportError);
+        });
+      return;
+    }
+    if(action==='hz-jump'){
+      var hzI = t.dataset.hzI;
+      var hzTarget = t.dataset.to === 'tell' ? document.getElementById('hz-tell-'+hzI)
+                   : document.querySelector('.hz-mark[data-hz-i="'+hzI+'"], .hz-mark[data-hz-also~="'+hzI+'"]');
+      if(hzTarget){
+        hzTarget.scrollIntoView({ behavior:'smooth', block:'center' });
+        hzHot(hzI, true);
+        setTimeout(function(){ hzHot(hzI, false); }, 1400);
+      }
+      return;
+    }
+
     // ---- flashcards ----
     if(action==='hs-open-deck'){ hsBackItemId = null; openStudySet(t.dataset.id); return; }
     if(action==='study-open-set'){ openStudySet(t.dataset.id); return; }
@@ -14097,6 +14809,8 @@
 
   document.addEventListener('change', function(e){
     var t = e.target;
+    if(t.id === 'hz-file'){ hzUpload(t.files && t.files[0]); return; }
+    if(t.matches('[data-action="hz-use-voice"]')){ HZ.useVoice = t.checked; hzPaintMeter(); return; }
     if(t.id === 'item-file-input'){
       if(itemFilePickerId && t.files && t.files.length) uploadFilesToItem(itemFilePickerId, t.files);
       return;

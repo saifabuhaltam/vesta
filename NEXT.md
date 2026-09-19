@@ -922,6 +922,31 @@ Still modals, and the obvious next pass:
 - [ ] **Existing saved Headstarts still are not threads.** They open in the old
       workspace. Migrating them would finish collapsing the two surfaces into one.
 
+## Humanizer in Study, built 2026-09-18
+
+Rewrites AI-sounding prose and marks each habit it removed on the original. The prompt
+is blader/humanizer's `SKILL.md` (MIT), vendored in `vendor/humanizer/` with the commit
+it came from; `humanizer.py` sends it as a cached system block and asks for JSON.
+Saif's choices: rewrite plus marked habits, a saved voice sample edited on the screen,
+all four sources (paste, note, thread, file), and a kept history.
+
+Measured against the real model on 2026-09-18, Sonnet 5:
+- Medium effort: 250 words in 20 s, 1,305 words in 63 s. The default effort took 39 s for
+  250 words and was no better; low left inflated phrases in; thinking off dropped a fact.
+- Cost is about 4 cents for 250 words and 8 cents for 1,300. The 7,500-token prompt is a
+  cache read on a second pass within five minutes.
+- The ceiling is 1,500 words, set by gunicorn's 120 s timeout, not the model.
+
+Rough edges left:
+- [ ] **Longer papers go through by hand, a section at a time.** Splitting on paragraph
+      boundaries and running the parts one request each would lift the ceiling without
+      touching the timeout.
+- [ ] **No "from Files" source.** Uploaded course files already have `extracted_text`,
+      so a picker over them would be cheap. Upload covers it for now.
+- [ ] **A note brought in loses its formatting**, and "Replace the note's text" writes
+      plain paragraphs back. The confirm says so, and the version history keeps the old
+      text.
+
 ## Decisions waiting on Saif
 
 - [ ] **Delete `cloud/`?** The Worker, R2 integration and four JavaScript shims are

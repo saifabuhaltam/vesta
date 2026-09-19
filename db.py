@@ -346,6 +346,28 @@ CREATE TABLE IF NOT EXISTS thread_sources (
     created_at TEXT
 );
 
+-- One pass of the Humanizer in Study: the text as it came in, the rewrite, and the
+-- AI habits it marked. Kept so a rewrite can be reopened and copied later. No class
+-- and no term: a piece of writing is not always about one course.
+CREATE TABLE IF NOT EXISTS humanizer_runs (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    -- where the text came from: paste, note, thread or file
+    source_kind TEXT,
+    source_id TEXT,
+    source_label TEXT,
+    original TEXT,
+    final TEXT,
+    tells TEXT,                     -- JSON: [{quote, pattern, name, why, start}]
+    still_off TEXT,                 -- JSON: what the rewrite left alone on purpose
+    questions TEXT,                 -- JSON: details only the writer can supply
+    used_voice INTEGER DEFAULT 0,
+    model TEXT,
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    created_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS term_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     name TEXT,

@@ -31,7 +31,7 @@ def clean():
     yield
     conn = psycopg.connect(DATABASE_URL, autocommit=True)
     with conn.cursor() as cur:
-        for t in ("materials", "classes", "app_settings", "ai_usage"):
+        for t in ("materials", "classes", "app_settings", "ai_usage", "humanizer_runs"):
             cur.execute(f"alter table {t} no force row level security")
             cur.execute(f"delete from {t}")
             cur.execute(f"alter table {t} force row level security")
@@ -275,6 +275,34 @@ def test_preferences_are_per_account():
         conn = vdb.get_db(user_id=uid)
         assert prefs.read(conn)["theme"] == theme
         conn.close()
+
+
+def test_humanizer_rewrites_and_voice_samples_are_per_account():
+    """Migration 005 built the table with its policies, and the voice sample is per account.
+
+    The sample is someone's own writing, and a rewrite is often a draft they have not
+    handed in yet: either one reaching another account would be the worst leak here.
+    """
+    import humanizer
+
+    for uid, voice, rid in ((ALICE, "Alice writes like this.", "run-a"), (BOB, "Bob writes like that.", "run-b")):
+        conn = vdb.get_db(user_id=uid)
+        humanizer.save_voice(conn, voice)
+        conn.execute("INSERT INTO humanizer_runs (id, title, original, final, tells, created_at)"
+                     " VALUES (?,?,?,?,?,?)", (rid, "t", "orig " + uid, "final", "[]", "2026-09-18"))
+        conn.commit()
+        conn.close()
+
+    for uid, voice, rid in ((ALICE, "Alice writes like this.", "run-a"), (BOB, "Bob writes like that.", "run-b")):
+        conn = vdb.get_db(user_id=uid)
+        assert humanizer.voice_sample(conn) == voice
+        assert [r["id"] for r in conn.execute("SELECT id FROM humanizer_runs").fetchall()] == [rid]
+        conn.close()
+
+    conn = vdb.get_db(user_id=BOB)
+    assert conn.execute("DELETE FROM humanizer_runs WHERE id='run-a'").rowcount == 0
+    conn.commit()
+    conn.close()
 
 
 def test_one_accounts_export_cannot_reach_another():

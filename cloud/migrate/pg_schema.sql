@@ -126,6 +126,28 @@ create table if not exists calendar_accounts (
 create index if not exists calendar_accounts_user_idx on calendar_accounts(user_id);
 
 -- ----------------------------------------------------------------------
+create table if not exists humanizer_runs (
+  "id" text,
+  "title" text,
+  "source_kind" text,
+  "source_id" text,
+  "source_label" text,
+  "original" text,
+  "final" text,
+  "tells" text,
+  "still_off" text,
+  "questions" text,
+  "used_voice" integer default 0,
+  "model" text,
+  "input_tokens" integer default 0,
+  "output_tokens" integer default 0,
+  "created_at" text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  primary key ("id")
+);
+create index if not exists humanizer_runs_user_idx on humanizer_runs(user_id);
+
+-- ----------------------------------------------------------------------
 create table if not exists semesters (
   "id" text,
   "name" text,
@@ -658,6 +680,7 @@ begin
     'ai_usage',
     'app_settings',
     'calendar_accounts',
+    'humanizer_runs',
     'semesters',
     'term_settings',
     'calendar_feeds',

@@ -358,6 +358,27 @@ anything happens: what it is working on, what it will read, and what it will cos
 - Every Headstart panel opened from inside an assignment card carries a
   **← Back to the assignment** button (`hsBackItemId`). Opened from the Headstart page,
   there is nothing to go back to, so there is no button.
+
+### Study: the Humanizer
+
+Study has two panes, **Sets** and **Humanizer**, switched by a `.seg-tabs` row at the top
+of the page (`studyPane`). Both are always on show; neither is a sidebar entry.
+
+- **Home** (`.hz-layout`): the editor card on the left, and on the right the voice card
+  and the list of past rewrites. The four ways to bring text in (paste, a note, a
+  Headstart thread reply, an uploaded file) are four visible `.hz-src` buttons, never a
+  menu. Text that came from somewhere says so in `.hz-from` and stays editable.
+- **Price before spending.** The foot of the editor shows words against the ceiling and a
+  live estimate. Over the ceiling the count turns red and Rewrite disables. Refusals use
+  the same `.hs-confirm` panel as Headstart.
+- **The result** (`.hz-run`) puts the original and the rewrite side by side. Each habit
+  is a `.hz-mark` on the original, numbered to match its card in "What it found", and
+  pointing at either lights both (`.is-hot`). A habit inside another's quote shares that
+  mark (`data-hz-also`) rather than going unmarked. Questions the model could not answer
+  without inventing come first, in a warn-toned `.hz-questions` panel, because the rewrite
+  is not ready to use until they are dealt with.
+- Copy and Save as a note confirm by changing their own label, not with a dialog: a
+  re-render there would move the page under you.
 - **Flashcards** use SM-2 scheduling. Review is one card at a time, front first, back on
   click, then four grades. Nothing about the schedule is exposed as a number in the UI.
 

@@ -276,3 +276,36 @@ grant select, insert, update, delete on thread_sources to authenticated;
 revoke all on threads from anon;
 revoke all on thread_messages from anon;
 revoke all on thread_sources from anon;
+
+
+-- migration: 005_humanizer
+-- Study gains a Humanizer: paste, pick or upload a piece of writing, get back a rewrite
+-- with the AI habits it removed marked on the original. Each pass is kept so it can be
+-- reopened. Nothing existing changes; the voice sample lives in app_settings, which is
+-- already per account.
+
+create table if not exists humanizer_runs (
+  "id"            text primary key,
+  "title"         text,
+  "source_kind"   text,
+  "source_id"     text,
+  "source_label"  text,
+  "original"      text,
+  "final"         text,
+  "tells"         text,
+  "still_off"     text,
+  "questions"     text,
+  "used_voice"    integer default 0,
+  "model"         text,
+  "input_tokens"  integer default 0,
+  "output_tokens" integer default 0,
+  "created_at"    text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade
+);
+create index if not exists humanizer_runs_user_idx on humanizer_runs(user_id);
+create index if not exists humanizer_runs_by_created on humanizer_runs("created_at");
+
+select apply_owner_rls('humanizer_runs');
+
+grant select, insert, update, delete on humanizer_runs to authenticated;
+revoke all on humanizer_runs from anon;
