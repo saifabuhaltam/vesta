@@ -946,6 +946,10 @@ Rough edges left:
 - [ ] **A note brought in loses its formatting**, and "Replace the note's text" writes
       plain paragraphs back. The confirm says so, and the version history keeps the old
       text.
+- [ ] **Not yet run signed in on the live site.** Deployed as `6594937`; /health shows
+      `005_humanizer` applied and 36 tables. Everything else was tested locally: 43
+      browser checks against a stubbed model, three real runs against Sonnet 5, and the
+      Postgres isolation test. The first real rewrite on vesta.study is the last check.
 
 ## Decisions waiting on Saif
 
