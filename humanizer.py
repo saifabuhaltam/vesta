@@ -15,27 +15,32 @@ user turn, so a second pass within a few minutes reads the prompt from cache.
 """
 import json
 import os
+import queue
 import tempfile
+import threading
 import uuid
 from datetime import datetime
 
 import anthropic
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 from werkzeug.utils import secure_filename
 
 import ai
-from db import get_db
+from db import current_user_id, get_db
 
 bp = Blueprint("humanizer", __name__)
 
 SKILL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "vendor", "humanizer", "SKILL.md")
 
-# Bounded by the request, not the model: gunicorn kills a worker after 120 seconds, and
-# the rewrite is about as long as the original plus the model's own working. Measured
-# on Sonnet 5 at medium effort, 250 words takes about 20 seconds; the ceiling keeps the
-# longest run comfortably inside the limit. A longer paper goes through in sections.
-MAX_WORDS = 1500
+# Measured on Sonnet 5 at medium effort: 250 words takes about 20 seconds, 1,305 about
+# 63, so 4,000 is roughly three minutes. That only works because the run is streamed on
+# a threaded worker: the old sync worker was killed at 120 seconds, which is what held
+# the ceiling at 1,500. A longer paper still goes through in sections.
+MAX_WORDS = 4000
+# Seconds between keep-alive comments while the model is quiet, so nothing between the
+# browser and the app decides the connection has gone idle.
+HEARTBEAT_SECONDS = 10
 # Medium, measured against the default and low on the same text: the default thought
 # for 4,600 tokens and 39 seconds for a rewrite no better than medium's 2,100 and 20;
 # low was faster again but left inflated phrases in. With thinking off the rewrite
@@ -163,18 +168,30 @@ def check_budget(conn, cfg, in_tokens, est_usd, confirmed):
                             "spentToday": used["usd"], "dailyCap": cfg["daily_cap_usd"]}, 409)
 
 
-def call_model(conn, cfg, text, voice, max_tokens):
+def call_model(conn, cfg, text, voice, max_tokens, on_progress=None):
+    """One streamed pass. `on_progress(phase, chars)` hears about it as it goes."""
     user = ""
     if voice.strip():
         user += "<voice_sample>\n" + voice.strip() + "\n</voice_sample>\n\n"
     user += "<text>\n" + text + "\n</text>"
     try:
-        response = anthropic.Anthropic().messages.create(
+        written = 0
+        with anthropic.Anthropic().messages.stream(
             model=cfg["model"], max_tokens=max_tokens, system=SYSTEM,
             output_config={"format": {"type": "json_schema", "schema": SCHEMA},
                            "effort": EFFORT},
+            # summarized, so there is something to show while it works
+            thinking={"type": "adaptive", "display": "summarized"},
             messages=[{"role": "user", "content": user}],
-        )
+        ) as stream:
+            for ev in stream:
+                if on_progress and ev.type == "content_block_delta":
+                    if ev.delta.type == "thinking_delta":
+                        on_progress("thinking", 0)
+                    elif ev.delta.type == "text_delta":
+                        written += len(ev.delta.text)
+                        on_progress("writing", written)
+            response = stream.get_final_message()
     except anthropic.AuthenticationError:
         raise ai.AiRefused({"error": "The Anthropic API key is missing or was rejected."}, 503)
     except anthropic.RateLimitError:
@@ -332,30 +349,91 @@ def run():
         voice = voice_sample(conn) if body.get("useVoice", True) else ""
         cfg, in_tokens, out_tokens, est = estimate(conn, text, voice)
         check_budget(conn, cfg, in_tokens, est, bool(body.get("confirmed")))
-        data, usage = call_model(conn, cfg, text, voice, max_tokens=min(20000, out_tokens * 2))
-
-        rid = str(uuid.uuid4())
-        kind = source.get("kind") if source.get("kind") in ("paste", "note", "thread", "file") else "paste"
-        label = (source.get("label") or "").strip()
-        conn.execute(
-            "INSERT INTO humanizer_runs (id, title, source_kind, source_id, source_label, original,"
-            " final, tells, still_off, questions, used_voice, model, input_tokens, output_tokens,"
-            " created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (rid, title_for(text, label), kind, source.get("id"), label, text,
-             (data.get("final") or "").strip(),
-             json.dumps(place_tells(text, data.get("tells"))),
-             json.dumps([s for s in data.get("stillOff") or [] if s]),
-             json.dumps([q for q in data.get("questions") or [] if q]),
-             1 if voice.strip() else 0, usage["model"],
-             usage["inputTokens"] + usage["cacheReadTokens"] + usage["cacheWriteTokens"],
-             usage["outputTokens"], now_iso()))
-        conn.commit()
-        row = conn.execute("SELECT * FROM humanizer_runs WHERE id=?", (rid,)).fetchone()
-        return jsonify(serialize_run(row)), 201
     except ai.AiRefused as e:
-        return jsonify(e.payload), e.status
-    finally:
         conn.close()
+        return jsonify(e.payload), e.status
+    except Exception:
+        conn.close()
+        raise
+
+    run_args = (text, source, voice, cfg, min(32000, out_tokens * 2))
+    if not body.get("stream"):
+        try:
+            return jsonify(serialize_run(do_run(conn, *run_args))), 201
+        except ai.AiRefused as e:
+            return jsonify(e.payload), e.status
+        finally:
+            conn.close()
+    conn.close()
+    return stream_run(current_user_id(), run_args)
+
+
+def do_run(conn, text, source, voice, cfg, max_tokens, on_progress=None):
+    """Call the model and keep the result. Returns the stored row."""
+    data, usage = call_model(conn, cfg, text, voice, max_tokens, on_progress)
+    rid = str(uuid.uuid4())
+    kind = source.get("kind") if source.get("kind") in ("paste", "note", "thread", "file") else "paste"
+    label = (source.get("label") or "").strip()
+    conn.execute(
+        "INSERT INTO humanizer_runs (id, title, source_kind, source_id, source_label, original,"
+        " final, tells, still_off, questions, used_voice, model, input_tokens, output_tokens,"
+        " created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (rid, title_for(text, label), kind, source.get("id"), label, text,
+         (data.get("final") or "").strip(),
+         json.dumps(place_tells(text, data.get("tells"))),
+         json.dumps([s for s in data.get("stillOff") or [] if s]),
+         json.dumps([q for q in data.get("questions") or [] if q]),
+         1 if voice.strip() else 0, usage["model"],
+         usage["inputTokens"] + usage["cacheReadTokens"] + usage["cacheWriteTokens"],
+         usage["outputTokens"], now_iso()))
+    conn.commit()
+    return conn.execute("SELECT * FROM humanizer_runs WHERE id=?", (rid,)).fetchone()
+
+
+def stream_run(user_id, run_args):
+    """Run it on a thread of its own and report progress as server-sent events.
+
+    The call runs apart from the response so a quiet stretch (the model thinking) can
+    still send keep-alives, and so a run finishes and lands in the history even if the
+    tab is closed halfway: the student paid for it.
+    """
+    events = queue.Queue()
+
+    def work():
+        conn = get_db(user_id=user_id)
+        try:
+            row = do_run(conn, *run_args,
+                         on_progress=lambda phase, chars: events.put(("progress", {"phase": phase, "chars": chars})))
+            events.put(("done", serialize_run(row)))
+        except ai.AiRefused as e:
+            events.put(("error", dict(e.payload, status=e.status)))
+        except Exception as e:
+            events.put(("error", {"error": f"The rewrite failed ({e}).", "status": 500}))
+        finally:
+            conn.close()
+
+    threading.Thread(target=work, daemon=True).start()
+
+    def stream():
+        last_sent = None
+        while True:
+            try:
+                kind, payload = events.get(timeout=HEARTBEAT_SECONDS)
+            except queue.Empty:
+                yield ": still working\n\n"
+                continue
+            if kind == "progress":
+                # Thousands of deltas become a few updates a second at most.
+                key = (payload["phase"], payload["chars"] // 400)
+                if key == last_sent:
+                    continue
+                last_sent = key
+            yield f"event: {kind}\ndata: {json.dumps(payload)}\n\n"
+            if kind in ("done", "error"):
+                return
+
+    return Response(stream(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @bp.route("/api/humanizer/runs/<rid>", methods=["GET", "DELETE"])

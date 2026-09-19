@@ -1996,6 +1996,12 @@
   .hz-still{ font-size:13px; color:var(--text-muted); line-height:1.55; }
   .hz-still h4{ font-size:13.5px; font-weight:700; color:var(--text); }
   .hz-by{ font-size:11.5px; color:var(--text-faint); }
+  .hz-progress{ display:flex; flex-direction:column; gap:8px; padding:4px 0; }
+  .hz-progress-head{ display:flex; align-items:center; gap:9px; font-size:13px; color:var(--text); }
+  .hz-progress-head span{ margin-left:auto; font-size:12px; font-weight:700; color:var(--text-muted); }
+  .hz-bar{ height:6px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; }
+  .hz-bar i{ display:block; height:100%; background:var(--accent); border-radius:var(--r-pill);
+    transition:width .3s ease; }
   @media (max-width:1000px){
     .hz-layout, .hz-compare{ grid-template-columns:minmax(0,1fr); }
     .hz-sources{ grid-template-columns:repeat(2, minmax(0,1fr)); }
@@ -2133,6 +2139,29 @@
   .th-composer{ display:flex; gap:8px; align-items:flex-end; padding:12px 0 16px;
     border-top:1px solid var(--border); background:var(--surface); position:sticky; bottom:0; }
   .th-composer textarea{ flex:1; resize:none; min-height:42px; max-height:150px; }
+  /* The lightning bolt: a pill that is plainly on or off, with its word beside the icon. */
+  .th-fast{ display:flex; align-items:center; gap:5px; height:38px; padding:0 12px; flex:none;
+    border:1px solid var(--border); background:var(--surface); border-radius:var(--r-pill);
+    font:inherit; font-size:12.5px; font-weight:650; color:var(--text-faint); cursor:pointer;
+    transition:background .12s, color .12s, border-color .12s; }
+  .th-fast svg{ width:15px; height:15px; }
+  .th-fast:hover{ color:var(--text); border-color:var(--text-faint); }
+  .th-fast.on{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); }
+  .th-fast.on svg{ fill:currentColor; }
+  .th-stop{ display:flex; align-items:center; gap:6px; }
+  .th-stop svg{ width:13px; height:13px; fill:currentColor; }
+  .th-live-status{ display:flex; align-items:center; gap:8px; min-width:0; font-size:12.5px;
+    color:var(--text-faint); }
+  .th-live-status:empty{ display:none; }
+  .th-think-line{ max-width:68ch; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-style:italic; }
+  .th-think-line b{ font-style:normal; font-weight:650; color:var(--text-muted); margin-right:3px; }
+  .th-spin{ width:12px; height:12px; flex:none; border-radius:50%; border:2px solid var(--surface-3);
+    border-top-color:var(--accent); animation:hs-spin .7s linear infinite; display:block; }
+  .th-live-text:empty{ display:none; }
+  .th-caret{ display:inline-block; width:7px; height:1em; margin-left:2px; vertical-align:-2px;
+    background:var(--accent); border-radius:2px; animation:th-blink 1s steps(2, start) infinite; }
+  @keyframes th-blink{ to{ visibility:hidden; } }
+  .th-stopped{ font-size:11.5px; font-weight:650; color:var(--text-faint); margin-top:4px; }
   .th-picker{ overflow:auto; }
   .hs-none{ color:var(--text-faint); font-size:12.5px; padding:4px 0; }
   @media (max-width:640px){ .th-msg{ max-width:94%; } }
@@ -2666,6 +2695,7 @@
     calendar: '<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.6v3.8M16 2.6v3.8"/>',
     classes: '<path d="M12 3 3 7.4l9 4.4 9-4.4L12 3Z"/><path d="M3 12.3 12 16.7l9-4.4"/><path d="M3 16.9 12 21.3l9-4.4"/>',
     assignments: '<rect x="5" y="4.2" width="14" height="16.6" rx="2.4"/><path d="M9.2 3.2h5.6v3.2H9.2z"/><path d="M9 11.6h6M9 15.4h4"/>',
+    stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="2.2"/>',
     pen: '<path d="M4 20h4L19.2 8.8a2.3 2.3 0 0 0 0-3.2l-.8-.8a2.3 2.3 0 0 0-3.2 0L4 16v4Z"/><path d="M13.6 6.4l4 4"/>',
     chat: '<path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5Z"/>',
     zap: '<path d="M13.2 2.4 4.8 13.6h6.2l-1 8 8.2-11.2h-6.2l1.2-8Z"/>',
@@ -5179,7 +5209,7 @@
   // is blader/humanizer (MIT), vendored in vendor/humanizer and sent by humanizer.py.
 
   var studyPane = 'sets';     // 'sets' or 'humanizer', switched by the tabs at the top of Study
-  var HZ = { loaded:false, loading:false, voice:'', runs:[], maxWords:1500, promptTokens:7500,
+  var HZ = { loaded:false, loading:false, voice:'', runs:[], maxWords:4000, promptTokens:7500,
              prices:[2, 10], confirmOverUsd:0.05,
              text:'', source:null, useVoice:true,
              busy:false, extracting:false, confirm:null,
@@ -5286,8 +5316,7 @@
       + (HZ.busy ? 'Rewriting…' : 'Rewrite')+'</button>'
       + '</div>'
       + (HZ.confirm ? hzConfirmHtml() : '')
-      + (HZ.busy ? '<div class="hs-thinking"><i></i>Marking the AI habits and rewriting. '
-                   + 'Short pieces take about 20 seconds, the longest about a minute.</div>' : '')
+      + (HZ.busy ? '<div class="hz-progress" id="hz-progress">'+hzProgressHtml()+'</div>' : '')
       + '</section>'
       + '<aside class="hz-side">' + hzVoiceCardHtml() + hzHistoryHtml() + '</aside>'
       + '</div>';
@@ -5561,36 +5590,77 @@
     }).catch(reportError);
   }
 
+  /** How far along a run is. The rewrite streams in as JSON, so its length is the gauge. */
+  function hzProgressHtml(){
+    var p = HZ.progress || { phase:'waiting', chars:0 };
+    var pct = p.phase === 'writing' ? Math.min(96, Math.max(3, Math.round(100 * p.chars / (HZ.expectChars || 1)))) : 0;
+    var label = p.phase === 'writing' ? 'Writing the rewrite'
+              : p.phase === 'thinking' ? 'Reading it and marking the AI habits'
+              : 'Sending it over';
+    return '<div class="hz-progress-head"><i class="th-spin"></i><b>'+label+'…</b>'
+      + (p.phase === 'writing' ? '<span>'+pct+'%</span>' : '')+'</div>'
+      + '<div class="hz-bar"><i style="width:'+(p.phase === 'writing' ? pct : (p.phase === 'thinking' ? 2 : 0))+'%"></i></div>'
+      + '<div class="hz-muted">A long piece can take a few minutes. You can leave this page: '
+      + 'it lands in Past rewrites when it is done.</div>';
+  }
+
+  function hzPaintProgress(){
+    var el = document.getElementById('hz-progress');
+    if(el) el.innerHTML = hzProgressHtml();
+  }
+
   function hzRun(confirmed){
     if(HZ.busy) return;
     var ta = document.getElementById('hz-text');
     if(ta) HZ.text = ta.value;
-    if(!hzWords(HZ.text)) return;
+    var words = hzWords(HZ.text);
+    if(!words) return;
     HZ.busy = true; HZ.confirm = null;
+    HZ.progress = { phase:'waiting', chars:0 };
+    // the JSON that comes back: the rewrite, plus about one marked habit per 15 words
+    HZ.expectChars = HZ.text.length * 1.05 + (words / 15) * 220 + 300;
     renderView(); paintIcons();
-    apiPostRaw('/api/humanizer/run', {
-      text: HZ.text, source: HZ.source || { kind:'paste' },
-      useVoice: !!(HZ.voice && HZ.useVoice), confirmed: !!confirmed
-    }).then(function(res){
+    var done = false;
+    function finish(){
       HZ.busy = false;
-      if(res.ok){
-        var run = res.body;
-        HZ.runs.unshift({ id:run.id, title:run.title, sourceKind:run.sourceKind, sourceLabel:run.sourceLabel,
-                          words:run.words, tellCount:run.tellCount, createdAt:run.createdAt });
-        HZ.run = run; HZ.copied = false; HZ.savedTo = null;
-        HZ.text = ''; HZ.source = null;
-        if(hsSideLoaded) hsLoadSide();       // the spend chip should reflect this pass
-      } else if(res.status === 409 || res.status === 402){
-        HZ.confirm = res.body;
-      } else {
-        reportError(new Error(res.body.error || ('The rewrite failed ('+res.status+').')));
-      }
       if(activeTab === 'study' && studyPane === 'humanizer'){ renderView(); paintIcons(); window.scrollTo(0, 0); }
-    }).catch(function(err){
-      HZ.busy = false;
-      if(activeTab === 'study' && studyPane === 'humanizer'){ renderView(); paintIcons(); }
-      reportError(err);
-    });
+    }
+    fetch('/api/humanizer/run', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text: HZ.text, source: HZ.source || { kind:'paste' },
+                             useVoice: !!(HZ.voice && HZ.useVoice), confirmed: !!confirmed, stream: true }) })
+      .then(function(r){
+        if((r.headers.get('content-type') || '').indexOf('text/event-stream') !== 0){
+          return r.json().catch(function(){ return {}; }).then(function(j){
+            if(r.status === 409 || r.status === 402) HZ.confirm = j;
+            else reportError(new Error(j.error || ('The rewrite failed ('+r.status+').')));
+            done = true; finish();
+          });
+        }
+        return readEventStream(r, function(name, data){
+          if(name === 'progress'){ HZ.progress = data; hzPaintProgress(); return; }
+          if(name === 'error'){ done = true; finish(); reportError(new Error(data.error || 'The rewrite failed.')); return; }
+          if(name === 'done'){
+            done = true;
+            var run = data;
+            HZ.runs.unshift({ id:run.id, title:run.title, sourceKind:run.sourceKind, sourceLabel:run.sourceLabel,
+                              words:run.words, tellCount:run.tellCount, createdAt:run.createdAt });
+            HZ.run = run; HZ.copied = false; HZ.savedTo = null;
+            HZ.text = ''; HZ.source = null;
+            if(hsSideLoaded) hsLoadSide();       // the spend chip should reflect this pass
+            finish();
+          }
+        }).then(function(){
+          if(!done){
+            // The connection dropped. The run carries on on the server and lands in
+            // Past rewrites, so say that rather than calling it a failure.
+            finish();
+            notify('Still working on it', 'The connection dropped, but the rewrite carries on. '
+                   + 'It will be in Past rewrites in a minute or two.');
+            setTimeout(function(){ HZ.loaded = false; if(activeTab === 'study' && studyPane === 'humanizer'){ renderView(); paintIcons(); } }, 60000);
+          }
+        });
+      })
+      .catch(function(err){ finish(); reportError(err); });
   }
 
   function hzOpenRun(id){
@@ -11657,6 +11727,8 @@
       + '<div class="th-who">'+who
       + (m.tool && HS_TOOLS[m.tool] ? ' · '+escapeHtml(HS_TOOLS[m.tool].label) : '')+'</div>'
       + body
+      // the server marks a reply stopped part way with tool 'stopped'
+      + (m.role === 'assistant' && (m.stopped || m.tool === 'stopped') ? '<div class="th-stopped">Stopped</div>' : '')
       + (m.role === 'assistant'
           ? '<div class="th-msg-acts">'
             + '<button type="button" class="btn ghost" data-action="th-copy" data-id="'+m.id+'">Copy</button>'
@@ -11738,16 +11810,12 @@
       var msgs = (d.messages||[]).map(threadBubbleHtml).join('');
       body = threadSourcesHtml()
         + '<div class="th-scroll" id="th-scroll">'
-        + (msgs || '<div class="th-empty">Nothing here yet. Ask for anything, or start with one of these.</div>')
-        + (TH.busy ? '<div class="hs-thinking"><i></i>Working through your material. This can take a minute.</div>' : '')
-        + ((d.messages||[]).length ? '' : threadStartersHtml())
+        + (msgs || (TH.stream ? '' : '<div class="th-empty">Nothing here yet. Ask for anything, or start with one of these.</div>'))
+        + threadLiveOrBusyHtml()
+        + ((d.messages||[]).length || TH.stream ? '' : threadStartersHtml())
         + '</div>'
         + (TH.confirm ? threadConfirmHtml() : '')
-        + '<div class="th-composer">'
-        + '<textarea id="th-draft" data-action="th-draft" rows="2" placeholder="Ask for anything, or say what to change…"'
-        + (TH.busy ? ' disabled' : '')+'>'+escapeHtml(TH.draft||'')+'</textarea>'
-        + '<button type="button" class="btn primary" data-action="th-send"'+(TH.busy?' disabled':'')+'>Send</button>'
-        + '</div>';
+        + threadComposerHtml();
     }
     document.getElementById('modal-root').innerHTML =
       '<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide th-modal" data-action="modal-stop">'
@@ -11871,15 +11939,12 @@
     var main = '<div class="th-main">'
       + threadSourcesHtml()
       + '<div class="th-scroll" id="th-scroll">'
-      + (msgs || threadEmptyHtml())
-      + (TH.busy ? '<div class="hs-thinking"><i></i>Working through your material. This can take a minute.</div>' : '')
+      + (msgs || (TH.stream ? '' : threadEmptyHtml()))
+      + threadLiveOrBusyHtml()
       + '</div>'
       + (TH.confirm ? threadConfirmHtml() : '')
-      + '<div class="th-composer">'
-      + '<textarea id="th-draft" data-action="th-draft" rows="2" placeholder="Ask for anything, or say what to change…"'
-      + (TH.busy ? ' disabled' : '')+'>'+escapeHtml(TH.draft||'')+'</textarea>'
-      + '<button type="button" class="btn primary" data-action="th-send"'+(TH.busy?' disabled':'')+'>Send</button>'
-      + '</div></div>';
+      + threadComposerHtml()
+      + '</div>';
 
     return '<div class="th-screen">'
       + '<div class="th-screen-head">'
@@ -12009,38 +12074,211 @@
     var ta = document.getElementById('th-draft');
     if(ta) TH.draft = ta.value;
     var text = (TH.draft||'').trim();
-    if(!toolKey && !text) return;
-    TH.busy = true; TH.confirm = null;
+    // "Send it anyway" answers the question the refusal kept, rather than asking it twice
+    var retry = confirmed && TH.retry ? TH.retry : null;
+    if(!toolKey && !text && !retry) return;
+    var th = TH;
+    var fast = threadFastOn();
+    var ctrl = window.AbortController ? new AbortController() : null;
+    TH.busy = true; TH.confirm = null; TH.retry = null;
+    TH.stream = { phase:'waiting', text:'', thinking:'', fast:fast, ctrl:ctrl,
+                  user: retry ? null : { role:'user', tool: toolKey || null,
+                                         content: toolKey ? ((HS_TOOLS[toolKey]||{}).label || '') : text } };
+    if(!retry) TH.draft = '';
     renderThread();
-    apiPostRaw('/api/threads/'+TH.id+'/messages',
-               { text: toolKey ? '' : text, tool: toolKey || null, confirmed: !!confirmed })
+    var payload = retry
+      ? { retryOf: retry, confirmed: true, stream: true, fast: fast }
+      : { text: toolKey ? '' : text, tool: toolKey || null, confirmed: !!confirmed, stream: true, fast: fast };
+    fetch('/api/threads/'+TH.id+'/messages', { method:'POST', headers:{'Content-Type':'application/json'},
+                                                body: JSON.stringify(payload), signal: ctrl ? ctrl.signal : undefined })
       .then(function(r){
-        if(!TH) return;
-        TH.busy = false;
-        // A refusal still kept the question, so show it rather than pretend it vanished.
-        if(r.status === 409 || r.status === 402){
-          TH.confirm = r.body;
-          if(r.body.userMessageId){
-            TH.data.messages = (TH.data.messages||[]).concat(
-              [{ id:r.body.userMessageId, role:'user', content:text, tool:toolKey||null }]);
-            TH.draft = '';
-          }
-          renderThread();
-          return;
+        if((r.headers.get('content-type') || '').indexOf('text/event-stream') !== 0){
+          return r.json().catch(function(){ return {}; }).then(function(j){
+            threadRefused(th, r.status, j, text, toolKey);
+          });
         }
-        if(!r.ok) throw new Error(r.body.error || 'That did not work.');
-        TH.draft = '';
-        TH.data.messages = (TH.data.messages||[]).concat([r.body.userMessage, r.body.reply]);
-        if(r.body.usage) hsUsage = r.body.usage;
-        renderThread();
-        hsLoadSide();
+        return readEventStream(r, function(name, data){ threadStreamEvent(th, name, data); })
+          .then(function(){ if(th.stream) threadStopped(th); });   // ended without saying done
       })
       .catch(function(err){
-        if(!TH) return;
-        TH.busy = false;
-        renderThread();
+        if(err && err.name === 'AbortError'){ threadStopped(th); return; }
+        if(th.stream) threadStopped(th);
         reportError(err);
       });
+  }
+
+  /** Server-sent events off a fetch response. EventSource cannot POST, so this reads them by hand. */
+  function readEventStream(r, onEvent){
+    var reader = r.body.getReader(), dec = new TextDecoder(), buf = '';
+    function pump(){
+      return reader.read().then(function(chunk){
+        if(chunk.done) return;
+        buf += dec.decode(chunk.value, { stream:true });
+        var cut;
+        while((cut = buf.indexOf('\n\n')) >= 0){
+          var raw = buf.slice(0, cut), name = 'message', data = '';
+          buf = buf.slice(cut + 2);
+          raw.split('\n').forEach(function(line){
+            if(line.indexOf('event:') === 0) name = line.slice(6).trim();
+            else if(line.indexOf('data:') === 0) data += line.slice(5).trim();
+          });
+          if(!data) continue;                 // a keep-alive comment
+          var parsed = null;
+          try{ parsed = JSON.parse(data); }catch(e){ continue; }
+          onEvent(name, parsed);
+        }
+        return pump();
+      });
+    }
+    return pump();
+  }
+
+  function threadFastOn(){ return !(PREFS && PREFS.threadFast === false); }
+  function threadFastTitle(on){
+    return on ? 'Fast replies are on: it starts writing straight away. Click to let it think first.'
+              : 'Fast replies are off: it thinks before answering. Click for quicker replies.';
+  }
+
+  function threadComposerHtml(){
+    var fast = threadFastOn();
+    return '<div class="th-composer">'
+      // left usable while a reply streams, so the next question can be written meanwhile
+      + '<textarea id="th-draft" data-action="th-draft" rows="2" placeholder="Ask for anything, or say what to change…">'
+      + escapeHtml(TH.draft||'')+'</textarea>'
+      + '<button type="button" class="th-fast'+(fast?' on':'')+'" data-action="th-fast" aria-pressed="'+fast+'"'
+      + ' title="'+escapeHtml(threadFastTitle(fast))+'">'+iconSvg('zap')+'<span>Fast</span></button>'
+      + (TH.stream
+          ? '<button type="button" class="btn th-stop" data-action="th-stop">'+iconSvg('stop')+'Stop</button>'
+          : '<button type="button" class="btn primary" data-action="th-send"'+(TH.busy?' disabled':'')+'>Send</button>')
+      + '</div>';
+  }
+
+  function threadLiveOrBusyHtml(){
+    if(TH.stream) return threadLiveHtml();
+    return TH.busy ? '<div class="hs-thinking"><i></i>Starting the thread…</div>' : '';
+  }
+
+  /** The question just asked, and the answer as it is being written. */
+  function threadLiveHtml(){
+    var st = TH.stream;
+    return (st.user ? threadBubbleHtml(st.user) : '')
+      + '<div class="th-msg th-assistant th-live" id="th-live">'
+      + '<div class="th-who">Vesta'+(st.fast ? ' · Fast' : '')+'</div>'
+      + '<div class="th-live-status">'+threadLiveStatusHtml(st)+'</div>'
+      + '<div class="th-text th-md th-live-text">'+threadLiveTextHtml(st)+'</div>'
+      + '</div>';
+  }
+
+  function threadLiveTextHtml(st){
+    if(!st.text) return '';
+    var caret = '<span class="th-caret"></span>';
+    var html = mdLite(st.text);
+    // inside the last paragraph or list item, so it follows the last word
+    var m = html.match(/<\/(p|li|h[1-6])>(\s*<\/(ul|ol)>)?\s*$/);
+    return m ? html.slice(0, m.index) + caret + html.slice(m.index) : html + caret;
+  }
+
+  function threadLiveStatusHtml(st){
+    if(st.phase === 'waiting'){
+      return '<i class="th-spin"></i><span>'+(st.fast ? 'Starting…' : 'Reading your material…')+'</span>';
+    }
+    if(st.phase === 'thinking'){
+      var lines = st.thinking.split(/\n+/).filter(function(l){ return l.trim(); });
+      var last = lines.length ? lines[lines.length - 1] : '';
+      return '<i class="th-spin"></i><span class="th-think-line"><b>Thinking</b> '
+        + escapeHtml(last.length > 200 ? '…' + last.slice(-200) : last)+'</span>';
+    }
+    if(st.thinkStart){
+      var secs = Math.max(1, Math.round(((st.thinkEnd || Date.now()) - st.thinkStart) / 1000));
+      return '<span>Thought for '+secs+' second'+(secs === 1 ? '' : 's')+'</span>';
+    }
+    return '';
+  }
+
+  function threadStreamEvent(th, name, data){
+    var st = th.stream;
+    if(!st) return;
+    if(name === 'start'){ st.user = data.userMessage; return; }
+    if(name === 'thinking'){
+      if(!st.thinkStart) st.thinkStart = Date.now();
+      st.thinking += data.t; st.phase = 'thinking';
+    } else if(name === 'text'){
+      if(st.thinkStart && !st.thinkEnd) st.thinkEnd = Date.now();
+      st.text += data.t; st.phase = 'writing';
+    } else if(name === 'error'){
+      st.error = data; return;
+    } else if(name === 'done'){
+      var add = [];
+      if(st.user) add.push(st.user);
+      if(data.reply) add.push(data.reply);
+      th.data.messages = (th.data.messages||[]).concat(add);
+      if(data.usage) hsUsage = data.usage;
+      th.busy = false; th.stream = null;
+      if(TH === th) renderThread();
+      hsLoadSide();
+      if(st.error) reportError(new Error(st.error.error || 'The reply stopped with an error.'));
+      return;
+    }
+    threadPaintLive(th);
+  }
+
+  /** Repaint just the answer being written, at most once a frame; the rest of the screen stays put. */
+  function threadPaintLive(th){
+    var st = th.stream;
+    if(!st || TH !== th || st.painting) return;
+    st.painting = true;
+    requestAnimationFrame(function(){
+      st.painting = false;
+      var box = document.getElementById('th-live');
+      if(!box || th.stream !== st) return;
+      var sc = document.getElementById('th-scroll');
+      // follow the answer down only if you were already at the bottom
+      var stick = sc && (sc.scrollHeight - sc.scrollTop - sc.clientHeight < 120);
+      box.querySelector('.th-live-status').innerHTML = threadLiveStatusHtml(st);
+      box.querySelector('.th-live-text').innerHTML = threadLiveTextHtml(st);
+      if(stick) sc.scrollTop = sc.scrollHeight;
+    });
+  }
+
+  /** Stopped, or the connection dropped: keep what was written, then take the server's copy. */
+  function threadStopped(th){
+    var st = th.stream;
+    if(!st) return;
+    var add = [];
+    if(st.user) add.push(st.user);
+    if(st.text.trim()) add.push({ role:'assistant', content:st.text, stopped:true });
+    th.data.messages = (th.data.messages||[]).concat(add);
+    th.busy = false; th.stream = null;
+    if(TH === th) renderThread();
+    // The server saves the stopped part as soon as it notices; fetching it back gives
+    // the reply an id, which Copy and Save as a note need.
+    setTimeout(function(){
+      apiGet('/api/threads/'+th.id).then(function(d){
+        if(TH === th && !th.busy && d && d.messages){ th.data.messages = d.messages; renderThread(); }
+        hsLoadSide();
+      }).catch(function(){});
+    }, 900);
+  }
+
+  /** Refused before anything was spent: the question was kept, so it can be sent on. */
+  function threadRefused(th, status, j, text, toolKey){
+    th.busy = false; th.stream = null;
+    if(status === 401 && j.signedOut){ authState.user = null; showLogin(); return; }
+    if(status === 409 || status === 402){
+      th.confirm = j;
+      if(j.userMessageId){
+        var have = (th.data.messages||[]).some(function(m){ return m.id === j.userMessageId; });
+        if(!have){
+          th.data.messages = (th.data.messages||[]).concat(
+            [{ id:j.userMessageId, role:'user', content:text, tool:toolKey||null }]);
+        }
+        th.retry = j.userMessageId;
+      }
+    } else {
+      if(text && !th.draft) th.draft = text;    // nothing was kept, so give the words back
+      reportError(new Error(j.error || 'That did not work.'));
+    }
+    if(TH === th) renderThread();
   }
 
   function threadSelectionFromChecks(){
@@ -14461,6 +14699,16 @@
     }
     if(action==='hs-all-threads'){ openThreadList(t.dataset.class); return; }
     if(action==='th-send'){ threadSend(null, t.dataset.confirmed === '1'); return; }
+    if(action==='th-stop'){ if(TH && TH.stream && TH.stream.ctrl) TH.stream.ctrl.abort(); return; }
+    if(action==='th-fast'){
+      var thFast = !threadFastOn();
+      savePrefs({ threadFast: thFast });
+      // changed in place: a repaint would take the caret out of a half-written question
+      t.classList.toggle('on', thFast);
+      t.setAttribute('aria-pressed', String(thFast));
+      t.title = threadFastTitle(thFast);
+      return;
+    }
     if(action==='th-tool'){ threadSend(t.dataset.tool, false); return; }
     if(action==='th-dismiss'){ TH.confirm = null; renderThread(); return; }
     if(action==='th-src-open'){ TH.srcOpen = !TH.srcOpen; renderThread(); return; }

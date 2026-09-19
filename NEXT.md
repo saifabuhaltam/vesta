@@ -935,12 +935,15 @@ Measured against the real model on 2026-09-18, Sonnet 5:
   250 words and was no better; low left inflated phrases in; thinking off dropped a fact.
 - Cost is about 4 cents for 250 words and 8 cents for 1,300. The 7,500-token prompt is a
   cache read on a second pass within five minutes.
-- The ceiling is 1,500 words, set by gunicorn's 120 s timeout, not the model.
+- The ceiling was 1,500 words, set by gunicorn's 120 s sync-worker timeout. Since
+  2026-09-19 the run streams on a threaded worker and the ceiling is 4,000 (see below).
 
 Rough edges left:
-- [ ] **Longer papers go through by hand, a section at a time.** Splitting on paragraph
-      boundaries and running the parts one request each would lift the ceiling without
-      touching the timeout.
+- [ ] **Papers over 4,000 words go through by hand, a section at a time.** Splitting on
+      paragraph boundaries and running the parts in turn would remove the ceiling.
+- [ ] **A 4,000-word run has not been done against the real model.** Measured runs
+      went to 1,305 words (63 s); 4,000 should be about three minutes and roughly 25
+      cents. The worker surviving a 150-second request was proven with a stand-in.
 - [ ] **No "from Files" source.** Uploaded course files already have `extracted_text`,
       so a picker over them would be cheap. Upload covers it for now.
 - [ ] **A note brought in loses its formatting**, and "Replace the note's text" writes
@@ -950,6 +953,50 @@ Rough edges left:
       `005_humanizer` applied and 36 tables. Everything else was tested locally: 43
       browser checks against a stubbed model, three real runs against Sonnet 5, and the
       Postgres isolation test. The first real rewrite on vesta.study is the last check.
+
+## Threads stream as they are written, built 2026-09-19
+
+Saif wanted threads to feel like Claude or ChatGPT instead of a blank wait. The wait
+was three things stacked: the reply was only shown once finished, it ran at the
+model's default thinking, and gunicorn ran one sync worker, so one reply blocked
+everyone and anything over 120 s was killed.
+
+- Replies stream as server-sent events (`stream_claude_chat` in ai.py, `stream_reply`
+  in threads.py). Refusals are still plain JSON, decided before the stream opens.
+- The lightning bolt beside Send is `threadFast` in prefs, on by default. On: low
+  effort, no thinking. Off: adaptive thinking with summarized display, shown live as
+  a "Thinking" line, then "Thought for N seconds".
+- Stop aborts the fetch; the server notices on its next write, keeps what was written
+  with `tool = 'stopped'`, and records the usage it can see (output estimated).
+- "Send it anyway" after a refusal did nothing: the refusal cleared the question and
+  the button re-sent an empty box. It now sends `retryOf`, which answers the kept
+  question without writing it into the thread twice.
+- Procfile: `--worker-class gthread --workers 1 --threads 16`. One process, so the
+  boot-time jobs still run once; sixteen requests at a time; a long request is no
+  longer killed at 120 s. The Humanizer streams too, with a progress bar and
+  keep-alives, and takes up to 4,000 words.
+
+Measured locally against Sonnet 5 through gunicorn gthread:
+- Fast: first words in 1.3 to 1.8 s. Before, the same reply showed nothing for its
+  whole 26 s on a thread-sized prompt.
+- Thorough: thinking visible from about 4 s, first words about 19 s on a heavy prompt.
+  Adaptive thinking decides for itself, so an easy question may not think at all.
+- Stop: the partial reply was kept and marked stopped. Copy and Save as a note work on
+  it once the thread refreshes.
+
+Left open:
+- [ ] **Not yet seen streaming on the live site.** Everything above ran locally. If
+      replies on vesta.study arrive all at once at the end, something between Railway
+      and the browser is buffering the stream; `X-Accel-Buffering: no` is already set.
+- [ ] **The Reads bar says the wrong thing when nothing is pinned.** It says "It will
+      answer from the conversation alone", but `collect_sources` with an empty
+      selection reads the class's material automatically. Found 2026-09-19, predates
+      streaming. Decide which is right: pin-only (change the code) or automatic (change
+      the words).
+- [ ] **The one-shot Headstart tools do not stream.** Only threads and the Humanizer
+      do. The one-shot workspace still waits for the whole answer.
+- [ ] **A stopped reply's output tokens are estimated** from the characters that
+      arrived, because the final usage never comes back on an aborted stream.
 
 ## Decisions waiting on Saif
 
@@ -990,8 +1037,9 @@ Rough edges left:
 - [ ] **Multi-section SFU courses** were only exercised against four real courses.
 - [ ] **`.docx` syllabus import** needs `python-docx` and therefore `lxml`. Fine on
       Railway; worth remembering if the runtime ever changes.
-- [ ] **`gunicorn` worker count.** Postgres handles several fine. If the SQLite
-      fallback is ever used in production, more than one worker risks write locking.
+- [ ] **`gunicorn` worker count.** Now one gthread worker with 16 threads (2026-09-19).
+      More processes would need the boot-time jobs made safe to run twice at once.
+      If the SQLite fallback is ever used in production, concurrent writes risk locking.
 - [ ] **Session length is 30 days** (`SESSION_SECONDS` in `auth.py`). A removed Supabase
       account keeps working locally until its cookie expires.
 

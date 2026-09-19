@@ -66,6 +66,10 @@ DEFAULTS = {
     "focus": FOCUS_DEFAULTS,
     # Headstart
     "headstartView": "cards",
+    # The lightning bolt beside Send in a thread: on, replies start at once with little
+    # thinking; off, the model takes its time. On by default, because a blank wait is
+    # what made threads feel slow.
+    "threadFast": True,
 }
 
 _CHOICES = {

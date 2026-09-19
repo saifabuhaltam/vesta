@@ -13,11 +13,11 @@ import json
 import uuid
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from db import get_db, active_semester_id
-from ai import (AiRefused, TOOLS, call_claude_chat, collect_sources, settings,
-                spent_today, strip_html)
+from ai import (AiRefused, TOOLS, call_claude_chat, chat_guard, collect_sources, settings,
+                spent_today, stream_claude_chat, strip_html)
 
 bp = Blueprint("threads", __name__)
 
@@ -228,18 +228,26 @@ def send_message(tid):
 
     The user's message is written before the model is called, so a failed or refused
     call does not lose what they typed: it stays in the thread and can be retried.
+    `retryOf` names that kept message, so "Send it anyway" answers it rather than
+    writing the same question into the thread a second time.
+
+    With `stream`, the answer comes back as server-sent events while it is written;
+    `fast` picks low effort over taking time to think. A refusal is still an ordinary
+    JSON answer, decided before the stream opens.
     """
     data = request.get_json(force=True) or {}
     tool_key = data.get("tool")
     text = (data.get("text") or "").strip()
+    retry_of = data.get("retryOf")
 
     # A tool press is just a first message with words already in it.
     if tool_key and tool_key in TOOLS and not text:
         text = TOOLS[tool_key]["prompt"]
-    if not text:
+    if not text and not retry_of:
         return jsonify({"error": "Say something first."}), 400
 
     conn = get_db()
+    handed_off = False
     try:
         row = load_thread(conn, tid)
         if not row:
@@ -249,39 +257,47 @@ def send_message(tid):
         context, used = collect_sources(conn, selection, row["class_id"], row["item_id"])
 
         prior = conn.execute(
-            "SELECT role, content FROM thread_messages WHERE thread_id=? ORDER BY created_at",
+            "SELECT id, role, content FROM thread_messages WHERE thread_id=? ORDER BY created_at",
             (tid,)).fetchall()
         history = [{"role": m["role"], "content": m["content"]} for m in prior][-HISTORY_TURNS:]
-        history.append({"role": "user", "content": text})
 
-        user_id = str(uuid.uuid4())
-        conn.execute(
-            "INSERT INTO thread_messages (id, thread_id, role, content, tool, created_at)"
-            " VALUES (?,?,?,?,?,?)",
-            (user_id, tid, "user", text, tool_key if tool_key in TOOLS else None, now_iso()))
-        conn.commit()
+        if retry_of:
+            # Only the thread's last turn, and only a question: anything else would
+            # answer something out of order.
+            last = prior[-1] if prior else None
+            if not last or last["id"] != retry_of or last["role"] != "user":
+                return jsonify({"error": "That question is no longer the last thing in the thread."}), 409
+            user_id = retry_of
+        else:
+            history.append({"role": "user", "content": text})
+            user_id = str(uuid.uuid4())
+            conn.execute(
+                "INSERT INTO thread_messages (id, thread_id, role, content, tool, created_at)"
+                " VALUES (?,?,?,?,?,?)",
+                (user_id, tid, "user", text, tool_key if tool_key in TOOLS else None, now_iso()))
+            conn.commit()
 
         try:
-            result = call_claude_chat(conn, "thread", context, history,
-                                      CHAT_MAX_TOKENS, bool(data.get("confirmed")))
+            cfg, _ = chat_guard(conn, context, history, CHAT_MAX_TOKENS, bool(data.get("confirmed")))
         except AiRefused as e:
             # The turn stays in the thread; the caller is told why nothing came back.
             payload = dict(e.payload)
             payload["userMessageId"] = user_id
             return jsonify(payload), e.status
 
-        reply_id = str(uuid.uuid4())
-        conn.execute(
-            "INSERT INTO thread_messages (id, thread_id, role, content, tool, input_tokens,"
-            " output_tokens, cache_read_tokens, cache_write_tokens, created_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (reply_id, tid, "assistant", result["text"], None, result["inputTokens"],
-             result["outputTokens"], result["cacheReadTokens"], result["cacheWriteTokens"],
-             now_iso()))
-        conn.execute("UPDATE threads SET updated_at=? WHERE id=?", (now_iso(), tid))
-        conn.commit()
+        if data.get("stream"):
+            handed_off = True          # the stream closes the connection when it ends
+            return stream_reply(conn, tid, user_id, cfg, context, history, used,
+                                fast=data.get("fast", True) is not False)
 
-        reply = conn.execute("SELECT * FROM thread_messages WHERE id=?", (reply_id,)).fetchone()
+        try:
+            result = call_claude_chat(conn, "thread", context, history, CHAT_MAX_TOKENS, True)
+        except AiRefused as e:
+            payload = dict(e.payload)
+            payload["userMessageId"] = user_id
+            return jsonify(payload), e.status
+
+        reply = save_reply(conn, tid, result["text"], result)
         user_row = conn.execute("SELECT * FROM thread_messages WHERE id=?", (user_id,)).fetchone()
         return jsonify({
             "userMessage": serialize_message(user_row),
@@ -290,7 +306,76 @@ def send_message(tid):
             "usage": spent_today(conn, settings(conn)),
         })
     finally:
-        conn.close()
+        if not handed_off:
+            conn.close()
+
+
+def save_reply(conn, tid, text, result):
+    """Write an answer, whole or stopped part way. Nothing at all is not written.
+
+    With no `result` the answer did not finish. That is recorded in `tool`, which is
+    otherwise only set on questions, so the thread can still say "Stopped" on it later.
+    """
+    if not (text or "").strip():
+        return None
+    stopped = result is None
+    result = result or {}
+    reply_id = str(uuid.uuid4())
+    conn.execute(
+        "INSERT INTO thread_messages (id, thread_id, role, content, tool, input_tokens,"
+        " output_tokens, cache_read_tokens, cache_write_tokens, created_at)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (reply_id, tid, "assistant", text, "stopped" if stopped else None, result.get("inputTokens", 0),
+         result.get("outputTokens", 0), result.get("cacheReadTokens", 0),
+         result.get("cacheWriteTokens", 0), now_iso()))
+    conn.execute("UPDATE threads SET updated_at=? WHERE id=?", (now_iso(), tid))
+    conn.commit()
+    return conn.execute("SELECT * FROM thread_messages WHERE id=?", (reply_id,)).fetchone()
+
+
+def sse(event, data):
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+def stream_reply(conn, tid, user_id, cfg, context, history, used, fast):
+    """The answer as server-sent events: start, thinking and text as they arrive, done.
+
+    If the student stops it, the browser drops the connection, the next write fails,
+    and the generator is closed where it stands. The `finally` then keeps whatever was
+    written, so a stopped answer stays in the thread like it would in any chat app.
+    """
+    user_row = conn.execute("SELECT * FROM thread_messages WHERE id=?", (user_id,)).fetchone()
+
+    def events():
+        parts, result, error = [], None, None
+        inner = stream_claude_chat(conn, cfg, "thread", context, history, fast, CHAT_MAX_TOKENS)
+        try:
+            try:
+                yield sse("start", {"userMessage": serialize_message(user_row), "fast": fast})
+                for kind, payload in inner:
+                    if kind == "text":
+                        parts.append(payload)
+                        yield sse("text", {"t": payload})
+                    elif kind == "thinking":
+                        yield sse("thinking", {"t": payload})
+                    elif kind == "done":
+                        result = payload
+                    elif kind == "error":
+                        error = payload
+            finally:
+                # Closed explicitly and first, so its own usage record lands on a
+                # connection that is still open.
+                inner.close()
+                reply = save_reply(conn, tid, "".join(parts), result)
+            if error:
+                yield sse("error", error)
+            yield sse("done", {"reply": serialize_message(reply) if reply else None,
+                               "sources": used, "usage": spent_today(conn, settings(conn))})
+        finally:
+            conn.close()
+
+    return Response(stream_with_context(events()), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @bp.route("/api/threads/<tid>/messages/<mid>", methods=["DELETE"])

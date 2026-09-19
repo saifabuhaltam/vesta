@@ -359,6 +359,20 @@ anything happens: what it is working on, what it will read, and what it will cos
   **← Back to the assignment** button (`hsBackItemId`). Opened from the Headstart page,
   there is nothing to go back to, so there is no button.
 
+### Threads: the composer
+
+- The answer streams in as it is written, with an accent caret (`.th-caret`) after the
+  last word. Only the live bubble (`#th-live`) repaints, once a frame; the page follows
+  it down only if you were already at the bottom.
+- Beside Send, the **lightning bolt** (`.th-fast`) is a pill that is plainly on (accent
+  fill, filled bolt) or off (outline). Its word, "Fast", is always shown next to the
+  icon, and the tooltip says what each state does.
+- While a reply is being written, Send becomes **Stop** (`.th-stop`). The box stays
+  usable so the next question can be written meanwhile.
+- Thinking shows as one italic line under "Vesta" (`.th-live-status`): the latest line
+  of the model's summary while it thinks, then "Thought for N seconds". A reply that
+  was stopped keeps a small "Stopped" label under it.
+
 ### Study: the Humanizer
 
 Study has two panes, **Sets** and **Humanizer**, switched by a `.seg-tabs` row at the top
@@ -368,6 +382,8 @@ of the page (`studyPane`). Both are always on show; neither is a sidebar entry.
   and the list of past rewrites. The four ways to bring text in (paste, a note, a
   Headstart thread reply, an uploaded file) are four visible `.hz-src` buttons, never a
   menu. Text that came from somewhere says so in `.hz-from` and stays editable.
+- **Progress while it runs** (`.hz-progress`): the phase, a bar that fills as the
+  rewrite streams in, and a note that it keeps going if you leave the page.
 - **Price before spending.** The foot of the editor shows words against the ceiling and a
   live estimate. Over the ceiling the count turns red and Rewrite disables. Refusals use
   the same `.hs-confirm` panel as Headstart.

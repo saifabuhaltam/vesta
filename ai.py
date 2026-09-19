@@ -267,18 +267,8 @@ CHAT_SYSTEM = (
 )
 
 
-def call_claude_chat(conn, kind, context, history, max_tokens=4000, confirmed=False):
-    """One turn of a thread: the pinned material, then the conversation so far.
-
-    The material goes in `system` with a cache breakpoint after it. Render order is
-    tools, then system, then messages, so caching there means the expensive part of
-    the prompt is a cache read on every turn after the first while the conversation
-    grows after the breakpoint. A ten-turn thread over 15,000 tokens of readings costs
-    roughly $0.10 this way against $0.35 without it.
-
-    `history` is the full conversation including the new user turn, oldest first.
-    """
-    cfg = settings(conn)
+def chat_system(context):
+    """The standing instruction, then the pinned material behind a cache breakpoint."""
     system = [{"type": "text", "text": CHAT_SYSTEM}]
     if context:
         system.append({
@@ -286,7 +276,16 @@ def call_claude_chat(conn, kind, context, history, max_tokens=4000, confirmed=Fa
             "text": "Course material the student attached to this conversation:\n\n" + context,
             "cache_control": {"type": "ephemeral"},
         })
+    return system
 
+
+def chat_guard(conn, context, history, max_tokens, confirmed):
+    """Refuse a thread turn before it costs anything: the caps, then the ask-first amount.
+
+    Separate from the call so a streamed reply can be refused with an ordinary JSON
+    answer before the stream opens, rather than halfway into one.
+    """
+    cfg = settings(conn)
     prompt_chars = len(CHAT_SYSTEM) + len(context or "") + sum(len(m["content"]) for m in history)
     in_tokens = estimate_tokens("x" * prompt_chars)
     est = estimate_cost(cfg, in_tokens, max_tokens)
@@ -305,13 +304,27 @@ def call_claude_chat(conn, kind, context, history, max_tokens=4000, confirmed=Fa
                          "estimateUsd": round(est, 4), "inputTokens": in_tokens,
                          "maxOutputTokens": max_tokens, "spentToday": used["usd"],
                          "dailyCap": cfg["daily_cap_usd"]}, status=409)
+    return cfg, in_tokens
 
+
+def call_claude_chat(conn, kind, context, history, max_tokens=4000, confirmed=False):
+    """One turn of a thread: the pinned material, then the conversation so far.
+
+    The material goes in `system` with a cache breakpoint after it. Render order is
+    tools, then system, then messages, so caching there means the expensive part of
+    the prompt is a cache read on every turn after the first while the conversation
+    grows after the breakpoint. A ten-turn thread over 15,000 tokens of readings costs
+    roughly $0.10 this way against $0.35 without it.
+
+    `history` is the full conversation including the new user turn, oldest first.
+    """
+    cfg, in_tokens = chat_guard(conn, context, history, max_tokens, confirmed)
     try:
         client = anthropic.Anthropic()
         response = client.messages.create(
             model=cfg["model"],
             max_tokens=max_tokens,
-            system=system,
+            system=chat_system(context),
             messages=[{"role": m["role"], "content": m["content"]} for m in history],
         )
     except anthropic.AuthenticationError:
@@ -332,6 +345,74 @@ def call_claude_chat(conn, kind, context, history, max_tokens=4000, confirmed=Fa
         raise AiRefused({"error": "The model returned nothing. Try again, or add more detail."}, 502)
     return {"text": text, "inputTokens": tin, "outputTokens": tout,
             "cacheReadTokens": cread, "cacheWriteTokens": cwrite, "model": cfg["model"]}
+
+
+# Thinking counts against max_tokens, so a thorough turn needs more room than a fast one
+# or a long think leaves nothing for the answer.
+THOROUGH_MAX_TOKENS = 16000
+
+
+def stream_claude_chat(conn, cfg, kind, context, history, fast=True, max_tokens=4000):
+    """A thread turn as it is written: yields ("thinking", s), ("text", s), then
+    ("done", usage), or ("error", payload) if the call fails.
+
+    Measured on a thread-sized prompt (9,300 tokens of material, "draft a discussion
+    post"): fast, at low effort, shows its first words in 1.4 seconds; thorough, with
+    adaptive thinking, starts thinking at 4 seconds and writing at 19. Without streaming
+    both were a blank wait for the whole 26 to 35 seconds.
+
+    Closing the generator part way (the student pressed Stop, or left) closes the
+    stream, which stops the generation; what was produced is still recorded, with the
+    output estimated from what arrived, because it was still billed.
+    """
+    request = dict(model=cfg["model"], max_tokens=max_tokens, system=chat_system(context),
+                   messages=[{"role": m["role"], "content": m["content"]} for m in history])
+    if fast:
+        request["output_config"] = {"effort": "low"}
+    else:
+        request["max_tokens"] = max(max_tokens, THOROUGH_MAX_TOKENS)
+        # Summarized, so the screen can show what it is working through while it thinks.
+        request["thinking"] = {"type": "adaptive", "display": "summarized"}
+
+    started = {"in": 0, "cread": 0, "cwrite": 0}
+    produced = 0
+    finished = False
+    try:
+        with anthropic.Anthropic().messages.stream(**request) as stream:
+            for ev in stream:
+                if ev.type == "message_start":
+                    u = ev.message.usage
+                    started.update(**{"in": getattr(u, "input_tokens", 0) or 0,
+                                      "cread": getattr(u, "cache_read_input_tokens", 0) or 0,
+                                      "cwrite": getattr(u, "cache_creation_input_tokens", 0) or 0})
+                elif ev.type == "content_block_delta":
+                    if ev.delta.type == "text_delta":
+                        produced += len(ev.delta.text)
+                        yield ("text", ev.delta.text)
+                    elif ev.delta.type == "thinking_delta" and ev.delta.thinking:
+                        produced += len(ev.delta.thinking)
+                        yield ("thinking", ev.delta.thinking)
+            final = stream.get_final_message()
+        tin, tout, cread, cwrite = usage_from(final, started["in"], estimate_tokens("x" * produced))
+        record_usage(conn, kind, cfg["model"], tin, tout, cread, cwrite)
+        finished = True
+        yield ("done", {"inputTokens": tin, "outputTokens": tout, "cacheReadTokens": cread,
+                        "cacheWriteTokens": cwrite, "model": cfg["model"],
+                        "stopReason": final.stop_reason})
+    except anthropic.AuthenticationError:
+        yield ("error", {"error": "The Anthropic API key is missing or was rejected.", "status": 503})
+    except anthropic.RateLimitError:
+        yield ("error", {"error": "Rate limited by Anthropic. Wait a moment and try again.", "status": 429})
+    except anthropic.APIConnectionError:
+        yield ("error", {"error": "Lost the connection to the Anthropic API.", "status": 502})
+    except anthropic.APIStatusError as e:
+        yield ("error", {"error": f"Anthropic error: {e.message}", "status": 502})
+    except Exception as e:
+        yield ("error", {"error": f"AI call failed ({e}).", "status": 503})
+    finally:
+        if not finished and (started["in"] or produced):
+            record_usage(conn, kind, cfg["model"], started["in"], estimate_tokens("x" * produced),
+                         started["cread"], started["cwrite"])
 
 
 def usage_from(response, fallback_in, fallback_out):
