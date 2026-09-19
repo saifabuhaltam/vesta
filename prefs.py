@@ -134,6 +134,11 @@ def clean(patch, base=None):
                         focus[fk] = _num(fv, low, high, FOCUS_DEFAULTS[fk])
                     elif isinstance(FOCUS_DEFAULTS[fk], bool):
                         focus[fk] = bool(fv)
+                    elif fk == "customScene":
+                        # An image address, and real ones (a CDN link with a query
+                        # string) run well past 120 characters. Cutting one short
+                        # broke the image after the next reload.
+                        focus[fk] = str(fv)[:2048]
                     else:
                         focus[fk] = str(fv)[:120]
             out["focus"] = focus

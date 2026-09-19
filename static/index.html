@@ -3564,6 +3564,10 @@
     calView = PREFS.calendarDefaultView;
     filesLayout = PREFS.filesDefaultLayout;
     hsView = PREFS.headstartView;
+    // focusSettings is first read while the page loads, before the account's prefs
+    // have arrived, so it only saw this browser's copy. Read it again now, so the
+    // timer, scene and effects follow the account onto a new device.
+    if(PREFS.focus) focusSettings = loadFocusSettings();
   }
 
   function applyEditorPrefs(){
@@ -3985,6 +3989,11 @@
     document.getElementById('side-stats').innerHTML = '';
   }
 
+  /** The first word of the display name set in Settings, or '' when there is none. */
+  function firstName(){
+    return (vestaProfile.displayName || '').trim().split(/\s+/)[0] || '';
+  }
+
   function greetingWord(){
     var h = new Date().getHours();
     if(h<12) return 'Good morning';
@@ -4021,7 +4030,7 @@
     }
 
     var titles = {
-      dashboard:[greetingWord()+', Saif.', 'Here\'s what\'s happening with your courses.'],
+      dashboard:[greetingWord()+(firstName() ? ', '+firstName()+'.' : '.'), 'Here\'s what\'s happening with your courses.'],
       calendar:['Calendar','View your classes, assignments, exams, and more.'],
       classes:['Classes','Your courses and everything attached to them.'],
       assignments:['Assignments','All your assignments, deadlines, and exams.'],
@@ -10198,7 +10207,7 @@
           + '<label class="set-field">Display name'
           + '<input type="text" id="f-profile-name" maxlength="80" placeholder="Your name" value="'
           + escapeHtml(vestaProfile.displayName||'')+'">'
-          + '<span class="hint">Shown on your avatar.</span></label>'
+          + '<span class="hint">Used in your greeting and on your avatar.</span></label>'
           + '<label class="set-field">Email address'
           + '<span class="set-input"><input type="email" readonly tabindex="-1" value="'+escapeHtml(accountEmail())+'">'
           + '<span class="set-input-lock">'+iconSvg('lock')+'</span></span>'
@@ -12308,7 +12317,9 @@
 
   function focusOverlayHtml(){
     var scened = focusHasScene();
-    return '<div class="fx-overlay'+(scened?' has-scene':'')+'" style="--fx-accent:'+focusSettings.accent+';'+focusSceneStyle()+'">'
+    // Escaped because a custom image arrives as url("…"), and those quotes would end the
+    // attribute early: the image then vanished on every redraw, such as picking an effect.
+    return '<div class="fx-overlay'+(scened?' has-scene':'')+'" style="'+escapeHtml('--fx-accent:'+focusSettings.accent+';'+focusSceneStyle())+'">'
       + '<canvas class="fx-ambient" id="fx-ambient"></canvas>'
       + '<button type="button" class="fx-close" data-action="focus-exit-fullscreen" title="Exit full screen">✕</button>'
       + '<div class="fx-stage">' + focusTimerHtml({ immersive:true }) + '</div>'
@@ -13994,7 +14005,11 @@
     if(action==='cycle-status'){
       var cit = items.find(function(i){ return i.id===t.dataset.id; });
       if(cit){
-        var next = cit.status==='done' ? 'todo' : (cit.status==='in_progress' ? 'done' : 'in_progress');
+        // An overdue pill says "Overdue" whatever the stored status is, so stepping it
+        // through In progress changed nothing you could see. One click completes it.
+        var next = cit.status==='done' ? 'todo'
+                 : workStatusKey(cit)==='overdue' ? 'done'
+                 : (cit.status==='in_progress' ? 'done' : 'in_progress');
         updateItem(cit.id, { status: next, completedAt: next==='done' ? todayIso() : null }).catch(reportError);
       }
       return;

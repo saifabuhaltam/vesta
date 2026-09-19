@@ -141,3 +141,9 @@ def test_sidebar_pages_default_on_and_can_be_hidden(signed_in):
     body = signed_in.put("/api/prefs", json={"sidebarShowFocus": False}).get_json()
     assert body["sidebarShowFocus"] is False
     assert body["sidebarShowGrades"] is True           # untouched
+
+
+def test_a_long_custom_focus_image_is_kept_whole(signed_in):
+    url = "https://images.example.com/photo-1500000000000?auto=format&fit=crop&w=2400&q=80&" + "x" * 200
+    body = signed_in.put("/api/prefs", json={"focus": {"customScene": url}}).get_json()
+    assert body["focus"]["customScene"] == url
