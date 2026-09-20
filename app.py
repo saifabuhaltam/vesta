@@ -283,7 +283,18 @@ def state_children(conn, class_ids, item_ids, extra_material_ids=()):
             conn,
             "SELECT material_id, item_id FROM item_files WHERE material_id IN ({marks})"
             " ORDER BY created_at", material_ids), "material_id"),
+        # Notes point at assignments two ways: the `linked_item_id` column, and
+        # `note_links` rows from the Links menu. The card reads both now.
+        "noteLinks": group_by(by_item(
+            "SELECT note_id, item_id FROM note_links WHERE item_id IN ({marks})"), "note_id"),
     }
+
+
+def note_link_item_ids(pre, nid):
+    """Assignments this note points at through `note_links`."""
+    if pre is None:
+        return []
+    return [r["item_id"] for r in pre["noteLinks"].get(nid, []) if r["item_id"]]
 
 
 def material_item_ids(pre, mid, conn=None):
@@ -326,14 +337,25 @@ def serialize_material(m, item_ids=None):
     return d
 
 
-def serialize_note(n):
+def serialize_note(n, link_item_ids=None):
+    """One note.
+
+    `linkedItemId` is the single column written when a note is made from an
+    assignment. `linkedItemIds` is every assignment the note points at through
+    `note_links`, which the Links menu writes and which the assignment card used to
+    ignore entirely: a note linked to two assignments showed up on neither.
+    """
     keys = n.keys()
+    linked = list(link_item_ids or [])
+    if n["linked_item_id"] and n["linked_item_id"] not in linked:
+        linked.insert(0, n["linked_item_id"])
     return {
         "id": n["id"],
         "title": n["title"] or "",
         "folderId": n["folder_id"],
         "text": n["text"],
         "linkedItemId": n["linked_item_id"],
+        "linkedItemIds": linked,
         "pinned": bool(n["pinned"]) if "pinned" in keys else False,
         "starred": bool(n["starred"]) if "starred" in keys else False,
         "sortOrder": (n["sort_order"] or 0) if "sort_order" in keys else 0,
@@ -447,7 +469,7 @@ def serialize_class(conn, row, pre=None):
         ],
         "materials": [serialize_material(m, material_item_ids(pre, m["id"], conn)) for m in materials],
         "fileFolders": [serialize_file_folder(f) for f in file_folders],
-        "notesList": [serialize_note(n) for n in notes],
+        "notesList": [serialize_note(n, note_link_item_ids(pre, n["id"])) for n in notes],
         "noteFolders": [
             {
                 "id": f["id"],
@@ -932,7 +954,8 @@ def get_state():
         # Notes and files jotted down or dropped in before there was anywhere to put
         # them. They live outside every class until they are filed.
         "unfiled": {
-            "notesList": [serialize_note(n) for n in unfiled_notes],
+            "notesList": [serialize_note(n, note_link_item_ids(pre, n["id"]))
+                          for n in unfiled_notes],
             "materials": [serialize_material(m, material_item_ids(pre, m["id"], conn))
                           for m in unfiled_materials],
         },

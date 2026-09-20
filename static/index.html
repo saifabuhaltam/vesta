@@ -1874,6 +1874,11 @@
   .set-mode svg{ width:20px; height:20px; color:var(--accent); margin-bottom:6px; }
   .set-mode b{ font-size:14px; font-weight:650; color:var(--text); }
   .set-mode span{ font-size:12.5px; color:var(--text-faint); }
+  /* Deleting one card of forty should not be the most repeated colour on the screen.
+     The control stays visible and one click away -- nothing is folded into a menu --
+     it just stops shouting until you reach for it. */
+  .row-x{ color:var(--text-faint); font-size:13px; line-height:1; padding:6px 9px; }
+  .row-x:hover, .row-x:focus-visible{ color:var(--danger); border-color:var(--danger); background:var(--danger-soft); }
   .set-mode.is-soon{ opacity:.72; }
   .set-mode.is-soon svg{ color:var(--text-faint); }
 
@@ -3533,8 +3538,12 @@
     return eagerNestedDelete(id, function(){ return apiDelete('/api/materials/'+id); });
   }
   function addNote(classId, data){
-    if(classId === INBOX_ID) return apiPost('/api/notes', data).then(loadState);
-    return route('addNote', [classId, data], function(){ return apiPost('/api/classes/'+classId+'/notes', data); }).then(loadState);
+    if(BE && typeof BE.addNote === 'function') return BE.addNote(classId, data).then(loadState);
+    // The new note's id comes back, so whoever asked for it can open it.
+    var post = classId === INBOX_ID
+      ? apiPost('/api/notes', data)
+      : apiPost('/api/classes/'+classId+'/notes', data);
+    return post.then(function(row){ return loadState().then(function(){ return row; }); });
   }
   function updateNote(id, data){
     if(BE && typeof BE.updateNote === 'function') return BE.updateNote(id, data).then(loadState);
@@ -4347,6 +4356,23 @@
       return '<div class="card"><div class="card-head"><h2>What to work on</h2></div>'
         + '<div class="empty"><div class="empty-icon">✓</div>Nothing open right now. Add an assignment to get started.</div></div>';
     }
+    // An archived term is for reading. Offering to start a focus session on last
+    // year's essay only leads to the server refusing the write with a 423.
+    if(termLocked){
+      var lit = open[0];
+      var lcls = classById(lit.classId);
+      return '<div class="card">'
+        + '<div class="card-head"><h2>Where this term stood</h2></div>'
+        + '<div class="focus-highlight">'
+        + '<div class="fh-icon">'+(TYPE_ICON[lit.type]||'▤')+'</div>'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div class="fh-top">'+(lcls?'<span class="class-chip" style="--c:'+(lcls.color||'var(--none)')+'">'+escapeHtml(lcls.code)+'</span>':'<span class="class-chip">General</span>')
+        + '<span class="due-label">Left open</span></div>'
+        + '<h3>'+escapeHtml(lit.title)+'</h3>'
+        + '<p>This term is archived. Unlock it in Settings if you need to change something.</p>'
+        + '<div class="fh-actions"><a href="#" data-action="open-item-detail" data-id="'+lit.id+'">View Details →</a></div>'
+        + '</div></div></div>';
+    }
     var it = open[0];
     var cls = classById(it.classId);
     var col = cls ? cls.color : 'var(--none)';
@@ -4987,7 +5013,9 @@
 
   function viewAssignments(){
     if(items.length===0){
-      return '<div class="empty">Nothing tracked yet.<div><button class="btn primary" data-action="open-add-item">+ Add your first assignment</button></div></div>';
+      return '<div class="empty">Nothing tracked yet.'
+        + (termLocked ? '' : '<div><button class="btn primary" data-action="open-add-item">+ Add your first assignment</button></div>')
+        + '</div>';
     }
     var tabs = '<div class="seg-tabs">'
       + '<button type="button" class="seg-tab'+(asgView==='all'?' active':'')+'" data-action="asg-view" data-view="all">All Assignments</button>'
@@ -4997,7 +5025,7 @@
       + '<div class="asg-toolbar-right">'
       + '<div class="input-search"><span class="ic" data-icon="search"></span>'
       + '<input type="text" id="asg-search" placeholder="Search assignments..." value="'+escapeHtml(asgSearch)+'"></div>'
-      + '<button type="button" class="btn primary" data-action="open-add-item">+ Add assignment</button>'
+      + (termLocked ? '' : '<button type="button" class="btn primary" data-action="open-add-item">+ Add assignment</button>')
       + '</div></div>';
 
     var filters = [['all','All'],['today','Today'],['week','This Week'],['upcoming','Upcoming'],['overdue','Overdue'],['completed','Completed']];
@@ -5237,6 +5265,8 @@
         + iconSvg('notes')+'Make flashcards</button>'
       + '<button type="button" class="hs-study-btn" data-action="hs-new-quiz" data-class="'+c.id+'">'
         + iconSvg('check')+'Quiz me</button>'
+      + '<button type="button" class="hs-study-btn" data-action="hs-new-test" data-class="'+c.id+'">'
+        + iconSvg('assignments')+'Practice test</button>'
       + saved
       + '</div></div>';
   }
@@ -5957,7 +5987,7 @@
       + '<div class="set-term-back">'+escapeHtml(card.back||'')+'</div>'
       + '<span class="set-term-due">'+escapeHtml(when)+'</span>'
       + '<button type="button" class="btn ghost" data-action="fc-edit" data-id="'+card.id+'">Edit</button>'
-      + '<button type="button" class="btn ghost danger" data-action="fc-delete" data-id="'+card.id+'">Delete</button>'
+      + '<button type="button" class="btn ghost row-x" data-action="fc-delete" title="Delete this card" data-id="'+card.id+'">✕</button>'
       + '</div>';
   }
 
@@ -7105,7 +7135,7 @@
   function assignmentsTabHtml(c){
     var classItems = items.filter(function(it){ return it.classId===c.id; })
       .sort(function(a,b){ return (a.dueDate||'zzzz').localeCompare(b.dueDate||'zzzz') || (a.dueTime||'').localeCompare(b.dueTime||''); });
-    return '<button type="button" class="btn ghost" data-action="open-add-item" data-classid="'+c.id+'" style="margin-bottom:10px;">+ Add assignment</button>'
+    return (termLocked ? '' : '<button type="button" class="btn ghost" data-action="open-add-item" data-classid="'+c.id+'" style="margin-bottom:10px;">+ Add assignment</button>')
       + (classItems.length
           ? classItems.map(function(it){ return calListRowHtml(it, {withGrade:true}); }).join('')
           : '<div class="hint">Nothing tracked for this class yet.</div>');
@@ -9783,19 +9813,35 @@
   var currentRubricClassId = null;
   var currentRubric = null;
 
-  function openRubricModal(materialId, classId){
+  function openRubricModal(materialId, classId, forItemId){
     currentRubricMaterialId = materialId;
     currentRubricClassId = classId;
+    // Opened from an assignment, the rubric belongs to that assignment. Headstart
+    // reads rubrics by item_id, so without this "Break down the rubric" runs with
+    // no rubric at all -- which is exactly what used to happen.
+    currentRubricForItem = forItemId || null;
     document.getElementById('modal-root').innerHTML = '<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop"><div class="modal-body"><div class="hint">Loading…</div></div></div></div>';
     fetchRubric(materialId).then(function(rubric){
       currentRubric = rubric;
+      // An already-parsed rubric opened from an assignment it is not linked to yet
+      // gets linked now, for the same reason as above.
+      if(rubric && rubric.id && !rubric.itemId && currentRubricForItem){
+        return updateRubric(rubric.id, { itemId: currentRubricForItem }).then(function(linked){
+          currentRubric = linked || rubric;
+          renderRubricModal();
+          loadState();
+        });
+      }
       renderRubricModal();
     }).catch(function(err){ closeModal(); reportError(err); });
   }
 
+  var currentRubricForItem = null;
+
   function renderRubricModal(){
     var cls = classById(currentRubricClassId);
-    var mat = cls ? (cls.materials||[]).find(function(m){ return m.id===currentRubricMaterialId; }) : null;
+    var mat = (cls ? (cls.materials||[]).find(function(m){ return m.id===currentRubricMaterialId; }) : null)
+            || findMaterial(currentRubricMaterialId);
     var body;
     if(!currentRubric){
       if(mat && !mat.hasText){
@@ -10681,12 +10727,33 @@
           + (m.cls && m.cls.id !== it.classId ? ' • lives in '+escapeHtml(m.cls.code||'Inbox') : '')
           + ((m.itemIds||[]).length > 1 ? ' • used by '+m.itemIds.length+' assignments' : '')
           +'</div></div>'
+        + '<button type="button" class="btn ghost" data-action="item-rubric" data-mid="'+m.id+'" data-id="'+it.id+'"'
+          + ' data-class="'+((m.cls && m.cls.id) || it.classId || '')+'"'
+          + ' title="Read the grading criteria out of this file and attach them here">Rubric</button>'
         + '<button type="button" class="btn ghost" data-action="preview-file" data-id="'+m.id+'" title="Open">…</button>'
         + '<button type="button" class="btn ghost" data-action="item-file-detach" data-mid="'+m.id+'" data-id="'+it.id+'" title="Remove from this assignment">✕</button>'
         + '</div>';
     }).join('');
 
-    var extras = '';
+    // Once a rubric is attached, it is shown here, because this is the card that
+    // Headstart reads it from. Before this existed the only route to a rubric was
+    // the class Files page, and "Break down the rubric" ran with nothing.
+    var rubricCard = '';
+    if(it.rubric && (it.rubric.criteria||[]).length){
+      rubricCard = '<div class="ac-card"><div class="ac-card-head"><h3>Rubric</h3>'
+        + '<div class="ac-card-actions"><span class="hint">'
+        + (it.rubric.totalPoints!=null ? it.rubric.totalPoints+' points' : (it.rubric.criteria.length+' criteria'))
+        + '</span></div></div>'
+        + '<div class="grade-table">'
+        + it.rubric.criteria.map(function(c){
+            return '<div class="grade-row"><span>'+escapeHtml(c.name||'')
+              + (c.description?' <span class="hint">— '+escapeHtml(c.description)+'</span>':'')
+              + '</span><span class="mono">'+(c.points!=null?c.points:'—')+'</span><span></span></div>';
+          }).join('')
+        + '</div></div>';
+    }
+
+    var extras = rubricCard;
     if(it.weight!=null || it.score!=null){
       extras += '<div class="ac-card"><div class="ac-card-head"><h3>Grade</h3></div>'
         + '<div class="hint">'+(it.weight!=null?'Worth '+it.weight+'% of the course':'No weight set')
@@ -10741,6 +10808,23 @@
         + '<b>'+escapeHtml(HEADSTART_LABELS[h.kind] || h.kind)+'</b>'
         + '<span class="hs-saved-sub">'+escapeHtml(h.updatedAt ? 'saved '+relTimeAgo(h.updatedAt) : 'saved earlier')+'</span></button>';
     }).join('');
+    // Quizzes, practice tests and decks carry an itemId too, and this card used to
+    // read `headstarts` alone -- so it claimed nothing had been generated while a
+    // practice test for the same assignment sat one screen away.
+    rows += hsQuizzes.filter(function(q){ return q.itemId === it.id; }).map(function(q){
+      return '<button type="button" class="hs-saved" style="width:100%;margin-bottom:6px;" '
+        + 'data-action="hs-open-quiz" data-id="'+q.id+'">'
+        + '<b>'+escapeHtml(q.title || (q.kind==='practice_test' ? 'Practice test' : 'Quiz'))+'</b>'
+        + '<span class="hs-saved-sub">'+q.questionCount+' question'+(q.questionCount===1?'':'s')
+        + (q.bestScore!=null ? ' · best '+q.bestScore+'%' : ' · not taken yet')+'</span></button>';
+    }).join('');
+    rows += hsDecks.filter(function(d){ return d.itemId === it.id; }).map(function(d){
+      return '<button type="button" class="hs-saved" style="width:100%;margin-bottom:6px;" '
+        + 'data-action="hs-open-deck" data-id="'+d.id+'">'
+        + '<b>'+escapeHtml(d.name || 'Flashcards')+'</b>'
+        + '<span class="hs-saved-sub">'+d.cardCount+' card'+(d.cardCount===1?'':'s')
+        + (d.dueCount ? ' · '+d.dueCount+' due' : '')+'</span></button>';
+    }).join('');
     return '<div class="ac-card">'
       + '<div class="ac-card-head"><h3>Headstart</h3>'
       + '<button type="button" class="btn primary" data-action="hs-open-item" data-id="'+it.id+'">'
@@ -10760,11 +10844,25 @@
       + '</div>';
   }
 
+  /**
+   * Does this note point at this assignment?
+   *
+   * Two mechanisms grew up separately: `linkedItemId`, the single column written when
+   * a note is started from an assignment, and `note_links`, the many-to-many the
+   * Links menu writes. The card used to read only the first, so a note linked to two
+   * assignments from the note side appeared on neither card.
+   */
+  function noteIsAbout(n, itemId){
+    if(!n || !itemId) return false;
+    if(n.linkedItemId === itemId) return true;
+    return (n.linkedItemIds || []).indexOf(itemId) > -1;
+  }
+
   function itemCardNotesHtml(it, cls){
     // A note attached from another class still belongs on this card, so look at
     // every note rather than only the ones filed under this assignment's class.
     var linked = allNotes().filter(function(n){
-      return !n.deletedAt && n.linkedItemId === it.id;
+      return !n.deletedAt && noteIsAbout(n, it.id);
     });
     var rows = linked.length ? linked.map(function(n){
       return '<div class="ac-file">'
@@ -10782,8 +10880,8 @@
       + '<div class="ac-card-actions">'
       + '<button type="button" class="btn" data-action="item-note-attach" data-id="'+it.id+'">'
         + iconSvg('link')+' Attach existing</button>'
-      + (cls ? '<button type="button" class="btn" data-action="item-note-new" data-id="'+it.id+'" data-class="'+cls.id+'">'
-          + iconSvg('plus')+' New note</button>' : '')
+      + '<button type="button" class="btn" data-action="item-note-new" data-id="'+it.id+'" data-class="'+(cls ? cls.id : INBOX_ID)+'">'
+        + iconSvg('plus')+' New note</button>' 
       + '</div></div>'
       + (rows || '<div class="ac-empty-box">No notes linked to this assignment yet.</div>')
       + '</div>';
@@ -10798,7 +10896,7 @@
   function attachNoteListHtml(it){
     var q = attachNoteSearch.trim().toLowerCase();
     var pool = allNotes().filter(function(n){
-      return !n.deletedAt && n.linkedItemId !== it.id;
+      return !n.deletedAt && !noteIsAbout(n, it.id);
     });
     if(q){
       pool = pool.filter(function(n){
@@ -11768,7 +11866,7 @@
         + '<div class="fc-row-back">'+escapeHtml(c.back||'')+'</div></div>'
         + '<span class="fc-row-due">'+due+'</span>'
         + '<button type="button" class="btn ghost" data-action="fc-edit" data-id="'+c.id+'">Edit</button>'
-        + '<button type="button" class="btn ghost danger" data-action="fc-delete" data-id="'+c.id+'">Delete</button>'
+        + '<button type="button" class="btn ghost row-x" data-action="fc-delete" title="Delete this card" data-id="'+c.id+'">✕</button>'
         + '</div>';
     }).join('') + '</div>';
   }
@@ -14269,10 +14367,26 @@
       return;
     }
     if(action==='item-note-new'){
+      // Creating an empty note and then showing the card again meant the next click
+      // was always Open. Land in the note instead, ready to type.
       var forItem = t.dataset.id;
+      var noteHome = t.dataset.class;
       itemCardTab = 'notes';
-      addNote(t.dataset.class, { title:'', text:'', linkedItemId: forItem })
-        .then(function(){ openItemDetailModal(forItem); }).catch(reportError);
+      addNote(noteHome, { title:'', text:'', linkedItemId: forItem })
+        .then(function(row){
+          var mroot = document.getElementById('modal-root');
+          if(mroot && mroot.innerHTML) closeModal();
+          activeTab = 'notes';
+          notesClassId = noteHome;
+          notesSearch = '';
+          if(row && row.id) notesOpenId = row.id;
+          else {
+            // No row came back, so fall back to the newest note in that class.
+            var pool = allNotes().filter(function(n){ return !n.deletedAt && noteIsAbout(n, forItem); });
+            if(pool.length) notesOpenId = pool[pool.length-1].id;
+          }
+          render(); paintIcons();
+        }).catch(reportError);
       return;
     }
     if(action==='item-note-attach'){ attachNoteSearch = ''; openAttachNoteModal(t.dataset.id); return; }
@@ -14819,11 +14933,24 @@
       return;
     }
     if(action==='open-rubric'){ openRubricModal(t.dataset.mid, t.dataset.class); return; }
+    if(action==='item-rubric'){
+      openRubricModal(t.dataset.mid, t.dataset.class || null, t.dataset.id);
+      return;
+    }
     if(action==='rubric-parse'){
       var rBody = document.querySelector('.modal-body');
       if(rBody) rBody.innerHTML = '<div class="hint">Reading the rubric… this can take up to a minute.</div>';
       parseRubric(currentRubricMaterialId).then(function(r){
         currentRubric = r;
+        // Opened from an assignment: link it there without a second step, since
+        // that is the whole reason it was parsed.
+        if(currentRubricForItem && r && r.id && !r.itemId){
+          return updateRubric(r.id, { itemId: currentRubricForItem }).then(function(linked){
+            currentRubric = linked || r;
+            renderRubricModal();
+            loadState();
+          });
+        }
         renderRubricModal();
         loadState();
       }).catch(function(err){ renderRubricModal(); reportError(err); });

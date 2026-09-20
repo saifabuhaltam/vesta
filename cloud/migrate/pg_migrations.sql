@@ -309,3 +309,20 @@ select apply_owner_rls('humanizer_runs');
 
 grant select, insert, update, delete on humanizer_runs to authenticated;
 revoke all on humanizer_runs from anon;
+
+
+-- migration: 006_deck_item
+-- A flashcard deck made for one assignment.
+--
+-- Quizzes have carried item_id since they were built, so a practice test could be
+-- tied to an assignment; decks never did. The assignment card reads both now, and
+-- without this column a deck built from an assignment has nothing to be found by.
+--
+-- The partner block for the SQLite ALTER in db.init_db(). Adding a nullable column
+-- needs no backfill and no policy change: flashcard_decks already carries user_id
+-- and forced row level security from the base schema.
+
+alter table flashcard_decks add column if not exists "item_id" text
+  references items(id) on delete set null;
+
+create index if not exists flashcard_decks_by_item on flashcard_decks("item_id");

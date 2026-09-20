@@ -942,9 +942,10 @@ def ai_flashcards():
         today = datetime.utcnow().strftime("%Y-%m-%d")
         did = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO flashcard_decks (id, semester_id, class_id, name, description, created_at, updated_at)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (did, semester_for(conn, class_id), class_id, data.get("name") or "Generated deck",
+            "INSERT INTO flashcard_decks (id, semester_id, class_id, item_id, name, description,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+            (did, semester_for(conn, class_id), class_id, data.get("itemId") or None,
+             data.get("name") or "Generated deck",
              "From " + ", ".join(s["title"] for s in used[:3]) if used else "", now, now))
         for i, c in enumerate(cards):
             conn.execute(
@@ -1135,9 +1136,10 @@ def decks():
         now = datetime.utcnow().isoformat()
         did = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO flashcard_decks (id, semester_id, class_id, name, description, created_at, updated_at)"
-            " VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO flashcard_decks (id, semester_id, class_id, item_id, name, description,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
             (did, semester_for(conn, data.get("classId")), data.get("classId"),
+             data.get("itemId") or None,
              (data.get("name") or "New deck").strip(),
              data.get("description") or "", now, now))
         conn.commit()
@@ -1156,7 +1158,9 @@ def decks():
         "FROM flashcard_decks d" + where + " ORDER BY d.updated_at DESC",
         [today_str()] + args).fetchall()
     conn.close()
-    return jsonify([{"id": r["id"], "classId": r["class_id"], "name": r["name"],
+    return jsonify([{"id": r["id"], "classId": r["class_id"],
+                     "itemId": r["item_id"] if "item_id" in r.keys() else None,
+                     "name": r["name"],
                      "description": r["description"], "cardCount": r["n_cards"],
                      "dueCount": r["n_due"], "newCount": r["n_new"],
                      "createdAt": r["created_at"], "updatedAt": r["updated_at"]} for r in rows])

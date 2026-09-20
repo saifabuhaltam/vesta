@@ -738,6 +738,13 @@ def init_db():
         if col not in ucols:
             conn.execute(f"ALTER TABLE ai_usage ADD COLUMN {col} INTEGER DEFAULT 0")
 
+    # A deck made for one assignment. Quizzes have carried `item_id` from the start;
+    # decks never did, so a deck built from an assignment could not be shown on its
+    # card. Partner block: 006_deck_item in cloud/migrate/pg_migrations.sql.
+    dcols = [r["name"] for r in conn.execute("PRAGMA table_info(flashcard_decks)").fetchall()]
+    if "item_id" not in dcols:
+        conn.execute("ALTER TABLE flashcard_decks ADD COLUMN item_id TEXT REFERENCES items(id) ON DELETE SET NULL")
+
     conn.commit()
     drop_class_not_null(conn)
     move_item_links(conn)
