@@ -2201,6 +2201,15 @@
   .hs-none{ color:var(--text-faint); font-size:12.5px; padding:4px 0; }
   @media (max-width:640px){ .th-msg{ max-width:94%; } }
 
+  /* Files whose text matched, shown under the ones whose names did. */
+  .files-inside{ display:flex; flex-direction:column; gap:8px; margin-bottom:18px; }
+  .files-inside-row{ display:flex; align-items:flex-start; gap:12px; text-align:left;
+    width:100%; padding:11px 13px; border:1px solid var(--border); background:var(--surface);
+    border-radius:var(--r-card); cursor:pointer; }
+  .files-inside-row:hover{ background:var(--surface-2); }
+  .files-inside-snip{ font-size:12.5px; color:var(--text-muted); line-height:1.5;
+    margin:3px 0 2px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+    overflow:hidden; }
   .files-result-banner{ display:flex; align-items:center; gap:10px; flex-wrap:wrap;
     background:var(--accent-soft); border:1px solid var(--accent); border-radius:var(--r-card);
     padding:11px 14px; margin-bottom:16px; font-size:13px; }
@@ -6625,6 +6634,10 @@
   var filesTab = 'all';
   var filesLayout = 'grid';
   var filesSearch = '';
+  // What the server found *inside* files for the current query: {query, hits}. The
+  // name match is instant and local; this arrives a moment later and is shown under it.
+  var filesTextHits = null;
+  var filesTextTimer = null;
   var filesFolder = null;         // class id
   var filesSubfolder = null;      // file folder id within that class
   var filesType = 'all';
@@ -6747,6 +6760,56 @@
    * you happen to have open is a search that hides the answer. Browsing is the
    * opposite, and shows one folder's own files and nothing nested below it.
    */
+  /**
+   * Search inside the files themselves.
+   *
+   * Debounced, because it runs on every keystroke and a phrase is usually several.
+   * The local name search never waits for it: the list filters as you type and the
+   * "found inside" section fills in underneath when the answer comes back.
+   */
+  function filesSearchContents(){
+    if(filesTextTimer) clearTimeout(filesTextTimer);
+    var q = filesSearch.trim();
+    if(q.length < 3){ filesTextHits = null; return; }
+    filesTextTimer = setTimeout(function(){
+      filesTextTimer = null;
+      apiGet('/api/search/files?q=' + encodeURIComponent(q)).then(function(r){
+        if((r.query || '') !== filesSearch.trim()) return;   // a later keystroke won
+        filesTextHits = r;
+        if(activeTab === 'files'){ renderView(); paintIcons(); }
+      }).catch(function(){ /* the name search still works; no dialog for this */ });
+    }, 350);
+  }
+
+  /** The files whose contents matched, minus the ones already listed by name. */
+  function filesTextOnlyHits(named){
+    if(!filesTextHits || (filesTextHits.query || '') !== filesSearch.trim()) return [];
+    var already = {};
+    named.forEach(function(m){ already[m.id] = true; });
+    return (filesTextHits.hits || []).filter(function(h){ return !already[h.id]; });
+  }
+
+  function filesInsideSectionHtml(named){
+    var extra = filesTextOnlyHits(named);
+    if(!filesSearch.trim() || !extra.length) return '';
+    return '<h2 class="files-section-h">Found inside files</h2>'
+      + '<div class="files-inside">'
+      + extra.map(function(h){
+          var c = classById(h.classId);
+          var name = h.title || h.filename || 'File';
+          return '<button type="button" class="files-inside-row" data-action="preview-file" data-id="'+h.id+'">'
+            + '<div class="file-ic" style="background:'+fileTypeColor(h.filename||name)+';">'
+              + fileTypeInitials(h.filename||name)+'</div>'
+            + '<div style="flex:1;min-width:0;">'
+            + '<div class="fr-title">'+escapeHtml(name)+'</div>'
+            + '<div class="files-inside-snip">'+escapeHtml(h.snippet||'')+'</div>'
+            + '<div class="ac-file-meta">'+escapeHtml(c ? (c.code||c.name||'') : 'Inbox')
+              + ' \u00b7 '+h.count+' mention'+(h.count===1?'':'s')+'</div>'
+            + '</div></button>';
+        }).join('')
+      + '</div>';
+  }
+
   function filesMatching(){
     var list = allMaterials();
     if(filesTab==='starred'){
@@ -6820,7 +6883,12 @@
 
   function fileListHtml(list){
     if(list.length===0){
-      var why = filesFiltering()
+      // "Nothing matches" directly above a list of matches reads as a bug, so when the
+      // text search found something the empty state says which search came up empty.
+      var insideCount = filesSearch ? filesTextOnlyHits(list).length : 0;
+      var why = insideCount
+        ? 'No file <em>named</em> that. The ones below have it inside them.'
+        : filesFiltering()
         ? 'Nothing matches. <button type="button" class="link-btn" data-action="files-clear-search">Clear the search and filters</button>'
         : 'No files here yet. Drag some in above.';
       return '<div class="card"><div class="empty" style="border:none;box-shadow:none;background:transparent;">'+why+'</div></div>';
@@ -6905,8 +6973,10 @@
    */
   function filesResultBannerHtml(n){
     if(!filesFiltering()) return '';
+    var inside = filesSearch ? filesTextOnlyHits(filesMatching()).length : 0;
     var what = filesSearch
       ? n + ' file' + (n===1?'':'s') + ' matching “' + escapeHtml(filesSearch) + '”'
+        + (inside ? ', and ' + inside + ' more with it inside them' : '')
       : n + ' file' + (n===1?'':'s') + ' after filtering';
     var where = filesSearch
       ? ' <span class="fr-scope">across every class</span>'
@@ -7001,7 +7071,8 @@
     return filesResultBannerHtml(list.length)
       + cards
       + '<div class="files-list-head"><h2 class="files-section-h">'+heading+'</h2>'+layoutToggle+'</div>'
-      + fileListHtml(list);
+      + fileListHtml(list)
+      + filesInsideSectionHtml(list);
   }
   // ---------------- Grades (global) ----------------
   // ---------------- Grades ----------------
@@ -7395,6 +7466,7 @@
       + '<label class="field">Color<div class="swatches" id="f-swatches">'+PALETTE.map(function(col){ return '<button type="button" class="swatch'+(col===editingColor?' selected':'')+'" style="--sw:'+col+'" data-action="pick-color" data-color="'+col+'"></button>'; }).join('')+'</div></label>'
       + '<label class="field">Meeting times<div id="f-schedule"></div><button type="button" class="btn ghost" data-action="add-schedule-row" style="width:fit-content">+ Add meeting time</button></label>'
       + '<label class="field">Notes<textarea id="f-notes" placeholder="Office hours, grading breakdown…">'+escapeHtml(existing?existing.notes:'')+'</textarea></label>'
+      + (isEdit ? classTermRowHtml(existing) : '')
       + '</div>'
       + '<div class="modal-foot">'
       + (isEdit ? '<button class="btn danger" data-action="save-class-delete" data-id="'+existing.id+'">Delete</button>' : '<span></span>')
@@ -7402,6 +7474,33 @@
       + '</div></div></div>';
     document.getElementById('modal-root').innerHTML = html;
     renderScheduleRows();
+  }
+
+  /**
+   * Which term this class belongs to.
+   *
+   * A class made in the wrong term used to have to be deleted and rebuilt, taking its
+   * files, notes and grades with it. Moving it carries all of that across, so this is
+   * one click rather than an evening. Only on an existing class: a new one is made in
+   * whichever term is open.
+   */
+  function classTermRowHtml(c){
+    if(!semesters || semesters.length < 2) return '';
+    var here = c.semesterId || (semester && semester.id);
+    return '<label class="field">Term'
+      + '<div class="nt-class-row">'
+      + semesters.map(function(sm){
+          var on = sm.id === here;
+          return '<button type="button" class="nt-class-pill'+(on?' active':'')+'"'
+            + ' data-action="class-term-pick" data-id="'+c.id+'" data-sem="'+sm.id+'"'
+            + (on ? ' aria-pressed="true"' : '')+'>'
+            + escapeHtml(sm.name || 'Term')
+            + (sm.status === 'archived' ? ' <span class="hint">archived</span>' : '')
+            + '</button>';
+        }).join('')
+      + '</div>'
+      + '<span class="hint">Moving it takes its assignments, files, notes and grades with it.</span>'
+      + '</label>';
   }
 
   function renderScheduleRows(){
@@ -14100,6 +14199,7 @@
     if(e.target.id==='files-search'){
       var hadSearch = !!filesSearch;
       filesSearch = e.target.value;
+      filesSearchContents();
       // The clear button only exists while there is something to clear, so its
       // appearing or disappearing needs the toolbar repainted, not just the body.
       if(hadSearch !== !!filesSearch){
@@ -15174,6 +15274,19 @@
           accountMsg = {kind:'err', text:'Could not reach Vesta.'};
           openSettingsModal();
         });
+      return;
+    }
+    if(action==='class-term-pick'){
+      var moveId = t.dataset.id, toSem = t.dataset.sem;
+      var moving = classes.find(function(x){ return x.id===moveId; });
+      if(!moving || moving.semesterId === toSem) return;
+      apiPut('/api/classes/'+moveId+'/semester', { semesterId: toSem })
+        .then(function(){
+          closeModal();
+          // The class has left the open term, so the whole page changes underneath.
+          return loadState();
+        })
+        .catch(reportError);
       return;
     }
     if(action==='save-class'){ saveClassFromForm(t.dataset.id||null); return; }

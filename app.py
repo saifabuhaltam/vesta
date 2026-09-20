@@ -443,6 +443,8 @@ def serialize_class(conn, row, pre=None):
             (cid,)).fetchall()
     return {
         "id": row["id"],
+        # Which term it belongs to, so the class form can show where it sits and move it.
+        "semesterId": row["semester_id"] if "semester_id" in row.keys() else None,
         "code": row["code"],
         "name": row["name"],
         "professor": row["professor"],
@@ -1081,6 +1083,89 @@ def update_class(cid):
     # can redraw one class instead of refetching the term.
     row = conn.execute("SELECT * FROM classes WHERE id=?", (cid,)).fetchone()
     out = serialize_class(conn, row) if row else {"ok": True}
+    conn.close()
+    return jsonify(out)
+
+
+@app.route("/api/search/files")
+def search_file_contents():
+    """Find a file by a phrase inside it, not just by its name.
+
+    Every PDF and Word file has its text pulled out on upload and kept in
+    `materials.extracted_text`, and until now nothing read it back: the Files page
+    matched names, classes and folders, so a reading you remembered a sentence from
+    was unfindable.
+
+    A LIKE scan, deliberately. At a realistic library -- a few hundred files over a
+    few terms -- it is a few milliseconds, and an index here would be a Postgres full
+    text index that SQLite could not share, so the two databases would answer the same
+    search differently. Worth revisiting at five semesters of readings, not before.
+    """
+    q = (request.args.get("q") or "").strip()
+    if len(q) < 3:
+        return jsonify({"query": q, "hits": []})
+    conn = get_db()
+    sid = active_semester_id(conn)
+    like = "%" + q.lower().replace("%", r"\%").replace("_", r"\_") + "%"
+    rows = conn.execute(
+        "SELECT id, class_id, title, filename, extracted_text FROM materials"
+        " WHERE semester_id=? AND extracted_text IS NOT NULL AND extracted_text != ''"
+        " AND LOWER(extracted_text) LIKE ?"
+        " ORDER BY created_at DESC LIMIT 40", (sid, like)).fetchall()
+    hits = []
+    for r in rows:
+        text = r["extracted_text"] or ""
+        at = text.lower().find(q.lower())
+        start = max(0, at - 90)
+        snippet = text[start:at + len(q) + 110].replace("\n", " ").strip()
+        if start > 0:
+            snippet = "\u2026" + snippet
+        hits.append({"id": r["id"], "classId": r["class_id"],
+                     "title": r["title"], "filename": r["filename"],
+                     "snippet": " ".join(snippet.split()),
+                     "count": text.lower().count(q.lower())})
+    conn.close()
+    return jsonify({"query": q, "hits": hits})
+
+
+@app.route("/api/classes/<cid>/semester", methods=["PUT"])
+def move_class_to_semester(cid):
+    """Move a class, and everything hanging off it, to another term.
+
+    A class created in the wrong term used to have to be deleted and made again, taking
+    its files, notes and grades with it. Every child table that carries its own copy of
+    `semester_id` is updated in the same transaction, because `semester_for` promises
+    that copy matches the class's -- a half-moved class would show its assignments in
+    one term and its files in another.
+
+    Both terms have to be writable. Moving work out of an archived term is a write to
+    that term, whatever the interface it is asked from.
+    """
+    data = request.get_json(force=True) or {}
+    target = data.get("semesterId")
+    conn = get_db()
+    cls = conn.execute("SELECT * FROM classes WHERE id=?", (cid,)).fetchone()
+    if not cls:
+        conn.close()
+        abort(404)
+    sem = conn.execute("SELECT * FROM semesters WHERE id=?", (target,)).fetchone()
+    if not sem:
+        conn.close()
+        return jsonify({"error": "No such term."}), 404
+    for check, label in ((cls["semester_id"], "the term it is in now"),
+                         (target, "the term you are moving it to")):
+        row = conn.execute("SELECT status FROM semesters WHERE id=?", (check,)).fetchone()
+        if row and row["status"] == "archived" and session.get(UNLOCK_KEY) != check:
+            conn.close()
+            return jsonify({"error": "That class cannot move while "
+                                     + label + " is archived. Unlock it first."}), 423
+
+    conn.execute("UPDATE classes SET semester_id=? WHERE id=?", (target, cid))
+    for table in SEMESTER_SCOPED:
+        conn.execute(f"UPDATE {table} SET semester_id=? WHERE class_id=?", (target, cid))
+    conn.commit()
+    row = conn.execute("SELECT * FROM classes WHERE id=?", (cid,)).fetchone()
+    out = serialize_class(conn, row)
     conn.close()
     return jsonify(out)
 

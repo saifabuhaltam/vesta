@@ -181,3 +181,43 @@ def test_a_saved_class_comes_back_whole():
     assert row["schedule"][0]["day"] == 2
     assert len(row["materials"]) == 1
     assert len(row["fileFolders"]) >= 7
+
+
+def test_a_class_moves_between_terms_with_everything_on_it():
+    """A class in the wrong term used to have to be deleted and rebuilt.
+
+    The point of the test is the children: `semester_for` promises every row's copy of
+    semester_id matches its class's, so a half-moved class would show its assignments
+    in one term and its files in another.
+    """
+    alice = signed_in(ALICE, "alice@example.com")
+    cid = seed(alice, "PHIL", classes=1, items_per_class=2, files_per_class=1)[0]
+    before = alice.get("/api/state").get_json()
+    first_term = before["semester"]["id"]
+    assert len(before["classes"]) == 1 and len(before["items"]) == 2
+
+    made = alice.post("/api/semesters", json={"name": "Spring 2027"}).get_json()
+    second = made.get("id") or made.get("semester", {}).get("id")
+    assert second and second != first_term
+
+    row = alice.put(f"/api/classes/{cid}/semester", json={"semesterId": second}).get_json()
+    assert row["semesterId"] == second
+
+    # the old term is empty, and switching to the new one finds all of it there
+    alice.put("/api/semesters/active", json={"id": first_term})
+    empty = alice.get("/api/state").get_json()
+    assert empty["classes"] == [] and empty["items"] == []
+
+    alice.put("/api/semesters/active", json={"id": second})
+    after = alice.get("/api/state").get_json()
+    assert len(after["classes"]) == 1
+    assert len(after["items"]) == 2
+    assert len(after["classes"][0]["materials"]) == 3
+    assert len(after["classes"][0]["notesList"]) == 1
+
+
+def test_moving_a_class_to_a_term_that_does_not_exist_is_refused():
+    alice = signed_in(ALICE, "alice@example.com")
+    cid = seed(alice, "PHIL", classes=1, items_per_class=0, files_per_class=0)[0]
+    r = alice.put(f"/api/classes/{cid}/semester", json={"semesterId": "nope"})
+    assert r.status_code == 404
