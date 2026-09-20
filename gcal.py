@@ -385,6 +385,29 @@ class Client:
             })
         return out
 
+    def watch(self, calendar_id, channel_id, address, token=None, ttl_seconds=None):
+        """Ask Google to call us when this calendar changes.
+
+        Notifications are headers only: the body is empty, and X-Goog-Resource-State
+        says only that something moved. The handler's one sane response is to run the
+        same incremental sync the Sync button runs.
+
+        Channels last about a week at most and Google never renews them, so whatever
+        registers one has to be able to notice it is close to expiring.
+        """
+        body = {"id": channel_id, "type": "web_hook", "address": address}
+        if token:
+            body["token"] = token
+        if ttl_seconds:
+            body["params"] = {"ttl": str(int(ttl_seconds))}
+        return self._call("POST", f"/calendars/{urllib.parse.quote(calendar_id)}/events/watch",
+                          json=body)
+
+    def stop_channel(self, channel_id, resource_id):
+        """Close a channel. Both ids are needed: storing only one leaves it undeletable."""
+        return self._call("POST", "/channels/stop",
+                          json={"id": channel_id, "resourceId": resource_id})
+
     def list_events(self, calendar_id, sync_token=None, page_token=None, time_min=None):
         params = {"maxResults": 250, "showDeleted": bool(sync_token)}
         if sync_token:

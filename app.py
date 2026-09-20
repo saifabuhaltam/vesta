@@ -2905,6 +2905,23 @@ def health():
         }
     except Exception as e:
         out["google"] = {"error": str(e)[:120]}
+
+    # Push channels, because a renewal that quietly stopped happening looks exactly
+    # like the lag push was built to remove. Counted across every account: this is an
+    # operational number, not one student's.
+    try:
+        conn = _db.get_db(user_id=None)
+        try:
+            conn.as_owner()
+        except Exception:
+            pass
+        rows = conn.execute("SELECT expiration FROM calendar_channels").fetchall()
+        conn.close()
+        soonest = min([r["expiration"] for r in rows if r["expiration"]] or [""]) or None
+        out["calendarPush"] = {"channels": len(rows), "nextExpiry": soonest}
+    except Exception as e:
+        out["calendarPush"] = {"error": str(e)[:120]}
+
     if _db.DATABASE_URL:
         try:
             conn = _db.get_db(user_id=None)

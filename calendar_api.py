@@ -5,6 +5,7 @@ nothing reaches a class until `/apply`, that runs in one transaction, and anythi
 unticked on the review screen is never written.
 """
 import json
+import threading
 import uuid
 from datetime import datetime, timedelta
 
@@ -418,6 +419,154 @@ def _pull(client, cal_id, sync_token):
     return events, None                   # no token: next sync does a full pass
 
 
+# ---------------------------------------------------------------------------
+# Push: Google calls us the moment something changes
+# ---------------------------------------------------------------------------
+#
+# Polling covered most of it -- the page syncs when it opens, when the tab is looked
+# at again, four seconds after a local change and on a three-minute timer -- but a
+# change made in Google while Vesta is closed waits until Vesta is next opened, and
+# one made while the tab sits idle waits up to three minutes. A watch channel removes
+# both waits.
+#
+# Traps, all of them learned the hard way or written down before they bit:
+#   - notifications are headers only. The body is empty and X-Goog-Resource-State says
+#     only that something moved, so the only sane response is the same incremental
+#     sync the Sync button runs.
+#   - the first notification after registering is a `sync` ping and means nothing.
+#   - the endpoint is public and unauthenticated by nature. It looks up the channel id
+#     and trusts nothing else in the request.
+#   - Google retries hard on any non-2xx, so it answers 200 at once and works after.
+#   - channels last about a week and Google never renews them. A missed renewal looks
+#     exactly like the lag this exists to remove, which is why /health reports it.
+
+CHANNEL_TTL_SECONDS = 7 * 24 * 3600
+# Renew once a channel is within a day of expiring, which every sync has a chance to do.
+RENEW_WITHIN_SECONDS = 24 * 3600
+
+
+def webhook_address():
+    """The HTTPS URL Google will call. Google will not deliver to localhost."""
+    env = (os.environ.get("GOOGLE_WEBHOOK_URL") or "").strip()
+    if env:
+        return env
+    try:
+        host = request.host or ""
+    except RuntimeError:
+        return ""
+    if not host or host.split(":")[0] in ("localhost", "127.0.0.1"):
+        return ""                      # local development: polling only, and that is fine
+    proto = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip()
+    scheme = "https" if proto in ("", "https") else proto
+    return f"{scheme}://{host}/api/calendar/google/webhook"
+
+
+def watched_calendar_ids(conn, acct, vesta_cal_id):
+    """Everything worth a channel: the calendars chosen, plus Vesta's own."""
+    ids = [f["calendar_id"] for f in gsync.feeds(conn, acct["id"], enabled_only=True)]
+    if vesta_cal_id and vesta_cal_id not in ids:
+        ids.append(vesta_cal_id)
+    return ids
+
+
+def ensure_channels(conn, client, acct, vesta_cal_id, address=None):
+    """Register or renew a watch channel per calendar. Never raises: push is an
+    improvement on polling, and failing to register one must not break a sync."""
+    address = address if address is not None else webhook_address()
+    if not address:
+        return {"registered": 0, "renewed": 0, "skipped": "no public address"}
+    out = {"registered": 0, "renewed": 0, "failed": 0}
+    existing = {r["calendar_id"]: r for r in conn.execute(
+        "SELECT * FROM calendar_channels WHERE account_id=?", (acct["id"],)).fetchall()}
+    cutoff = (datetime.utcnow() + timedelta(seconds=RENEW_WITHIN_SECONDS)).isoformat()
+    for cal_id in watched_calendar_ids(conn, acct, vesta_cal_id):
+        have = existing.get(cal_id)
+        if have and (have["expiration"] or "") > cutoff:
+            continue
+        channel_id = str(uuid.uuid4())
+        try:
+            res = client.watch(cal_id, channel_id, address, ttl_seconds=CHANNEL_TTL_SECONDS)
+        except gcal.GoogleError:
+            out["failed"] += 1
+            continue
+        # Google answers with milliseconds since the epoch.
+        exp = res.get("expiration")
+        try:
+            expiry = datetime.utcfromtimestamp(int(exp) / 1000).isoformat() if exp else ""
+        except (TypeError, ValueError):
+            expiry = ""
+        if have:
+            try:
+                client.stop_channel(have["channel_id"], have["resource_id"])
+            except gcal.GoogleError:
+                pass                    # the old one expires on its own soon enough
+            conn.execute(
+                "UPDATE calendar_channels SET channel_id=?, resource_id=?, expiration=?,"
+                " created_at=? WHERE id=?",
+                (channel_id, res.get("resourceId"), expiry, now(), have["id"]))
+            out["renewed"] += 1
+        else:
+            conn.execute(
+                "INSERT INTO calendar_channels (id, account_id, calendar_id, channel_id,"
+                " resource_id, expiration, created_at) VALUES (?,?,?,?,?,?,?)",
+                (str(uuid.uuid4()), acct["id"], cal_id, channel_id,
+                 res.get("resourceId"), expiry, now()))
+            out["registered"] += 1
+        conn.commit()
+    return out
+
+
+@bp.route("/api/calendar/google/webhook", methods=["POST"])
+def google_webhook():
+    """Google says something changed on a calendar. Answer at once, then sync.
+
+    Deliberately does nothing with the request but read the channel id: this URL is
+    public, and anything else in it is unverified.
+    """
+    channel_id = request.headers.get("X-Goog-Channel-ID") or ""
+    state = request.headers.get("X-Goog-Resource-State") or ""
+    if not channel_id or state == "sync":
+        # The first notification after registering is a handshake and means nothing.
+        return ("", 200)
+    import db as _db
+    conn = _db.get_db(user_id=None)
+    owner = None
+    try:
+        conn.as_owner()                 # no session here: the channel row says whose it is
+    except Exception:
+        pass                            # SQLite has one account and no owner switch
+    try:
+        row = conn.execute(
+            "SELECT * FROM calendar_channels WHERE channel_id=?", (channel_id,)).fetchone()
+        if row is not None:
+            owner = row["user_id"] if "user_id" in row.keys() else None
+    finally:
+        conn.close()
+    if row is None:
+        return ("", 200)                # an unknown or stale channel: nothing to do
+    threading.Thread(target=_sync_for_push, args=(owner,), daemon=True).start()
+    return ("", 200)
+
+
+def _sync_for_push(user_id):
+    """The same incremental sync the button runs, without a request to hang it on."""
+    import db as _db
+    conn = _db.get_db(user_id=user_id)
+    try:
+        acct = gsync.account(conn)
+        if not acct:
+            return
+        token = access_token(conn, acct)
+        client = gcal.Client(token)
+        cal_id = acct["calendar_id"] or client.ensure_calendar()
+        run_sync(conn, acct, client, cal_id, register_channels=False)
+    except Exception:
+        # A push that fails is a lag, not a loss: the next poll picks it up.
+        pass
+    finally:
+        conn.close()
+
+
 @bp.route("/api/calendar/google/sync", methods=["POST"])
 def google_sync():
     conn = get_db()
@@ -429,7 +578,22 @@ def google_sync():
         token = access_token(conn, acct)
         client = gcal.Client(token)
         cal_id = acct["calendar_id"] or client.ensure_calendar()
+        result = run_sync(conn, acct, client, cal_id, address=webhook_address())
+    except gcal.GoogleError as e:
+        conn.execute("UPDATE calendar_accounts SET last_error=? WHERE id=?", (e.message, acct["id"]))
+        conn.commit()
+        conn.close()
+        return jsonify({"error": e.message}), 502
+    conn.close()
+    return jsonify(result)
 
+
+def run_sync(conn, acct, client, cal_id, register_channels=True, address=None):
+    """One full exchange with Google: pull the chosen calendars, pull Vesta's own,
+    then push. Shared by the Sync button and by a push notification, so the two can
+    never drift into doing different things.
+    """
+    try:
         # Every calendar the student picked, mirrored into Vesta. This is the half that
         # makes a connected account actually show something: without it Vesta only ever
         # looked at the calendar it made for itself, which is empty until Vesta fills it.
@@ -507,13 +671,12 @@ def google_sync():
                      " last_error=NULL WHERE id=?",
                      (next_token, cal_id, now(), acct["id"]))
         conn.commit()
-    except gcal.GoogleError as e:
-        conn.execute("UPDATE calendar_accounts SET last_error=? WHERE id=?", (e.message, acct["id"]))
-        conn.commit()
-        conn.close()
-        return jsonify({"error": e.message}), 502
+        # Registering happens after a good sync, so a channel is only ever asked for
+        # on an account that is actually working.
+        channels = ensure_channels(conn, client, acct, cal_id, address) if register_channels else None
+    except gcal.GoogleError:
+        raise
     counts = gsync.summarise(pushed)
     counts.update({"fromGoogle": gsync.summarise(pulled), "absorbed": absorbed})
-    conn.close()
-    return jsonify({"ok": True, "counts": counts, "needsReview": len(review),
-                    "absorbed": absorbed})
+    return {"ok": True, "counts": counts, "needsReview": len(review),
+            "absorbed": absorbed, "push": channels}

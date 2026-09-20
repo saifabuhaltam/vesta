@@ -359,3 +359,35 @@ alter table headstarts add column if not exists "thread_id" text
   references threads(id) on delete set null;
 
 create index if not exists headstarts_by_thread on headstarts("thread_id");
+
+
+-- migration: 009_calendar_channels
+-- Google push channels, one per watched calendar.
+--
+-- Until now a change made in Google waited up to three minutes for Vesta's timer, and
+-- waited indefinitely while Vesta was closed. A watch channel makes Google call us the
+-- moment something moves.
+--
+-- Both ids are stored because stopping a channel needs the pair: a channel with only
+-- its id recorded cannot be closed and keeps calling. `expiration` is what renewal
+-- reads -- channels last about a week, Google never renews them, and a missed renewal
+-- looks exactly like the lag this removes, which is why /health reports it.
+
+create table if not exists calendar_channels (
+  "id"           text primary key,
+  "account_id"   text not null references calendar_accounts(id) on delete cascade,
+  "calendar_id"  text not null,
+  "channel_id"   text not null,
+  "resource_id"  text,
+  "expiration"   text,
+  "created_at"   text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  unique (account_id, calendar_id)
+);
+create index if not exists calendar_channels_user_idx on calendar_channels(user_id);
+create index if not exists calendar_channels_by_channel on calendar_channels("channel_id");
+
+select apply_owner_rls('calendar_channels');
+
+grant select, insert, update, delete on calendar_channels to authenticated;
+revoke all on calendar_channels from anon;

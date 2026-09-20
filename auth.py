@@ -42,7 +42,11 @@ SUPABASE_JWT_SECRET = (os.environ.get("SUPABASE_JWT_SECRET") or "").strip()
 SESSION_SECONDS = 60 * 60 * 24 * 30
 
 # Paths that must work before anyone is signed in.
-OPEN_PATHS = {"/api/auth/login", "/api/auth/signup", "/api/auth/reset",
+# Google's push notifications arrive from Google, not from a signed-in browser, so
+# this one cannot be gated. It is written to trust nothing in the request but the
+# channel id, which it looks up before doing anything at all.
+OPEN_PATHS = {"/api/calendar/google/webhook",
+              "/api/auth/login", "/api/auth/signup", "/api/auth/reset",
               "/api/auth/logout", "/api/auth/me", "/api/auth/google/start",
               "/api/auth/session", "/api/auth/password", "/health"}
 

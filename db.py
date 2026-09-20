@@ -699,6 +699,23 @@ def init_db():
             UNIQUE(account_id, calendar_id)
         )""")
     conn.execute("CREATE INDEX IF NOT EXISTS calendar_feeds_by_account ON calendar_feeds(account_id)")
+    # One Google push channel per watched calendar. Stopping a channel needs both the
+    # channel id and the resource id, so storing one without the other leaves a channel
+    # that cannot be closed and keeps calling us. `expiration` is what the renewal job
+    # reads: Google never renews a channel itself, and a missed renewal looks exactly
+    # like the lag this whole feature exists to remove.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS calendar_channels (
+            id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL REFERENCES calendar_accounts(id) ON DELETE CASCADE,
+            calendar_id TEXT NOT NULL,
+            channel_id TEXT NOT NULL,
+            resource_id TEXT,
+            expiration TEXT,
+            created_at TEXT,
+            UNIQUE(account_id, calendar_id)
+        )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS calendar_channels_by_channel ON calendar_channels(channel_id)")
 
     # An incoming feed is reviewed before it lands, exactly like a syllabus.
     conn.execute("""
