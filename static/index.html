@@ -2804,7 +2804,7 @@
     <div class="side-stats" id="side-stats"></div>
     <div class="side-foot">
       <button class="nav-extra" data-action="open-settings"><span class="ic" data-icon="settings"></span><span class="lbl">Settings</span></button>
-      <div class="sync-row"><span class="sync-dot" id="sync-dot"></span><span id="sync-label">Connecting…</span></div>
+      <div class="sync-row"><span class="sync-dot" id="sync-dot"></span><span id="sync-label"></span></div>
     </div>
   </aside>
   <main id="main">
@@ -4203,7 +4203,12 @@
       render();
       return migratePrefs();
     });
-    loadState().then(function(){ notifyDueSoon(); }).catch(function(){});
+    loadState().then(function(){
+      notifyDueSoon();
+      // A link to a chat or a set, or a refresh: land where the address bar says,
+      // once there is data to land on.
+      applyPendingRoute();
+    }).catch(function(){});
   }
 
   function authSubmit(){
@@ -4344,7 +4349,12 @@
           render();
           return migratePrefs();
         });
-        return loadState().then(function(){ notifyDueSoon(); });
+        return loadState().then(function(){
+          notifyDueSoon();
+          // A link to a chat, a set or a quiz, and a plain refresh: land where the
+          // address bar says once there is data to land on.
+          applyPendingRoute();
+        });
       });
     }).catch(function(){ loadState(); });
   }
@@ -4381,7 +4391,75 @@
     paintIcons();
     renderMathIn(document);
     restoreInlineFocus();
+    syncUrl();
   }
+
+  // ---------------- where you are, in the address bar ----------------
+  //
+  // Screens lived in memory alone, so a chat could not be linked to, the browser's
+  // back button walked out of Vesta entirely, and a reload always landed on the
+  // dashboard. The address bar now names the screen, which costs one line at the end
+  // of render and gives back linking, Back, and reopening where you left off.
+  //
+  // Deliberately a hash: no server routes to add, and nothing to configure on Railway
+  // for deep links to survive a refresh.
+
+  function currentRoute(){
+    if(activeTab === 'study' && studyScreen && studyScreen.kind === 'set') return 'study/set/' + studyScreen.id;
+    if(activeTab === 'study' && studyScreen && studyScreen.kind === 'quiz') return 'study/quiz/' + studyScreen.id;
+    if(activeTab === 'headstart' && hsScreen && hsScreen.kind === 'thread' && hsScreen.id) return 'chat/' + hsScreen.id;
+    if(activeTab === 'class' && activeClassId) return 'class/' + activeClassId;
+    return activeTab;
+  }
+
+  // The route the page was opened on. Captured at parse time, because the first
+  // render happens before the data is there and would otherwise push the dashboard
+  // over the link that was clicked.
+  var pendingRoute = (typeof location !== 'undefined' && location.hash) || '';
+
+  var routeApplying = false;
+  function syncUrl(){
+    if(routeApplying) return;
+    var want = '#/' + currentRoute();
+    if(location.hash === want) return;
+    // pushState, not replace: each screen is somewhere you can come back from.
+    try{ history.pushState({ route: currentRoute() }, '', want); }catch(e){ location.hash = want; }
+  }
+
+  /** Put the page where the address bar says it should be. */
+  function applyRoute(){
+    var parts = (location.hash || '').replace(/^#\/?/, '').split('/').filter(Boolean);
+    routeApplying = true;
+    try{
+      var tab = parts[0] || 'dashboard';
+      if(tab === 'chat' && parts[1]){ openThread(parts[1]); return; }
+      if(tab === 'study' && parts[1] === 'set' && parts[2]){ openStudySet(parts[2]); return; }
+      if(tab === 'study' && parts[1] === 'quiz' && parts[2]){ openQuiz(parts[2]); return; }
+      if(tab === 'class' && parts[1]){
+        activeClassId = parts[1]; activeTab = 'class'; render(); return;
+      }
+      if(KNOWN_TABS.indexOf(tab) < 0) return;
+      hsScreen = null; TH = null; studyScreen = null;
+      activeTab = tab;
+      render();
+    } finally {
+      routeApplying = false;
+    }
+  }
+
+  var KNOWN_TABS = ['dashboard','calendar','classes','assignments','grades','notes',
+                    'files','headstart','study','focus'];
+
+  /** Open whatever the page was linked to, once there is data to open it with. */
+  function applyPendingRoute(){
+    var want = pendingRoute;
+    pendingRoute = '';
+    if(!want || want === '#/dashboard') return;
+    try{ history.replaceState({}, '', want); }catch(e){ location.hash = want; }
+    applyRoute();
+  }
+
+  window.addEventListener('popstate', applyRoute);
 
   function accountEmail(){
     return (authState.user && authState.user.email) || vestaProfile.email || '';
@@ -4484,6 +4562,9 @@
     else if(activeTab==='focus') view.innerHTML = viewFocusPage();
     else view.innerHTML = viewAssignments();
     if(activeTab==='notes') loadNoteSuggestions();
+    // Opening a screen often redraws the view without going through render(), so the
+    // address bar is kept honest here too. syncUrl does nothing when it already agrees.
+    syncUrl();
   }
 
   function renderAsgBody(){
@@ -5594,11 +5675,13 @@
   function viewStudy(){
     if(!hsSideLoaded) hsLoadSide();
     if(studyScreen && studyScreen.kind === 'set') return setScreenHtml();
+    if(studyScreen && studyScreen.kind === 'quiz') return quizScreenHtml();
     if(studyPane === 'humanizer') return hzViewHtml();
     var sets = studySets();
-    if(!sets.length){
-      return studyTabsHtml() + '<div class="empty">No sets yet. Make one from a class\'s material in '
-           + 'Headstart, or start an empty set here.'
+    var quizzes = (hsQuizzes || []).slice();
+    if(!sets.length && !quizzes.length){
+      return studyTabsHtml() + '<div class="empty">Nothing to study yet. Make a set of terms, '
+           + 'or build one from a class\'s material.'
            + '<div style="margin-top:14px;">'
            + '<button type="button" class="btn" data-action="study-generate">Build from my material</button> '
            + '<button type="button" class="btn primary" data-action="study-new-set">New set</button>'
@@ -5614,6 +5697,8 @@
       + '<button type="button" class="btn" data-action="study-generate">Build from my material</button>'
       + '<button type="button" class="btn primary" data-action="study-new-set">New set</button>'
       + '</div></div>'
+      + studyQuizzesHtml(quizzes)
+      + (sets.length ? '<h2 class="files-section-h">Sets of terms</h2>' : '')
       + '<div class="set-grid">'
       + sets.map(function(d){
           var c = classById(d.classId);
@@ -5623,6 +5708,32 @@
             + '<span class="set-card-name">'+escapeHtml(d.name||'Untitled set')+'</span>'
             + '<span class="set-card-meta">'+d.cardCount+' term'+(d.cardCount===1?'':'s')
             + (d.dueCount ? ' · <b>'+d.dueCount+' due</b>' : '')+'</span>'
+            + '</button>';
+        }).join('')
+      + '</div>';
+  }
+
+  /**
+   * Quizzes and practice tests, on the page that is about studying.
+   *
+   * They were only reachable from the assignment that made them, so a practice test
+   * built last week was effectively lost unless you remembered which assignment it
+   * hung off. They belong here beside the sets, with the best score so far, which is
+   * the number that says whether it is worth sitting again.
+   */
+  function studyQuizzesHtml(quizzes){
+    if(!quizzes || !quizzes.length) return '';
+    return '<h2 class="files-section-h">Quizzes and practice tests</h2>'
+      + '<div class="set-grid">'
+      + quizzes.map(function(q){
+          var c = classById(q.classId);
+          return '<button type="button" class="set-card" data-action="hs-open-quiz" data-id="'+q.id+'">'
+            + '<span class="dot" style="--c:'+(classColor(q.classId)||'var(--none)')+'"></span>'
+            + '<span class="set-card-class">'+escapeHtml(c ? (c.code||c.name||'') : 'No class')
+            + (q.kind === 'practice_test' ? ' \u00b7 practice test' : '')+'</span>'
+            + '<span class="set-card-name">'+escapeHtml(q.title||'Quiz')+'</span>'
+            + '<span class="set-card-meta">'+q.questionCount+' question'+(q.questionCount===1?'':'s')
+            + (q.bestScore!=null ? ' \u00b7 <b>best '+q.bestScore+'%</b>' : ' \u00b7 not taken yet')+'</span>'
             + '</button>';
         }).join('')
       + '</div>';
@@ -11817,8 +11928,30 @@
     }).catch(function(){});
   }
 
+  /**
+   * Run, unless there is nothing to read.
+   *
+   * The button used to be live beside "reads 0 sources" and "Nothing selected yet":
+   * the interface had already worked out it had no input and still offered to spend
+   * money on it. Every tool's prompt says to work from the material provided, so a
+   * run with none either refuses or invents, and is billed either way.
+   */
+  function hsRunButtonHtml(){
+    var e = HW.estimate;
+    var empty = e && (!e.sources || !e.sources.length) && !HS_NEEDS_TEXT[HW.tool];
+    if(empty){
+      return '<button type="button" class="btn primary" disabled'
+        + ' title="Pick a file, a note or a folder first. With nothing to read it would '
+        + 'have to invent an answer.">Run</button>';
+    }
+    return '<button type="button" class="btn primary" data-action="hs-run">Run</button>';
+  }
+
   function hsCostText(e){
     if(!e) return '';
+    if(!e.sources || !e.sources.length){
+      return 'Nothing to read yet \u00b7 pick a file or a note';
+    }
     return 'About $'+e.estimateUsd.toFixed(3)+' · reads '+e.sources.length
       + ' source'+(e.sources.length===1?'':'s');
   }
@@ -12064,7 +12197,7 @@
       + '<input type="text" id="hs-instructions" placeholder="Optional. e.g. keep it under 500 words"'
       + ' value="'+escapeHtml(HW.instructions)+'"></label>'
       + '<div class="hs-runbar">'
-      + '<button type="button" class="btn primary" data-action="hs-run">Run</button>'
+      + hsRunButtonHtml()
       + '<span class="hs-cost" id="hs-cost">'+hsCostText(HW.estimate)+'</span>'
       + '</div>'
       + '<div id="hs-outwrap" style="margin-top:16px;">'+hsOutputHtml()+'</div>';
@@ -12224,6 +12357,35 @@
     return { quiz:'Quiz me', test:'Build a practice test', cards:'Make flashcards' }[QM.mode];
   }
 
+  /**
+   * Is there anything for the maker to read?
+   *
+   * Same rule as the Run button: the quiz prompt says "base every question on the
+   * material provided, do not invent facts that are not in it", so building from an
+   * empty class either refuses or invents, and bills either way.
+   */
+  function qmHasMaterial(){
+    var sel = QM.selection || {};
+    if((sel.materialIds||[]).length || (sel.noteIds||[]).length
+       || (sel.folderIds||[]).length || (sel.syllabusIds||[]).length) return true;
+    var ctx = QM.ctx;
+    if(!ctx) return true;                       // not loaded yet: do not judge it
+    return !!((ctx.files||[]).length || (ctx.notes||[]).length
+              || (ctx.folders||[]).length || (ctx.syllabus||[]).length);
+  }
+  function qmBuildButtonHtml(){
+    if(qmHasMaterial()){
+      return '<button type="button" class="btn primary" data-action="qm-build">Build it</button>';
+    }
+    return '<button type="button" class="btn primary" disabled'
+      + ' title="Upload a file or write a note for this class first.">Build it</button>';
+  }
+  function qmBuildHintHtml(){
+    return qmHasMaterial()
+      ? 'Costs a little; you will be asked before anything large.'
+      : 'Nothing to read in this class yet. Upload a file or write a note first.';
+  }
+
   function hsRenderMaker(){
     if(!QM) return;
     var c = classById(QM.classId);
@@ -12280,8 +12442,8 @@
                     + 'data-action="qm-diff" data-v="'+o[0]+'">'+o[1]+'</button>';
                 }).join('') + '</div></label>')
         + '<div class="hs-runbar">'
-        + '<button type="button" class="btn primary" data-action="qm-build">Build it</button>'
-        + '<span class="hs-cost">Costs a little; you will be asked before anything large.</span>'
+        + qmBuildButtonHtml()
+        + '<span class="hs-cost">'+qmBuildHintHtml()+'</span>'
         + '</div>';
     }
 
@@ -12336,6 +12498,11 @@
   var QZ = null;
 
   function openQuiz(qid){
+    // A quiz is a screen, not a modal. Sitting an exam-practice run in a panel that
+    // covers half the window was the same complaint as threads in 20% of the screen.
+    closeModal();
+    studyScreen = { kind: 'quiz', id: qid };
+    if(activeTab !== 'study'){ activeTab = 'study'; render(); }
     apiGet('/api/quizzes/'+qid).then(function(quiz){
       QZ = { quiz: quiz, answers: {}, results: null, attemptId: null,
              startedAt: new Date().toISOString(), score: null, history: [] };
@@ -12399,16 +12566,9 @@
       + body + after + '</div>';
   }
 
-  function renderQuiz(){
-    if(!QZ) return;
+  /** Score, progress, the questions and the earlier attempts. One source for both. */
+  function quizBodyHtml(){
     var q = QZ.quiz;
-    // The modal is rebuilt wholesale, so remember where the reader was and what they
-    // were typing in. Without this, answering question 8 throws you back to question 1.
-    var prevBody = document.querySelector('#modal-root .modal-body');
-    var keepScroll = prevBody ? prevBody.scrollTop : 0;
-    var active = document.activeElement;
-    var keepFocus = (active && active.dataset && active.dataset.action === 'qz-write')
-      ? { id: active.dataset.id, start: active.selectionStart, end: active.selectionEnd } : null;
     var answered = q.questions.filter(function(x){
       var a = QZ.answers[x.id];
       return a !== undefined && a !== null && String(a).trim() !== '';
@@ -12438,23 +12598,66 @@
           }).join('') + '</div>'
       : '';
 
-    document.getElementById('modal-root').innerHTML =
-      '<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide" data-action="modal-stop">'
-      + '<div class="modal-head"><h2>'+escapeHtml(q.title||'Quiz')+'</h2>'
-      + '<div class="row-meta" style="margin-top:6px;"><span class="type-badge">'
-      + (q.kind==='practice_test' ? 'Practice test' : 'Quiz')+'</span>'
-      + '<span class="type-badge">'+escapeHtml(q.difficulty||'mixed')+'</span></div></div>'
-      + '<div class="modal-body">'+score+head
-      + q.questions.map(qzQuestionHtml).join('') + history + '</div>'
-      + '<div class="modal-foot">'
-      + '<span style="display:flex;gap:8px;">'+hsBackBtnHtml()
-      + '<button class="btn ghost danger" data-action="qz-delete" data-id="'+q.id+'">Delete</button></span>'
-      + '<div class="right">'
-      + (QZ.score != null ? '<button class="btn" data-action="qz-retake" data-id="'+q.id+'">Take it again</button>' : '')
-      + '<button class="btn" data-action="modal-close">Close</button></div></div>'
-      + '</div></div>';
+    return score + head + q.questions.map(qzQuestionHtml).join('') + history;
+  }
 
-    var body = document.querySelector('#modal-root .modal-body');
+  /** The whole quiz, as a screen in the Study tab. */
+  function quizScreenHtml(){
+    if(!QZ || !QZ.quiz){
+      return '<div class="th-screen"><div class="hs-thinking"><i></i>Opening it\u2026</div></div>';
+    }
+    var q = QZ.quiz;
+    return '<div class="set-screen">'
+      + '<div class="th-screen-head">'
+      + '<button type="button" class="th-back" data-action="study-home">\u2039 Study</button>'
+      + '<div class="th-screen-title"><h2>'+escapeHtml(q.title||'Quiz')+'</h2>'
+      + '<span class="type-badge">'+(q.kind==='practice_test' ? 'Practice test' : 'Quiz')+'</span>'
+      + '<span class="type-badge">'+escapeHtml(q.difficulty||'mixed')+'</span></div>'
+      + '<div class="th-screen-acts">'
+      + (QZ.score != null
+          ? '<button type="button" class="btn" data-action="qz-retake" data-id="'+q.id+'">Take it again</button>'
+          : '')
+      + '<button type="button" class="btn ghost row-x" data-action="qz-delete" data-id="'+q.id+'" title="Delete this quiz">Delete</button>'
+      + '</div></div>'
+      + '<div class="set-mode-body" id="qz-body">'+quizBodyHtml()+'</div>'
+      + '</div>';
+  }
+
+  function renderQuiz(){
+    if(!QZ) return;
+    var q = QZ.quiz;
+    // Rebuilt wholesale on every answer, so remember where the reader was and what
+    // they were typing in. Without this, answering question 8 throws you back to
+    // question 1.
+    var onScreen = activeTab === 'study' && studyScreen && studyScreen.kind === 'quiz';
+    var prevBody = onScreen ? document.getElementById('main')
+                            : document.querySelector('#modal-root .modal-body');
+    var keepScroll = prevBody ? prevBody.scrollTop : 0;
+    var active = document.activeElement;
+    var keepFocus = (active && active.dataset && active.dataset.action === 'qz-write')
+      ? { id: active.dataset.id, start: active.selectionStart, end: active.selectionEnd } : null;
+    if(onScreen){
+      renderView();
+      paintIcons();
+    } else {
+      document.getElementById('modal-root').innerHTML =
+        '<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide" data-action="modal-stop">'
+        + '<div class="modal-head"><h2>'+escapeHtml(q.title||'Quiz')+'</h2>'
+        + '<div class="row-meta" style="margin-top:6px;"><span class="type-badge">'
+        + (q.kind==='practice_test' ? 'Practice test' : 'Quiz')+'</span>'
+        + '<span class="type-badge">'+escapeHtml(q.difficulty||'mixed')+'</span></div></div>'
+        + '<div class="modal-body">'+quizBodyHtml()+'</div>'
+        + '<div class="modal-foot">'
+        + '<span style="display:flex;gap:8px;">'+hsBackBtnHtml()
+        + '<button class="btn ghost danger" data-action="qz-delete" data-id="'+q.id+'">Delete</button></span>'
+        + '<div class="right">'
+        + (QZ.score != null ? '<button class="btn" data-action="qz-retake" data-id="'+q.id+'">Take it again</button>' : '')
+        + '<button class="btn" data-action="modal-close">Close</button></div></div>'
+        + '</div></div>';
+    }
+
+    var body = onScreen ? document.getElementById('main')
+                        : document.querySelector('#modal-root .modal-body');
     if(body && keepScroll){
       // Read a layout property first: a freshly written element that has not been
       // laid out yet reports no scrollable height, and the assignment below would
@@ -12849,8 +13052,8 @@
                 + (s.readable ? '' : ' title="No text could be read out of this one, so it is not sent."')
                 + '>'+escapeHtml(s.title||'Source')+'</span>';
             }).join('')
-          : '<span class="th-none">Nothing pinned yet. It will answer from the '
-            + 'conversation alone until you attach something.</span>')
+          : '<span class="th-none">Nothing pinned, so it reads this class\u2019s five '
+            + 'newest files and notes. Pin something to choose for yourself.</span>')
       + (unreadable
           ? '<span class="th-srcwarn">'
             + (unreadable===1
