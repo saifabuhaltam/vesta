@@ -2,8 +2,11 @@
 
 A real, self-hosted rebuild of the Term Board school dashboard (classes, calendar, grades, to-dos), built specifically to support actual file uploads, which the Claude-artifact version couldn't do.
 
-**Status:** Built and tested locally. Repo: [github.com/saifabuhaltam/vesta](https://github.com/saifabuhaltam/vesta) — not deployed yet.
-**Stack:** Flask + SQLite + vanilla JS frontend (no build step, no frameworks).
+**Status:** Live at [vesta.study](https://vesta.study), invite only, deploying from
+`main` on every push. Repo: [github.com/saifabuhaltam/vesta](https://github.com/saifabuhaltam/vesta).
+**Stack:** Flask + vanilla JS frontend, no build step and no frameworks. Postgres and
+accounts where they are configured, SQLite and a single user where they are not, which
+is what makes the same code serve the deployment and a laptop.
 
 ## What it does
 
@@ -14,7 +17,21 @@ A real, self-hosted rebuild of the Term Board school dashboard (classes, calenda
 - **Rubric parsing** — any file categorized as a rubric gets a "Parse rubric" action that extracts its grading criteria via Claude, which can then be linked to a specific assignment. Once linked, the criteria show up on that assignment's detail view and feed into Headstart's context.
 - **Headstart** — a dedicated tab listing everything open, plus a "Headstart" button on any assignment. Depending on the assignment's type it offers a draft, an essay outline, quiz prep, a study outline, or a synthesis of the class's readings (using their extracted text, plus a linked rubric's criteria if one exists). Generated work stays attached to that assignment — accept it, edit it, ask for changes, or regenerate it from scratch. Calls the Claude API server-side; see the API key setup below.
 - **Lock In** — a Pomodoro-style focus timer tied to a specific assignment. Time spent in "work" phases logs back onto that assignment (visible on its detail view), so the loop of upload materials → Headstart drafts something → Lock In session to work on it → time logged is real, not just a diagram.
-- Everything persists in a SQLite database on disk
+- **Study** — sets of terms with three ways through them: Flashcards, Learn (four
+  choices, then typed from memory, until every term is learned) and Test (a scored
+  paper of mixed questions). All three run in the browser from your own terms, so they
+  cost nothing. Quizzes and practice tests built by Headstart are listed here too.
+- **The Humanizer** — rewrites AI-sounding prose and marks each habit it removed on the
+  original. It reads a paste, a note, a chat, a file you upload, or a file already in
+  Vesta, and splits a long paper into sections on its own.
+- Terms, with everything scoped to the one that is open: archive a semester and it
+  stays readable and searchable without cluttering the current one. A class can be
+  moved between terms and takes its work with it.
+- Search inside your files, not just their names: the text of every PDF and Word file
+  is pulled out on upload.
+- Works on a phone: the sidebar becomes a drawer and the pages fit.
+- Everything persists in Postgres, or in a SQLite database on disk when it is run
+  without one
 
 ## Local development
 
@@ -68,10 +85,16 @@ Every other feature works without this key — Headstart and rubric parsing just
 ## Tests
 
 ```bash
-.venv/bin/python -m pip install pgserver "psycopg[binary]" pytest esprima
-.venv/bin/python -m pytest tests/test_auth.py    # accounts, against SQLite
+.venv/bin/python -m pip install pgserver "psycopg[binary]" pytest esprima playwright
+.venv/bin/python -m pytest tests/test_auth.py tests/test_prefs.py tests/test_calendar_push.py
 .venv/bin/python -m pytest tests/pg              # isolation, against a real Postgres
 ```
+
+The browser harnesses live in `reference/speed/` and are run against a locally served
+app with `reference/speed/seed.py` in it: `test_instant.py` (edits paint before the
+server answers), `test_bugfixes.py`, `test_learn.py` and `test_phone.py`.
+`reference/speed/stub_stream.py` serves Vesta with a model that streams canned text, so
+the streaming screens can be driven without spending anything.
 
 Run the two separately. `db.py` picks its database at import time, so one process
 cannot host both. `tests/pg` downloads nothing and needs no installed Postgres:
@@ -90,9 +113,18 @@ git commit -m "Describe the change"
 git push
 ```
 
+## Where things stand
+
+`NEXT.md` is the current list of what is open, what was deliberately parked, and the
+things about this codebase that have caused real trouble before. It is worth reading
+before changing anything structural — particularly the note that a schema change only
+reaches the deployed database through `cloud/migrate/pg_migrations.sql`.
+
 ## Known limitations / next steps
 
-- **AI syllabus parsing isn't built yet.** The groundwork is there — PDF and DOCX text gets extracted on upload and stored (`materials.extracted_text` in the database) — but turning that into "paste or upload a syllabus and get assignments/dates/grading weights auto-filled" needs an Anthropic API key of your own (a small per-use cost) and a review step before anything gets written to your calendar, so a bad extraction can't silently create a wrong deadline.
+- **Syllabus import is built**: upload one and Vesta proposes the assignments, dates
+  and grading weights, with a review step before anything is written, so a bad
+  extraction cannot silently create a wrong deadline. It needs an Anthropic API key.
 - The dev server (`python app.py`) is for local testing only. Railway runs it through `gunicorn` (see `Procfile`), which is production-appropriate.
 - **Accounts are on where Supabase is configured, and only there.** Run locally with no
   `SUPABASE_URL`, Vesta stays the single-user tool it began as: no login, no session.
