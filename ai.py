@@ -1125,6 +1125,7 @@ def card_json(r):
             "kind": r["kind"], "ease": r["ease"], "interval": r["interval_days"],
             "repetitions": r["repetitions"], "lapses": r["lapses"], "due": r["due_date"],
             "lastReviewed": r["last_reviewed_at"], "suspended": bool(r["suspended"]),
+            "learnLevel": (r["learn_level"] or 0) if "learn_level" in r.keys() else 0,
             "sortOrder": r["sort_order"]}
 
 
@@ -1164,6 +1165,46 @@ def decks():
                      "description": r["description"], "cardCount": r["n_cards"],
                      "dueCount": r["n_due"], "newCount": r["n_new"],
                      "createdAt": r["created_at"], "updatedAt": r["updated_at"]} for r in rows])
+
+
+@bp.route("/api/decks/<did>/learn", methods=["POST"])
+def save_learn_progress(did):
+    """How far Learn has got with each card in this set.
+
+    Sent at the end of each round rather than after every answer: a round is a handful
+    of cards, and one request for it keeps a slow connection from making the mode feel
+    the way the rest of the app used to. Levels are clamped here, so a hand-written
+    request cannot mark a set learned.
+    """
+    data = request.get_json(force=True) or {}
+    levels = data.get("levels") or {}
+    conn = get_db()
+    if not conn.execute("SELECT 1 FROM flashcard_decks WHERE id=?", (did,)).fetchone():
+        conn.close()
+        abort(404)
+    for cid, lvl in list(levels.items())[:500]:
+        try:
+            lvl = max(0, min(2, int(lvl)))
+        except (TypeError, ValueError):
+            continue
+        conn.execute("UPDATE flashcards SET learn_level=? WHERE id=? AND deck_id=?",
+                     (lvl, cid, did))
+    conn.commit()
+    rows = conn.execute("SELECT id, learn_level FROM flashcards WHERE deck_id=?", (did,)).fetchall()
+    conn.close()
+    return jsonify({"levels": {r["id"]: (r["learn_level"] or 0) for r in rows}})
+
+
+@bp.route("/api/decks/<did>/learn/reset", methods=["POST"])
+def reset_learn_progress(did):
+    conn = get_db()
+    if not conn.execute("SELECT 1 FROM flashcard_decks WHERE id=?", (did,)).fetchone():
+        conn.close()
+        abort(404)
+    conn.execute("UPDATE flashcards SET learn_level=0 WHERE deck_id=?", (did,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 @bp.route("/api/decks/<did>", methods=["GET", "PUT", "DELETE"])

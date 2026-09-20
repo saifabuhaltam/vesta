@@ -696,6 +696,17 @@
   .qz-answer{ margin-top:10px; padding:11px 13px; border-radius:var(--r-md);
     background:var(--surface-2); font-size:12.5px; line-height:1.6; }
   .qz-answer b{ font-weight:650; }
+  /* Learn: a progress bar, a typed answer box, and what you said when it was wrong. */
+  .learn-bar{ height:6px; border-radius:var(--r-pill); background:var(--surface-3);
+    overflow:hidden; margin:0 0 16px; }
+  .learn-bar i{ display:block; height:100%; background:var(--accent);
+    border-radius:var(--r-pill); transition:width .25s ease; }
+  .learn-input{ width:100%; font-size:15px; padding:12px 14px; }
+  .learn-given{ margin-top:8px; font-size:12.5px; color:var(--text-muted); }
+  .qz-answer.right{ border-color:var(--success); background:var(--success-soft); }
+  .qz-answer.wrong{ border-color:var(--danger); background:var(--danger-soft); }
+  .linkish{ background:none; border:none; padding:0; font:inherit; color:var(--accent);
+    cursor:pointer; text-decoration:underline; }
   .qz-score{ text-align:center; padding:22px 0 10px; }
   .qz-score .qz-pct{ font-size:44px; font-weight:700; letter-spacing:-.02em; }
   .qz-score .qz-sub{ font-size:12.5px; color:var(--text-muted); margin-top:4px; }
@@ -5225,15 +5236,15 @@
     var mine = hsThreads.filter(function(t){ return t.classId===c.id; });
     var shown = mine.slice(0, 4).map(function(t){
       return '<button type="button" class="hs-saved" data-action="hs-open-thread" data-id="'+t.id+'">'
-        + '<b>'+escapeHtml(t.title||'Thread')+'</b>'
+        + '<b>'+escapeHtml(t.title||'Chat')+'</b>'
         + '<span class="hs-saved-sub">'+t.messageCount+' message'+(t.messageCount===1?'':'s')
         + (t.lastMessageAt ? ' · '+relTimeAgo(t.lastMessageAt) : ' · not started')+'</span></button>';
     }).join('');
     return '<div class="hs-row">'
-      + '<div class="hs-row-label">Threads</div>'
+      + '<div class="hs-row-label">Chats</div>'
       + '<div class="hs-row-items">'
       + '<button type="button" class="hs-study-btn primary-ish" data-action="hs-new-thread" data-class="'+c.id+'">'
-        + iconSvg('plus')+'New thread</button>'
+        + iconSvg('plus')+'New chat</button>'
       + shown
       + (mine.length > 4
           ? '<button type="button" class="hs-study-btn" data-action="hs-all-threads" data-class="'+c.id+'">'
@@ -5347,15 +5358,15 @@
   function hsThreadsSectionHtml(){
     var mine = hsClassId ? hsThreads.filter(function(t){ return t.classId===hsClassId; }) : hsThreads;
     return '<section class="hs-bucket hs-threads-sec">'
-      + '<div class="hs-bucket-head"><h3>Threads</h3>'
+      + '<div class="hs-bucket-head"><h3>Chats</h3>'
       + (mine.length ? '<span class="hs-bucket-count">'+mine.length+'</span>' : '')+'</div>'
       + '<div class="hs-row-items">'
       + '<button type="button" class="hs-study-btn primary-ish" data-action="hs-pick-thread-class">'
-        + iconSvg('plus')+'New thread</button>'
+        + iconSvg('plus')+'New chat</button>'
       + mine.slice(0, 6).map(function(t){
           return '<button type="button" class="hs-saved" data-action="hs-open-thread" data-id="'+t.id+'">'
             + '<span class="dot" style="--c:'+(classColor(t.classId)||'var(--none)')+'"></span>'
-            + '<b>'+escapeHtml(t.title||'Thread')+'</b>'
+            + '<b>'+escapeHtml(t.title||'Chat')+'</b>'
             + '<span class="hs-saved-sub">'+t.messageCount+' message'+(t.messageCount===1?'':'s')
             + (t.lastMessageAt ? ' · '+relTimeAgo(t.lastMessageAt) : '')+'</span></button>';
         }).join('')
@@ -5450,7 +5461,7 @@
              pick:null };      // an open picker: {kind:'note', filter} or {kind:'thread', thread}
 
   var HZ_SOURCES = [['paste','Paste or type','pen'], ['note','From a note','notes'],
-                    ['thread','From a Headstart thread','chat'], ['file','Upload a file','upload']];
+                    ['thread','From a chat','chat'], ['file','Upload a file','upload']];
 
   function hzLoad(){
     if(HZ.loading) return;
@@ -5588,7 +5599,7 @@
       + '</div>';
   }
 
-  var HZ_KIND_LABEL = { paste:'Pasted', note:'Note', thread:'Thread', file:'File' };
+  var HZ_KIND_LABEL = { paste:'Pasted', note:'Note', thread:'Chat', file:'File' };
 
   function hzHistoryHtml(){
     return '<div class="tile hz-card">'
@@ -5757,21 +5768,21 @@
               }).join('') + '</div>'
             : '<div class="hs-none">'+(allNotes().length ? 'No notes match that.' : 'You have no notes yet.')+'</div>');
     } else if(!p.thread){
-      title = 'Which thread?';
+      title = 'Which chat?';
       body = hsThreads.length
         ? '<div class="hz-pick-list">' + hsThreads.map(function(th){
             return '<button type="button" class="hz-pick" data-action="hz-pick-thread" data-id="'+th.id+'">'
               + '<span class="dot" style="--c:'+(classColor(th.classId)||'var(--none)')+'"></span>'
-              + '<b>'+escapeHtml(th.title||'Untitled thread')+'</b>'
+              + '<b>'+escapeHtml(th.title||'Untitled chat')+'</b>'
               + '<span class="hz-pick-sub">'+escapeHtml(classLabel(th.classId))+' · '
               + (th.messageCount||0)+' message'+(th.messageCount===1?'':'s')+'</span></button>';
           }).join('') + '</div>'
-        : '<div class="hs-none">You have no Headstart threads yet.</div>';
+        : '<div class="hs-none">You have no chats yet.</div>';
     } else if(p.thread === 'loading'){
       title = 'Which reply?';
-      body = '<div class="hs-thinking"><i></i>Opening the thread…</div>';
+      body = '<div class="hs-thinking"><i></i>Opening the chat…</div>';
     } else {
-      title = 'Which reply from "'+(p.thread.title||'Thread')+'"?';
+      title = 'Which reply from "'+(p.thread.title||'Chat')+'"?';
       var replies = (p.thread.messages||[]).map(function(m, i){ return { m:m, i:i }; })
         .filter(function(x){ return x.m.role === 'assistant'; }).reverse();
       body = replies.length
@@ -5783,14 +5794,14 @@
               + '<span class="hz-pick-preview">'+escapeHtml(txt.slice(0, 220))+(txt.length > 220 ? '…' : '')+'</span>'
               + '</button>';
           }).join('') + '</div>'
-        : '<div class="hs-none">This thread has no replies yet.</div>';
+        : '<div class="hs-none">This chat has no replies yet.</div>';
     }
     paintModal('<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop">'
       + '<div class="modal-head"><h2>'+escapeHtml(title)+'</h2></div>'
       + '<div class="modal-body">'+body+'</div>'
       + '<div class="modal-foot">'
       + (p.kind === 'thread' && p.thread && p.thread !== 'loading'
-          ? '<button class="btn" data-action="hz-pick-back">‹ Other threads</button>' : '<span></span>')
+          ? '<button class="btn" data-action="hz-pick-back">‹ Other chats</button>' : '<span></span>')
       + '<div class="right"><button class="btn" data-action="hz-pick-close">Cancel</button></div></div>'
       + '</div></div>');
     paintIcons();
@@ -5937,10 +5948,14 @@
     var today = todayIso();
     var due = (d.cards||[]).filter(function(x){ return !x.suspended && (!x.due || x.due <= today); }).length;
 
-    if(FC.mode === 'review'){
+    if(FC.mode !== 'list'){
+      var inner = FC.mode === 'review'     ? fcReviewHtml()
+                : FC.mode === 'test'       ? testHtml()
+                : FC.mode === 'learn-done' ? learnDoneHtml()
+                :                            learnHtml();
       return '<div class="set-screen">'
         + setHeadHtml(d, c, due)
-        + '<div class="set-mode-body">'+fcReviewHtml()+'</div>'
+        + '<div class="set-mode-body">'+inner+'</div>'
         + '</div>';
     }
     return '<div class="set-screen">'
@@ -5948,9 +5963,9 @@
       + '<div class="set-modes">'
       + '<button type="button" class="set-mode" data-action="fc-review">'
         + iconSvg('cards')+'<b>Flashcards</b><span>Flip through them and grade yourself.</span></button>'
-      + '<button type="button" class="set-mode is-soon" data-action="study-soon" data-mode="Learn">'
-        + iconSvg('check')+'<b>Learn</b><span>Multiple choice built from these terms.</span></button>'
-      + '<button type="button" class="set-mode is-soon" data-action="study-soon" data-mode="Test">'
+      + '<button type="button" class="set-mode" data-action="study-learn">'
+        + iconSvg('check')+'<b>Learn</b><span>'+learnSubtitle(d)+'</span></button>'
+      + '<button type="button" class="set-mode" data-action="study-test">'
         + iconSvg('assignments')+'<b>Test</b><span>A scored run through the whole set.</span></button>'
       + '</div>'
       + '<div class="set-terms">'
@@ -5973,9 +5988,11 @@
       + (due ? '<span class="type-badge">'+due+' due</span>' : '')
       + '</div>'
       + '<div class="th-screen-acts">'
-      + (FC.mode === 'review'
+      // In a mode, the only action worth offering is the way out of it. Delete belongs
+      // to the set itself, not to the middle of a round.
+      + (FC.mode !== 'list'
           ? '<button type="button" class="btn" data-action="fc-list">Back to the set</button>'
-          : '<button type="button" class="btn ghost danger" data-action="fc-delete-deck" data-id="'+d.id+'">Delete set</button>')
+          : '<button type="button" class="btn ghost row-x" data-action="fc-delete-deck" data-id="'+d.id+'" title="Delete this set">Delete set</button>')
       + '</div></div>';
   }
 
@@ -5989,6 +6006,373 @@
       + '<button type="button" class="btn ghost" data-action="fc-edit" data-id="'+card.id+'">Edit</button>'
       + '<button type="button" class="btn ghost row-x" data-action="fc-delete" title="Delete this card" data-id="'+card.id+'">✕</button>'
       + '</div>';
+  }
+
+
+  // ---------------- Learn and Test ----------------
+  //
+  // Both are built from the set's own terms, in the browser, so neither costs
+  // anything to run: making your own cards should not put a price on studying them.
+  //
+  // Learn is a loop, not a quiz. A term is "learned" at level 2: recognised once from
+  // four choices, then typed correctly from memory. Getting one wrong drops it to 0
+  // and puts it back in the round, so the set narrows to what you do not know yet.
+  // The level lives on the card in the database, so closing the tab, or picking the
+  // set up on a phone, carries on where you left off.
+  //
+  // Test is one scored sitting: a fixed paper of mixed questions, answered in any
+  // order, marked at the end. Written answers are marked leniently on purpose
+  // (case, spaces and punctuation ignored) and anything it is unsure about is handed
+  // back to you to mark, exactly as the AI quiz player already does.
+
+  /** What the Learn button says: progress if there is any, what it does if not. */
+  function learnSubtitle(d){
+    var cards = (d.cards||[]).filter(function(c){ return !c.suspended && c.front && c.back; });
+    var done = cards.filter(function(c){ return (c.learnLevel||0) >= 2; }).length;
+    if(!cards.length) return 'Add a few terms and it will drill you on them.';
+    if(!done) return 'Multiple choice, then typed, until you know them.';
+    if(done >= cards.length) return 'Every term learned. Start again to go round once more.';
+    return done + ' of ' + cards.length + ' learned so far.';
+  }
+
+  var LEARN_GOAL = 2;                 // level at which a term counts as learned
+  var TEST_DEFAULT = 20;              // questions in a test, when the set is big enough
+
+  /** Four options for one term: the right answer plus three of the set's others. */
+  function studyChoices(card, pool, key){
+    var right = (card[key] || '').trim();
+    var others = pool.filter(function(c){
+      return c.id !== card.id && (c[key] || '').trim() && (c[key] || '').trim() !== right;
+    });
+    var picked = [];
+    var bag = others.slice();
+    while(picked.length < 3 && bag.length){
+      picked.push(bag.splice(Math.floor(Math.random() * bag.length), 1)[0][key]);
+    }
+    var opts = picked.concat([right]);
+    for(var i = opts.length - 1; i > 0; i--){        // shuffle, so the answer moves
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = opts[i]; opts[i] = opts[j]; opts[j] = t;
+    }
+    return opts;
+  }
+
+  /** Lenient comparison: what a person typed against what the card says. */
+  function studySame(a, b){
+    function flat(s){
+      return (s || '').toLowerCase()
+        .replace(/[‘’“”]/g, "'")
+        .replace(/[^a-z0-9' ]+/g, ' ')
+        .replace(/\b(a|an|the)\b/g, ' ')
+        .replace(/\s+/g, ' ').trim();
+    }
+    var x = flat(a), y = flat(b);
+    if(!x || !y) return false;
+    return x === y;
+  }
+
+  function shuffled(list){
+    var out = list.slice();
+    for(var i = out.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = out[i]; out[i] = out[j]; out[j] = t;
+    }
+    return out;
+  }
+
+  function learnableCards(){
+    return (FC.deck.cards || []).filter(function(c){
+      return !c.suspended && (c.front || '').trim() && (c.back || '').trim();
+    });
+  }
+
+  // ---- Learn ----------------------------------------------------------------
+
+  function learnStart(){
+    var cards = learnableCards();
+    if(cards.length < 2){
+      notify('Not enough terms yet', 'Learn needs at least two terms with both a front and a back.');
+      return;
+    }
+    FC.learn = {
+      levels: {},                 // id -> 0, 1 or 2, seeded from the server
+      queue: [],
+      at: 0,
+      answered: null,             // {right, given, answer} while the result shows
+      round: 1,
+      dirty: {}
+    };
+    cards.forEach(function(c){ FC.learn.levels[c.id] = c.learnLevel || 0; });
+    learnBuildRound();
+    FC.mode = 'learn';
+    renderDeck();
+  }
+
+  /** A round is up to seven terms, the least-known first. */
+  function learnBuildRound(){
+    var L = FC.learn;
+    var pending = learnableCards().filter(function(c){ return (L.levels[c.id] || 0) < LEARN_GOAL; });
+    pending.sort(function(a, b){ return (L.levels[a.id] || 0) - (L.levels[b.id] || 0); });
+    L.queue = shuffled(pending.slice(0, 7));
+    L.at = 0;
+    L.answered = null;
+  }
+
+  function learnProgress(){
+    var cards = learnableCards();
+    var done = cards.filter(function(c){ return (FC.learn.levels[c.id] || 0) >= LEARN_GOAL; }).length;
+    return { done: done, total: cards.length,
+             pct: cards.length ? Math.round(done / cards.length * 100) : 0 };
+  }
+
+  /** Save what this round changed. One request, and nothing waits for it. */
+  function learnSaveProgress(){
+    var L = FC.learn;
+    if(!L || !Object.keys(L.dirty).length) return;
+    var levels = L.dirty;
+    L.dirty = {};
+    apiPost('/api/decks/' + FC.deck.id + '/learn', { levels: levels })
+      .then(function(r){
+        // Keep the card rows honest, so leaving Learn shows the same progress.
+        (FC.deck.cards || []).forEach(function(c){
+          if(r && r.levels && r.levels[c.id] != null) c.learnLevel = r.levels[c.id];
+        });
+      })
+      .catch(function(){ /* a lost round of progress is not worth an error dialog */ });
+  }
+
+  function learnAnswer(given){
+    var L = FC.learn;
+    if(L.answered) return;
+    var card = L.queue[L.at];
+    if(!card) return;
+    var level = L.levels[card.id] || 0;
+    var right = studySame(given, card.back);
+    if(right){
+      L.levels[card.id] = Math.min(LEARN_GOAL, level + 1);
+    } else {
+      L.levels[card.id] = 0;
+      L.queue.push(card);                 // it comes back before the round ends
+    }
+    L.dirty[card.id] = L.levels[card.id];
+    L.answered = { right: right, given: given, answer: card.back };
+    renderDeck();
+  }
+
+  function learnNext(){
+    var L = FC.learn;
+    L.answered = null;
+    L.at += 1;
+    if(L.at >= L.queue.length){
+      learnSaveProgress();
+      var p = learnProgress();
+      if(p.done >= p.total){ FC.mode = 'learn-done'; renderDeck(); return; }
+      L.round += 1;
+      learnBuildRound();
+    }
+    renderDeck();
+  }
+
+  function learnHtml(){
+    var L = FC.learn;
+    var p = learnProgress();
+    var card = L.queue[L.at];
+    if(!card){ return learnDoneHtml(); }
+    var level = L.levels[card.id] || 0;
+    var typed = level >= 1;                 // recognised already: now type it
+    var head = '<div class="qz-head"><div>'
+      + '<div class="qz-progress">Round ' + L.round + ' · ' + (L.at + 1) + ' of ' + L.queue.length + '</div>'
+      + '</div><div class="qz-progress">' + p.done + ' of ' + p.total + ' learned</div></div>'
+      + '<div class="learn-bar"><i style="width:' + p.pct + '%"></i></div>';
+
+    var body;
+    if(L.answered){
+      var tone = L.answered.right ? 'right' : 'wrong';
+      body = '<div class="qz-q">'
+        + '<div class="qz-q-num">' + (typed ? 'Typed answer' : 'Multiple choice') + '</div>'
+        + '<div class="qz-prompt">' + escapeHtml(card.front || '') + '</div>'
+        + '<div class="qz-answer ' + tone + '">'
+        + (L.answered.right ? '<b>Right.</b> ' : '<b>Not quite.</b> ')
+        + escapeHtml(card.back || '')
+        + (L.answered.right || !L.answered.given ? ''
+            : '<div class="learn-given">You said: ' + escapeHtml(L.answered.given) + '</div>')
+        + '</div>'
+        + '<div class="hs-runbar"><button type="button" class="btn primary" data-action="learn-next">Continue</button>'
+        + '<span class="hs-cost">Enter</span></div>'
+        + '</div>';
+    } else if(typed){
+      body = '<div class="qz-q">'
+        + '<div class="qz-q-num">Type the answer</div>'
+        + '<div class="qz-prompt">' + escapeHtml(card.front || '') + '</div>'
+        + '<input type="text" class="learn-input" id="learn-input" autocomplete="off" '
+        + 'placeholder="What does it mean?" data-action="learn-typing">'
+        + '<div class="hs-runbar"><button type="button" class="btn primary" data-action="learn-submit">Check</button>'
+        + '<span class="hs-cost">Enter to check · <button type="button" class="linkish" data-action="learn-dontknow">I do not know</button></span>'
+        + '</div></div>';
+    } else {
+      var opts = studyChoices(card, learnableCards(), 'back');
+      body = '<div class="qz-q">'
+        + '<div class="qz-q-num">Pick the answer</div>'
+        + '<div class="qz-prompt">' + escapeHtml(card.front || '') + '</div>'
+        + opts.map(function(o, i){
+            return '<label class="qz-choice"><input type="radio" name="learn-opt" '
+              + 'data-action="learn-pick" value="' + escapeHtml(o) + '">'
+              + '<span><b>' + (i + 1) + '.</b> ' + escapeHtml(o) + '</span></label>';
+          }).join('')
+        + '<div class="hs-runbar"><span class="hs-cost">Press 1 to 4, or click</span></div>'
+        + '</div>';
+    }
+    return head + body;
+  }
+
+  function learnDoneHtml(){
+    var p = learnProgress();
+    return '<div class="qz-score"><div class="qz-pct">' + p.done + '/' + p.total + '</div>'
+      + '<div class="qz-sub">Every term in this set is learned. Come back tomorrow and see what sticks.</div>'
+      + '<div style="margin-top:16px;display:flex;gap:8px;justify-content:center;">'
+      + '<button type="button" class="btn" data-action="fc-list">Back to the set</button>'
+      + '<button type="button" class="btn primary" data-action="learn-restart">Start again</button>'
+      + '</div></div>';
+  }
+
+  // ---- Test -----------------------------------------------------------------
+
+  function testStart(){
+    var cards = learnableCards();
+    if(cards.length < 2){
+      notify('Not enough terms yet', 'A test needs at least two terms with both a front and a back.');
+      return;
+    }
+    var picked = shuffled(cards).slice(0, Math.min(TEST_DEFAULT, cards.length));
+    FC.test = {
+      questions: picked.map(function(c, i){
+        // Written questions need something to type; true/false and multiple choice
+        // need at least one other term to draw a wrong answer from.
+        var kind = cards.length < 4 ? (i % 2 ? 'written' : 'truefalse')
+                 : ['choice', 'choice', 'written', 'truefalse'][i % 4];
+        var q = { id: c.id, kind: kind, prompt: c.front || '', answer: c.back || '' };
+        if(kind === 'choice'){ q.options = studyChoices(c, cards, 'back'); }
+        if(kind === 'truefalse'){
+          var wrong = shuffled(cards.filter(function(x){ return x.id !== c.id; }))[0];
+          q.claim = (Math.random() < 0.5 || !wrong) ? c.back : wrong.back;
+          q.truth = q.claim === c.back;
+        }
+        return q;
+      }),
+      answers: {},
+      marks: null,
+      submitted: false
+    };
+    FC.mode = 'test';
+    renderDeck();
+  }
+
+  function testSubmit(){
+    var T = FC.test;
+    var marks = {};
+    T.questions.forEach(function(q){
+      var given = T.answers[q.id];
+      if(q.kind === 'truefalse'){
+        marks[q.id] = given == null ? false : (String(given) === String(q.truth));
+      } else if(q.kind === 'choice'){
+        marks[q.id] = studySame(given, q.answer);
+      } else {
+        // Written: right if it matches, otherwise handed back for you to mark, since
+        // a phrase can be correct without being the words on the card.
+        marks[q.id] = studySame(given, q.answer) ? true : null;
+      }
+    });
+    T.marks = marks;
+    T.submitted = true;
+    renderDeck();
+  }
+
+  function testScore(){
+    var T = FC.test;
+    var right = 0, marked = 0;
+    T.questions.forEach(function(q){
+      var m = T.marks[q.id];
+      if(m === null) return;              // still yours to mark
+      marked += 1;
+      if(m) right += 1;
+    });
+    return { right: right, marked: marked, total: T.questions.length,
+             pct: marked ? Math.round(right / marked * 100) : 0 };
+  }
+
+  function testHtml(){
+    var T = FC.test;
+    var answered = T.questions.filter(function(q){ return T.answers[q.id] != null && T.answers[q.id] !== ''; }).length;
+    var head = '<div class="qz-head"><div class="qz-progress">'
+      + (T.submitted ? 'Marked' : answered + ' of ' + T.questions.length + ' answered')
+      + '</div>'
+      + (T.submitted ? '' : '<button type="button" class="btn primary" data-action="test-submit">Finish and mark it</button>')
+      + '</div>';
+
+    var body = T.questions.map(function(q, i){
+      var given = T.answers[q.id];
+      var mark = T.submitted ? T.marks[q.id] : undefined;
+      var inner = '<div class="qz-q-num">Question ' + (i + 1) + '</div>';
+      if(q.kind === 'truefalse'){
+        inner += '<div class="qz-prompt">' + escapeHtml(q.prompt) + ' — "' + escapeHtml(q.claim) + '"</div>'
+          + [['true', 'True'], ['false', 'False']].map(function(o){
+              var picked = String(given) === o[0];
+              var tone = '';
+              if(T.submitted && picked) tone = mark ? ' right' : ' wrong';
+              return '<label class="qz-choice' + (picked ? ' picked' : '') + tone + '">'
+                + '<input type="radio" name="t-' + q.id + '" data-action="test-pick" data-id="' + q.id + '"'
+                + ' value="' + o[0] + '"' + (picked ? ' checked' : '') + (T.submitted ? ' disabled' : '') + '>'
+                + '<span>' + o[1] + '</span></label>';
+            }).join('');
+      } else if(q.kind === 'choice'){
+        inner += '<div class="qz-prompt">' + escapeHtml(q.prompt) + '</div>'
+          + (q.options || []).map(function(o){
+              var picked = given === o;
+              var tone = '';
+              if(T.submitted){
+                if(o === q.answer) tone = ' right';
+                else if(picked) tone = ' wrong';
+              }
+              return '<label class="qz-choice' + (picked ? ' picked' : '') + tone + '">'
+                + '<input type="radio" name="t-' + q.id + '" data-action="test-pick" data-id="' + q.id + '"'
+                + ' value="' + escapeHtml(o) + '"' + (picked ? ' checked' : '') + (T.submitted ? ' disabled' : '') + '>'
+                + '<span>' + escapeHtml(o) + '</span></label>';
+            }).join('');
+      } else {
+        inner += '<div class="qz-prompt">' + escapeHtml(q.prompt) + '</div>'
+          + '<textarea class="qz-written" data-action="test-write" data-id="' + q.id + '"'
+          + (T.submitted ? ' disabled' : '') + ' placeholder="In your own words">'
+          + escapeHtml(given || '') + '</textarea>';
+      }
+      if(T.submitted){
+        var verdict = mark === true ? '<span class="qz-verdict right">Right</span>'
+                    : mark === false ? '<span class="qz-verdict wrong">Wrong</span>'
+                    : '<span class="qz-verdict unmarked">Your call</span>';
+        inner += '<div class="qz-answer"><b>Answer:</b> ' + escapeHtml(q.answer) + '</div>';
+        inner += '<div class="qz-mark">' + verdict
+          + (mark === null
+              ? '<span>Did you get it?</span>'
+                + '<button type="button" class="btn ghost" data-action="test-self" data-id="' + q.id + '" data-v="1">Yes</button>'
+                + '<button type="button" class="btn ghost" data-action="test-self" data-id="' + q.id + '" data-v="0">No</button>'
+              : '')
+          + '</div>';
+      }
+      return '<div class="qz-q">' + inner + '</div>';
+    }).join('');
+
+    var foot = '';
+    if(T.submitted){
+      var sc = testScore();
+      foot = '<div class="qz-score"><div class="qz-pct">' + sc.pct + '%</div>'
+        + '<div class="qz-sub">' + sc.right + ' of ' + sc.marked + ' marked right'
+        + (sc.marked < sc.total ? ' · ' + (sc.total - sc.marked) + ' still yours to mark' : '')
+        + '</div>'
+        + '<div style="margin-top:16px;display:flex;gap:8px;justify-content:center;">'
+        + '<button type="button" class="btn" data-action="fc-list">Back to the set</button>'
+        + '<button type="button" class="btn primary" data-action="test-restart">Take it again</button>'
+        + '</div></div>';
+    }
+    return head + body + foot;
   }
 
   // ---------------- Notes (global) ----------------
@@ -11876,6 +12260,10 @@
     if(activeTab === 'study' && studyScreen && studyScreen.kind === 'set'){
       renderView();
       paintIcons();
+      // A typed Learn answer should be ready to type into: reaching for the mouse to
+      // click the box every time is what makes a drill tiring.
+      var lbox = document.getElementById('learn-input');
+      if(lbox) lbox.focus();
       return;
     }
     var today = new Date().toISOString().slice(0,10);
@@ -11915,6 +12303,46 @@
   var FC_DEFAULT_PICK = 2;   // Good: the honest default, not the flattering one
 
   /** Keyboard for the review loop. Returns true when the key was ours. */
+  /**
+   * Learn from the keyboard.
+   *
+   * Multiple choice takes 1 to 4, a typed answer takes Enter, and the result screen
+   * takes Enter to carry on -- so a round can be done without reaching for the mouse,
+   * which is the whole point of a drill.
+   */
+  function learnHandleKey(e){
+    if(!FC || FC.mode !== 'learn' || !FC.learn) return false;
+    if(e.metaKey || e.ctrlKey || e.altKey) return false;
+    var card = FC.learn.queue[FC.learn.at];
+    if(!card) return false;
+    var typing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA'
+                              || e.target.isContentEditable);
+
+    if(FC.learn.answered){
+      if(e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar'){
+        e.preventDefault(); learnNext(); return true;
+      }
+      return false;
+    }
+    if((FC.learn.levels[card.id] || 0) >= 1){
+      // typed answer: Enter checks it, and everything else belongs to the box
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        var box = document.getElementById('learn-input');
+        learnAnswer(box ? box.value : '');
+        return true;
+      }
+      return false;
+    }
+    if(typing) return false;
+    if(['1','2','3','4'].indexOf(e.key) > -1){
+      var opts = document.querySelectorAll('[data-action="learn-pick"]');
+      var chosen = opts[Number(e.key) - 1];
+      if(chosen){ e.preventDefault(); learnAnswer(chosen.value); return true; }
+    }
+    return false;
+  }
+
   function fcHandleKey(e){
     if(!FC || FC.mode !== 'review') return false;
     if(e.metaKey || e.ctrlKey || e.altKey) return false;
@@ -12104,7 +12532,7 @@
     var d = TH.data;
     var body;
     if(TH.loading){
-      body = '<div class="hs-thinking"><i></i>Opening the thread…</div>';
+      body = '<div class="hs-thinking"><i></i>Opening the chat…</div>';
     } else if(TH.picking){
       body = threadPickerHtml();
     } else {
@@ -12120,7 +12548,7 @@
     }
     document.getElementById('modal-root').innerHTML =
       '<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide th-modal" data-action="modal-stop">'
-      + '<div class="modal-head"><h2>'+escapeHtml(d ? (d.title||'Thread') : 'Thread')+'</h2>'
+      + '<div class="modal-head"><h2>'+escapeHtml(d ? (d.title||'Chat') : 'Chat')+'</h2>'
       + (d ? '<div class="row-meta" style="margin-top:6px;">'
              + '<span class="type-badge">'+escapeHtml(classLabel(d.classId))+'</span>'
              + '<span class="type-badge">'+((d.messages||[]).length)+' message'
@@ -12130,7 +12558,7 @@
       + '<div class="modal-foot">'
       + '<span style="display:flex;gap:8px;">'
       + '<button class="btn" data-action="th-rename">Rename</button>'
-      + '<button class="btn ghost danger" data-action="th-delete">Delete thread</button></span>'
+      + '<button class="btn ghost danger" data-action="th-delete">Delete chat</button></span>'
       + '<div class="right"><button class="btn" data-action="modal-close">Close</button></div>'
       + '</div></div></div>';
     paintIcons();
@@ -12219,21 +12647,21 @@
   /** The whole page, given over to one conversation. */
   function threadScreenHtml(){
     if(!TH || TH.loading || !TH.data){
-      return '<div class="th-screen"><div class="hs-thinking"><i></i>Opening the thread…</div></div>';
+      return '<div class="th-screen"><div class="hs-thinking"><i></i>Opening the chat…</div></div>';
     }
     var d = TH.data;
     var siblings = hsThreads.filter(function(t){ return t.classId === d.classId; });
     var rail = '<aside class="th-rail">'
-      + '<div class="th-rail-head">Threads</div>'
+      + '<div class="th-rail-head">Chats</div>'
       + siblings.map(function(t){
           return '<button type="button" class="th-rail-item'+(t.id===d.id?' active':'')+'"'
             + ' data-action="hs-open-thread" data-id="'+t.id+'">'
-            + '<span class="th-rail-name">'+escapeHtml(t.title||'Thread')+'</span>'
+            + '<span class="th-rail-name">'+escapeHtml(t.title||'Chat')+'</span>'
             + '<span class="th-rail-sub">'+t.messageCount+' message'+(t.messageCount===1?'':'s')+'</span>'
             + '</button>';
         }).join('')
       + '<button type="button" class="th-rail-new" data-action="hs-new-thread" data-class="'+d.classId+'">'
-      + iconSvg('plus')+'New thread</button>'
+      + iconSvg('plus')+'New chat</button>'
       + '</aside>';
 
     var msgs = (d.messages||[]).map(threadBubbleHtml).join('');
@@ -12319,10 +12747,10 @@
   var pendingClassPick = null;
 
   function startNamedThread(cid){
-    askForText('New thread', { label:'What is it about?', placeholder:'Discussions',
+    askForText('New chat', { label:'What is it about?', placeholder:'Discussions',
                                confirmLabel:'Create' }).then(function(name){
       if(name === null) return;
-      return apiPost('/api/threads', { classId: cid, title: (name||'').trim() || 'New thread' })
+      return apiPost('/api/threads', { classId: cid, title: (name||'').trim() || 'New chat' })
         .then(function(th){ return hsLoadSide().then(function(){ openThread(th.id); }); });
     }).catch(reportError);
   }
@@ -12332,7 +12760,7 @@
     var mine = hsThreads.filter(function(t){ return t.classId===cid; });
     document.getElementById('modal-root').innerHTML =
       '<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop">'
-      + '<div class="modal-head"><h2>Threads</h2>'
+      + '<div class="modal-head"><h2>Chats</h2>'
       + '<div class="row-meta" style="margin-top:6px;"><span class="type-badge">'
       + escapeHtml(classLabel(cid))+'</span></div></div>'
       + '<div class="modal-body">'
@@ -12340,16 +12768,16 @@
           ? mine.map(function(t){
               return '<button type="button" class="hs-saved" style="width:100%;margin-bottom:6px;"'
                 + ' data-action="hs-open-thread" data-id="'+t.id+'">'
-                + '<b>'+escapeHtml(t.title||'Thread')+'</b>'
+                + '<b>'+escapeHtml(t.title||'Chat')+'</b>'
                 + '<span class="hs-saved-sub">'+t.messageCount+' message'
                 + (t.messageCount===1?'':'s')
                 + (t.lastMessageAt ? ' · '+relTimeAgo(t.lastMessageAt) : ' · not started')
                 + '</span></button>';
             }).join('')
-          : '<div class="empty">No threads in this class yet.</div>')
+          : '<div class="empty">No chats in this class yet.</div>')
       + '</div>'
       + '<div class="modal-foot"><span></span><div class="right">'
-      + '<button class="btn" data-action="hs-new-thread" data-class="'+cid+'">New thread</button>'
+      + '<button class="btn" data-action="hs-new-thread" data-class="'+cid+'">New chat</button>'
       + '<button class="btn" data-action="modal-close">Close</button></div></div>'
       + '</div></div>';
     paintIcons();
@@ -12474,7 +12902,7 @@
 
   function threadLiveOrBusyHtml(){
     if(TH.stream) return threadLiveHtml();
-    return TH.busy ? '<div class="hs-thinking"><i></i>Starting the thread…</div>' : '';
+    return TH.busy ? '<div class="hs-thinking"><i></i>Starting the chat…</div>' : '';
   }
 
   /** The question just asked, and the answer as it is being written. */
@@ -13585,6 +14013,12 @@
   });
   document.addEventListener('input', function(e){
     if(TH && e.target && e.target.id === 'th-draft'){ TH.draft = e.target.value; return; }
+    // Stored as it is typed, never on blur: a written answer that only registers when
+    // the box loses focus is a written answer that gets thrown away on submit.
+    if(FC && FC.test && e.target && e.target.matches('[data-action="test-write"]')){
+      FC.test.answers[e.target.dataset.id] = e.target.value;
+      return;
+    }
     if(e.target && e.target.id === 'hz-text'){ HZ.text = e.target.value; hzPaintMeter(); return; }
     if(e.target && e.target.id === 'hz-pick-filter' && HZ.pick){ HZ.pick.filter = e.target.value; hzPaintPicker(); return; }
     if(e.target && e.target.id === 'hz-voice-input'){
@@ -15042,10 +15476,10 @@
     }
     if(action==='hs-new-thread'){
       var ncid = t.dataset.class;
-      askForText('New thread', { label:'What is it about?', placeholder:'Discussions',
+      askForText('New chat', { label:'What is it about?', placeholder:'Discussions',
                                  confirmLabel:'Create' }).then(function(name){
         if(name === null) return;
-        return apiPost('/api/threads', { classId:ncid, title:(name||'').trim() || 'New thread' })
+        return apiPost('/api/threads', { classId:ncid, title:(name||'').trim() || 'New chat' })
           .then(function(th){ return hsLoadSide().then(function(){ openThread(th.id); }); });
       }).catch(reportError);
       return;
@@ -15088,13 +15522,13 @@
     if(action==='th-to-note'){
       var nm = (TH.data.messages||[]).find(function(m){ return m.id===t.dataset.id; });
       if(!nm) return;
-      addNote(TH.data.classId, { title: TH.data.title || 'From a thread', text: mdLite(nm.content||'') })
+      addNote(TH.data.classId, { title: TH.data.title || 'From a chat', text: mdLite(nm.content||'') })
         .then(function(){ notify('Saved to Notes', 'Filed under “'+(TH.data.title||'thread')+'”.'); })
         .catch(reportError);
       return;
     }
     if(action==='th-rename'){
-      askForText('Rename thread', { label:'Name', value: TH.data.title || '' }).then(function(nm2){
+      askForText('Rename chat', { label:'Name', value: TH.data.title || '' }).then(function(nm2){
         if(!nm2 || !nm2.trim()) return;
         return apiPut('/api/threads/'+TH.id, { title: nm2.trim() }).then(function(){
           TH.data.title = nm2.trim(); renderThread(); return hsLoadSide();
@@ -15103,7 +15537,7 @@
       return;
     }
     if(action==='th-delete'){
-      confirmAction('Delete this thread?', 'Its whole conversation goes with it.').then(function(ok){
+      confirmAction('Delete this chat?', 'Its whole conversation goes with it.').then(function(ok){
         if(!ok) return;
         return apiDelete('/api/threads/'+TH.id).then(function(){
           hsScreen = null; TH = null; closeModal();
@@ -15296,10 +15730,26 @@
     if(action==='hs-open-deck'){ hsBackItemId = null; openStudySet(t.dataset.id); return; }
     if(action==='study-open-set'){ openStudySet(t.dataset.id); return; }
     if(action==='study-home'){ studyScreen = null; FC = null; renderView(); paintIcons(); return; }
-    if(action==='study-soon'){
-      notify(t.dataset.mode + ' is next',
-             'Flashcards works now. ' + t.dataset.mode + ' is the next thing being built, '
-             + 'and it will run off these same terms.');
+    if(action==='study-learn'){ learnStart(); return; }
+    if(action==='study-test'){ testStart(); return; }
+    if(action==='learn-next'){ learnNext(); return; }
+    if(action==='learn-restart'){
+      apiPost('/api/decks/'+FC.deck.id+'/learn/reset', {}).catch(function(){});
+      (FC.deck.cards||[]).forEach(function(c){ c.learnLevel = 0; });
+      learnStart();
+      return;
+    }
+    if(action==='learn-submit'){
+      var li = document.getElementById('learn-input');
+      learnAnswer(li ? li.value : '');
+      return;
+    }
+    if(action==='learn-dontknow'){ learnAnswer(''); return; }
+    if(action==='test-submit'){ testSubmit(); return; }
+    if(action==='test-restart'){ testStart(); return; }
+    if(action==='test-self'){
+      FC.test.marks[t.dataset.id] = t.dataset.v === '1';
+      renderDeck();
       return;
     }
     if(action==='study-generate'){
@@ -15539,6 +15989,16 @@
         .then(function(){ openClassDetailModal(mcId); }).catch(reportError);
       return;
     }
+    if(t.matches('[data-action="learn-pick"]')){
+      learnAnswer(t.value);
+      return;
+    }
+    if(t.matches('[data-action="test-pick"]')){
+      FC.test.answers[t.dataset.id] = t.value;
+      // No redraw: it would take the caret and the scroll with it, which is the bug
+      // that made the AI quiz unusable before it was fixed the same way.
+      return;
+    }
     if(t.matches('[data-action="rubric-link-select"]')){
       updateRubric(currentRubric.id, { itemId: t.value || null }).then(function(r){
         currentRubric = r;
@@ -15637,6 +16097,7 @@
     if(TH && e.target && e.target.id === 'th-draft' && e.key === 'Enter' && !e.shiftKey){
       e.preventDefault(); threadSend(null, false); return;
     }
+    if(learnHandleKey(e)) return;
     if(fcHandleKey(e)) return;
     if(e.key === 'Tab'){
       var ed = e.target.closest && e.target.closest('.rte-editor');

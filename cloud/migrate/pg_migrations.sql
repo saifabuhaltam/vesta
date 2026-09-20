@@ -326,3 +326,18 @@ alter table flashcard_decks add column if not exists "item_id" text
   references items(id) on delete set null;
 
 create index if not exists flashcard_decks_by_item on flashcard_decks("item_id");
+
+
+-- migration: 007_card_learn
+-- How far the Learn mode has got with each card.
+--
+-- 0 not started, 1 recognised from four choices, 2 typed correctly. Deliberately
+-- separate from ease/interval_days/repetitions: those schedule a review over days,
+-- this is progress through a set that should survive closing the tab and follow the
+-- account to another device.
+--
+-- The partner block for the SQLite ALTER in db.init_db(). A nullable column with a
+-- default needs no backfill, and flashcards already carries user_id and forced row
+-- level security from the base schema.
+
+alter table flashcards add column if not exists "learn_level" integer default 0;

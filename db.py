@@ -738,6 +738,15 @@ def init_db():
         if col not in ucols:
             conn.execute(f"ALTER TABLE ai_usage ADD COLUMN {col} INTEGER DEFAULT 0")
 
+    # How well each card is learned, for the Learn mode: 0 not started, 1 recognised
+    # from four choices, 2 typed correctly, which is what counts as learned. Separate
+    # from the spaced-repetition columns on purpose: those schedule a review over days,
+    # this is progress within one sitting that should survive closing the tab.
+    # Partner block: 007_card_learn in cloud/migrate/pg_migrations.sql.
+    ccols = [r["name"] for r in conn.execute("PRAGMA table_info(flashcards)").fetchall()]
+    if "learn_level" not in ccols:
+        conn.execute("ALTER TABLE flashcards ADD COLUMN learn_level INTEGER DEFAULT 0")
+
     # A deck made for one assignment. Quizzes have carried `item_id` from the start;
     # decks never did, so a deck built from an assignment could not be shown on its
     # card. Partner block: 006_deck_item in cloud/migrate/pg_migrations.sql.
