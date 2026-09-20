@@ -984,6 +984,11 @@ Measured locally against Sonnet 5 through gunicorn gthread:
 - Stop: the partial reply was kept and marked stopped. Copy and Save as a note work on
   it once the thread refreshes.
 
+Full screen for threads, built 2026-09-19 at Saif's request: a button in the thread's
+title row, ⌘⇧F, and Esc. The conversation gains about 160 px of height on a laptop;
+the rail stays. Saved per account as `threadFullscreen` ("auto" is on for a phone).
+Browser-tested 19/19 on a laptop and a phone, against the stub server.
+
 Left open:
 - [ ] **Not yet seen streaming on the live site.** Everything above ran locally. If
       replies on vesta.study arrive all at once at the end, something between Railway

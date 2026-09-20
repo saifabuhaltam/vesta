@@ -211,6 +211,88 @@ def item_ids_for_material(conn, mid):
         "SELECT item_id FROM item_files WHERE material_id=? ORDER BY created_at", (mid,))]
 
 
+def rows_in(conn, sql, ids, chunk=300):
+    """Run one query over a list of ids, in chunks, and return every row.
+
+    `sql` carries `{marks}` where the placeholders belong. Chunking keeps a term with
+    hundreds of assignments from building a single statement with hundreds of
+    parameters, which some drivers handle badly.
+    """
+    ids = [i for i in ids if i is not None]
+    out = []
+    for start in range(0, len(ids), chunk):
+        part = ids[start:start + chunk]
+        marks = ",".join("?" * len(part))
+        out.extend(conn.execute(sql.format(marks=marks), tuple(part)).fetchall())
+    return out
+
+
+def group_by(rows, key):
+    """Rows bucketed by one column, keeping the order the query returned them in."""
+    out = {}
+    for r in rows:
+        out.setdefault(r[key], []).append(r)
+    return out
+
+
+def state_children(conn, class_ids, item_ids, extra_material_ids=()):
+    """Every child row `/api/state` needs, one query per table instead of per parent.
+
+    Serialising a class cost seven queries and an item four, plus one per file for its
+    assignment links, so a term with five classes, sixty assignments and forty files
+    ran well over three hundred round trips for a single page load. Against SQLite on
+    the same disk that is invisible; against Postgres over a network it is seconds, and
+    the page reloads all of this after every small edit. Same rows, same order, one
+    query each.
+    """
+    by_class = lambda sql: rows_in(conn, sql, class_ids)
+    by_item = lambda sql: rows_in(conn, sql, item_ids)
+    materials = by_class(
+        "SELECT * FROM materials WHERE class_id IN ({marks}) ORDER BY created_at")
+    # The files' assignment links are looked up by material, and the unfiled files
+    # (Inbox) need theirs too, so they come in on the same query.
+    material_ids = [m["id"] for m in materials] + list(extra_material_ids)
+    return {
+        "schedule": group_by(by_class(
+            'SELECT * FROM schedule_entries WHERE class_id IN ({marks})'), "class_id"),
+        "materials": group_by(materials, "class_id"),
+        "notes": group_by(by_class(
+            "SELECT * FROM notes WHERE class_id IN ({marks})"
+            " AND (deleted_at IS NULL OR deleted_at='')"
+            " ORDER BY pinned DESC, sort_order, created_at"), "class_id"),
+        "topics": group_by(by_class(
+            "SELECT * FROM syllabus_topics WHERE class_id IN ({marks})"
+            " ORDER BY sort_order, title"), "class_id"),
+        "gradeCategories": group_by(by_class(
+            "SELECT * FROM grade_categories WHERE class_id IN ({marks})"
+            " ORDER BY sort_order, name"), "class_id"),
+        "fileFolders": group_by(by_class(
+            "SELECT * FROM file_folders WHERE class_id IN ({marks})"
+            " ORDER BY sort_order, created_at"), "class_id"),
+        "noteFolders": group_by(by_class(
+            "SELECT * FROM note_folders WHERE class_id IN ({marks})"
+            " ORDER BY sort_order, created_at"), "class_id"),
+        "subtasks": group_by(by_item(
+            "SELECT * FROM subtasks WHERE item_id IN ({marks})"), "item_id"),
+        "headstarts": group_by(by_item(
+            "SELECT id, item_id, kind, status, updated_at FROM headstarts"
+            " WHERE item_id IN ({marks}) ORDER BY updated_at DESC"), "item_id"),
+        "rubrics": group_by(by_item(
+            "SELECT * FROM rubrics WHERE item_id IN ({marks})"), "item_id"),
+        "itemFiles": group_by(rows_in(
+            conn,
+            "SELECT material_id, item_id FROM item_files WHERE material_id IN ({marks})"
+            " ORDER BY created_at", material_ids), "material_id"),
+    }
+
+
+def material_item_ids(pre, mid, conn=None):
+    """The assignments a file is attached to, from the prefetched bundle or the database."""
+    if pre is not None:
+        return [r["item_id"] for r in pre["itemFiles"].get(mid, [])]
+    return item_ids_for_material(conn, mid)
+
+
 def serialize_material(m, item_ids=None):
     item_ids = item_ids or []
     d = {
@@ -296,25 +378,47 @@ def serialize_event(e):
     }
 
 
-def serialize_class(conn, row):
-    schedule = conn.execute(
-        "SELECT id, day, start, \"end\", location FROM schedule_entries WHERE class_id=?",
-        (row["id"],),
-    ).fetchall()
-    materials = conn.execute(
-        "SELECT * FROM materials WHERE class_id=? ORDER BY created_at", (row["id"],)
-    ).fetchall()
-    notes = conn.execute(
-        "SELECT * FROM notes WHERE class_id=? AND (deleted_at IS NULL OR deleted_at='') "
-        "ORDER BY pinned DESC, sort_order, created_at",
-        (row["id"],),
-    ).fetchall()
-    topics = conn.execute(
-        # rowid is SQLite-only; sort_order already carries the intended order and title
-        # is a deterministic tiebreak in either database.
-        "SELECT * FROM syllabus_topics WHERE class_id=? ORDER BY sort_order, title",
-        (row["id"],),
-    ).fetchall()
+def serialize_class(conn, row, pre=None):
+    """One class, with its schedule, files, notes and syllabus.
+
+    `pre` is the prefetched bundle from `state_children`. Without it each class costs
+    seven queries of its own, which is why `/api/state` always passes one.
+    """
+    cid = row["id"]
+    if pre is not None:
+        schedule = pre["schedule"].get(cid, [])
+        materials = pre["materials"].get(cid, [])
+        notes = pre["notes"].get(cid, [])
+        topics = pre["topics"].get(cid, [])
+        grade_cats = pre["gradeCategories"].get(cid, [])
+        file_folders = pre["fileFolders"].get(cid, [])
+        note_folders = pre["noteFolders"].get(cid, [])
+    else:
+        schedule = conn.execute(
+            'SELECT * FROM schedule_entries WHERE class_id=?', (cid,)).fetchall()
+        materials = conn.execute(
+            "SELECT * FROM materials WHERE class_id=? ORDER BY created_at", (cid,)
+        ).fetchall()
+        notes = conn.execute(
+            "SELECT * FROM notes WHERE class_id=? AND (deleted_at IS NULL OR deleted_at='') "
+            "ORDER BY pinned DESC, sort_order, created_at",
+            (cid,),
+        ).fetchall()
+        topics = conn.execute(
+            # rowid is SQLite-only; sort_order already carries the intended order and title
+            # is a deterministic tiebreak in either database.
+            "SELECT * FROM syllabus_topics WHERE class_id=? ORDER BY sort_order, title",
+            (cid,),
+        ).fetchall()
+        grade_cats = conn.execute(
+            "SELECT * FROM grade_categories WHERE class_id=? ORDER BY sort_order, name",
+            (cid,)).fetchall()
+        file_folders = conn.execute(
+            "SELECT * FROM file_folders WHERE class_id=? ORDER BY sort_order, created_at",
+            (cid,)).fetchall()
+        note_folders = conn.execute(
+            "SELECT * FROM note_folders WHERE class_id=? ORDER BY sort_order, created_at",
+            (cid,)).fetchall()
     return {
         "id": row["id"],
         "code": row["code"],
@@ -327,9 +431,7 @@ def serialize_class(conn, row):
         "gradeCategories": [
             {"id": g["id"], "name": g["name"] or "", "weight": g["weight"],
              "dropLowest": g["drop_lowest"] or 0, "sortOrder": g["sort_order"] or 0}
-            for g in conn.execute(
-                "SELECT * FROM grade_categories WHERE class_id=? ORDER BY sort_order, name",
-                (row["id"],)).fetchall()
+            for g in grade_cats
         ],
         "website": row["website"] or "",
         "createdAt": row["created_at"],
@@ -343,10 +445,8 @@ def serialize_class(conn, row):
              "endDate": s["end_date"] if "end_date" in s.keys() else None}
             for s in schedule
         ],
-        "materials": [serialize_material(m, item_ids_for_material(conn, m["id"])) for m in materials],
-        "fileFolders": [serialize_file_folder(f) for f in conn.execute(
-            "SELECT * FROM file_folders WHERE class_id=? ORDER BY sort_order, created_at",
-            (row["id"],)).fetchall()],
+        "materials": [serialize_material(m, material_item_ids(pre, m["id"], conn)) for m in materials],
+        "fileFolders": [serialize_file_folder(f) for f in file_folders],
         "notesList": [serialize_note(n) for n in notes],
         "noteFolders": [
             {
@@ -356,10 +456,7 @@ def serialize_class(conn, row):
                 "kind": (f["kind"] or "custom") if "kind" in f.keys() else "custom",
                 "sortOrder": (f["sort_order"] or 0) if "sort_order" in f.keys() else 0,
             }
-            for f in conn.execute(
-                "SELECT * FROM note_folders WHERE class_id=? ORDER BY sort_order, created_at",
-                (row["id"],),
-            ).fetchall()
+            for f in note_folders
         ],
         "syllabus": [
             {"id": t["id"], "title": t["title"], "done": bool(t["done"])} for t in topics
@@ -380,17 +477,27 @@ def serialize_rubric(r):
     }
 
 
-def serialize_item(conn, row):
-    subtasks = conn.execute(
-        "SELECT * FROM subtasks WHERE item_id=?", (row["id"],)
-    ).fetchall()
-    headstarts = conn.execute(
-        "SELECT id, kind, status, updated_at FROM headstarts WHERE item_id=? ORDER BY updated_at DESC",
-        (row["id"],)
-    ).fetchall()
-    rubric_row = conn.execute(
-        "SELECT * FROM rubrics WHERE item_id=?", (row["id"],)
-    ).fetchone()
+def serialize_item(conn, row, pre=None):
+    """One assignment, with its subtasks, saved generations and rubric.
+
+    `pre` is the prefetched bundle from `state_children`; see `serialize_class`.
+    """
+    if pre is not None:
+        subtasks = pre["subtasks"].get(row["id"], [])
+        headstarts = pre["headstarts"].get(row["id"], [])
+        rubrics = pre["rubrics"].get(row["id"], [])
+        rubric_row = rubrics[0] if rubrics else None
+    else:
+        subtasks = conn.execute(
+            "SELECT * FROM subtasks WHERE item_id=?", (row["id"],)
+        ).fetchall()
+        headstarts = conn.execute(
+            "SELECT id, kind, status, updated_at FROM headstarts WHERE item_id=? ORDER BY updated_at DESC",
+            (row["id"],)
+        ).fetchall()
+        rubric_row = conn.execute(
+            "SELECT * FROM rubrics WHERE item_id=?", (row["id"],)
+        ).fetchone()
     return {
         "id": row["id"],
         "classId": row["class_id"],
@@ -766,6 +873,20 @@ def get_state():
         "SELECT * FROM items WHERE semester_id=? ORDER BY created_at", (sid,)).fetchall()
     events = conn.execute(
         "SELECT * FROM events WHERE semester_id=? ORDER BY date, start", (sid,)).fetchall()
+    unfiled_notes = conn.execute(
+        "SELECT * FROM notes WHERE class_id IS NULL AND semester_id=? "
+        "ORDER BY pinned DESC, updated_at DESC", (sid,)).fetchall()
+    unfiled_materials = conn.execute(
+        "SELECT * FROM materials WHERE class_id IS NULL AND semester_id=? "
+        "ORDER BY created_at DESC", (sid,)).fetchall()
+    # Every child row in one query per table. Without this the page costs one query per
+    # class, per assignment and per file, which is what made saving feel slow.
+    pre = state_children(
+        conn,
+        [c["id"] for c in classes],
+        [i["id"] for i in items],
+        [m["id"] for m in unfiled_materials],
+    )
     result = {
         "semesters": [serialize_semester(r) for r in conn.execute(
             f"SELECT * FROM semesters ORDER BY {SEMESTER_ORDER}").fetchall()],
@@ -778,8 +899,8 @@ def get_state():
         # an archived term opens locked, so last year's grades cannot be edited by a
         # stray click; the unlock is per browser session and drops on switching away
         "locked": sem["status"] == "archived" and session.get(UNLOCK_KEY) != sid,
-        "classes": [serialize_class(conn, c) for c in classes],
-        "items": [serialize_item(conn, i) for i in items],
+        "classes": [serialize_class(conn, c, pre) for c in classes],
+        "items": [serialize_item(conn, i, pre) for i in items],
         "events": [serialize_event(e) for e in events],
         # kept under its old name so nothing in the page has to be renamed: the
         # current term is now simply the active semester
@@ -811,12 +932,9 @@ def get_state():
         # Notes and files jotted down or dropped in before there was anywhere to put
         # them. They live outside every class until they are filed.
         "unfiled": {
-            "notesList": [serialize_note(n) for n in conn.execute(
-                "SELECT * FROM notes WHERE class_id IS NULL AND semester_id=? "
-                "ORDER BY pinned DESC, updated_at DESC", (sid,)).fetchall()],
-            "materials": [serialize_material(m, item_ids_for_material(conn, m["id"])) for m in conn.execute(
-                "SELECT * FROM materials WHERE class_id IS NULL AND semester_id=? "
-                "ORDER BY created_at DESC", (sid,)).fetchall()],
+            "notesList": [serialize_note(n) for n in unfiled_notes],
+            "materials": [serialize_material(m, material_item_ids(pre, m["id"], conn))
+                          for m in unfiled_materials],
         },
     }
     conn.close()
@@ -877,8 +995,10 @@ def create_class():
         )
     ensure_default_file_folders(conn, cid)
     conn.commit()
+    row = conn.execute("SELECT * FROM classes WHERE id=?", (cid,)).fetchone()
+    out = serialize_class(conn, row) if row else {"id": cid}
     conn.close()
-    return jsonify({"id": cid}), 201
+    return jsonify(out), 201
 
 
 def save_grade_categories(conn, cid, cats):
@@ -934,8 +1054,12 @@ def update_class(cid):
                  s.get("kind") or "lecture", s.get("section") or "", s.get("startDate"), s.get("endDate")),
             )
     conn.commit()
+    # The saved class travels back for the same reason as an assignment does: the page
+    # can redraw one class instead of refetching the term.
+    row = conn.execute("SELECT * FROM classes WHERE id=?", (cid,)).fetchone()
+    out = serialize_class(conn, row) if row else {"ok": True}
     conn.close()
-    return jsonify({"ok": True})
+    return jsonify(out)
 
 
 @app.route("/api/classes/<cid>", methods=["DELETE"])
@@ -992,8 +1116,10 @@ def create_item():
             (s.get("id") or str(uuid.uuid4()), iid, s.get("title", ""), 1 if s.get("done") else 0),
         )
     conn.commit()
+    row = conn.execute("SELECT * FROM items WHERE id=?", (iid,)).fetchone()
+    out = serialize_item(conn, row) if row else {"id": iid}
     conn.close()
-    return jsonify({"id": iid}), 201
+    return jsonify(out), 201
 
 
 @app.route("/api/items/<iid>", methods=["PUT"])
@@ -1030,8 +1156,12 @@ def update_item(iid):
                 (s.get("id") or str(uuid.uuid4()), iid, s.get("title", ""), 1 if s.get("done") else 0),
             )
     conn.commit()
+    # The saved row travels back, so the page can update the one assignment that
+    # changed instead of reloading every class, file and note to see one new due date.
+    row = conn.execute("SELECT * FROM items WHERE id=?", (iid,)).fetchone()
+    out = serialize_item(conn, row) if row else {"ok": True}
     conn.close()
-    return jsonify({"ok": True})
+    return jsonify(out)
 
 
 @app.route("/api/items/<iid>", methods=["DELETE"])

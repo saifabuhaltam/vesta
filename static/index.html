@@ -2076,6 +2076,25 @@
     .th-rail{ width:auto; flex-direction:row; flex-wrap:wrap; }
     .th-rail-new{ margin-top:0; }
   }
+  /* Full screen: the thread over the whole window, the way Notes' editor goes full
+     screen. The rail stays, so switching threads is still one click. */
+  .th-screen.fullscreen{ position:fixed; inset:0; z-index:100; background:var(--bg);
+    height:auto; min-height:0; padding:14px 22px 0; }
+  .th-screen.fullscreen .th-body-wrap{ flex:1; min-height:0; }
+  .th-full-btn{ display:flex; align-items:center; gap:6px; }
+  .th-full-btn svg{ width:15px; height:15px; }
+  @media (max-width:900px){
+    .th-screen.fullscreen{ padding:10px 10px 0; }
+    .th-screen.fullscreen .th-main{ flex:1; min-height:0; }
+    .th-screen.fullscreen .th-rail{ flex:none; max-height:92px; overflow:auto; }
+  }
+  /* On a phone the thread's head stacks: back and title, then the actions on a row of
+     their own that can wrap, rather than squeezing labels onto three lines. */
+  @media (max-width:720px){
+    .th-screen .th-screen-title{ flex-basis:calc(100% - 120px); }
+    .th-screen .th-screen-acts{ flex-basis:100%; flex-wrap:wrap; }
+    .th-screen .th-screen-acts .btn, .th-screen .th-screen-acts .hs-spend{ white-space:nowrap; }
+  }
 
   /* ---------- Threads ---------- */
   /* A transcript in the same bubble language as the rest of the app: the student's
@@ -2695,6 +2714,8 @@
     calendar: '<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.6v3.8M16 2.6v3.8"/>',
     classes: '<path d="M12 3 3 7.4l9 4.4 9-4.4L12 3Z"/><path d="M3 12.3 12 16.7l9-4.4"/><path d="M3 16.9 12 21.3l9-4.4"/>',
     assignments: '<rect x="5" y="4.2" width="14" height="16.6" rx="2.4"/><path d="M9.2 3.2h5.6v3.2H9.2z"/><path d="M9 11.6h6M9 15.4h4"/>',
+    expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+    shrink: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
     stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="2.2"/>',
     pen: '<path d="M4 20h4L19.2 8.8a2.3 2.3 0 0 0 0-3.2l-.8-.8a2.3 2.3 0 0 0-3.2 0L4 16v4Z"/><path d="M13.6 6.4l4 4"/>',
     chat: '<path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5Z"/>',
@@ -3310,8 +3331,20 @@
       .then(function(r){ noteLocalChange(url); return r; });
   }
 
+  // What the last state load carried, so a reload that changed nothing can stop before
+  // redrawing the page. Background reconciles run after most saves and after every
+  // calendar sync, and a redraw costs a caret, a hover and a scroll position.
+  var lastStateSig = null;
+
   function loadState(){
     return (BE ? BE.loadState() : apiGet('/api/state')).then(function(data){
+      // The connection is good, whatever the payload says, so the indicator is set
+      // before the early return below.
+      document.getElementById('sync-dot').classList.remove('off');
+      document.getElementById('sync-label').textContent = BE ? 'Synced to your account' : 'Saved to your server';
+      var sig = JSON.stringify(data);
+      if(sig === lastStateSig) return;
+      lastStateSig = sig;
       classes = data.classes; items = data.items; events = data.events || []; termSettings = data.term;
       semesters = data.semesters || [];
       semester = data.semester || null;
@@ -3325,8 +3358,6 @@
       var wasOn = gsyncOn;
       gsyncOn = !!data.googleSync;
       if(gsyncOn && !wasOn){ startGoogleSync(); setTimeout(function(){ runGoogleSync('open'); }, 600); }
-      document.getElementById('sync-dot').classList.remove('off');
-      document.getElementById('sync-label').textContent = BE ? 'Synced to your account' : 'Saved to your server';
       render();
     }).catch(function(err){
       document.getElementById('sync-dot').classList.add('off');
@@ -3338,12 +3369,141 @@
   }
 
   // ---------------- data layer ----------------
-  function addClass(data){ return route('addClass', [data], function(){ return apiPost('/api/classes', data); }).then(loadState); }
-  function updateClass(id, data){ return route('updateClass', [id, data], function(){ return apiPut('/api/classes/'+id, data); }).then(loadState); }
-  function deleteClass(id){ return route('deleteClass', [id], function(){ return apiDelete('/api/classes/'+id); }).then(loadState); }
-  function addItem(data){ return route('addItem', [data], function(){ return apiPost('/api/items', data); }).then(loadState); }
-  function updateItem(id, data){ return route('updateItem', [id, data], function(){ return apiPut('/api/items/'+id, data); }).then(loadState); }
-  function deleteItem(id){ return route('deleteItem', [id], function(){ return apiDelete('/api/items/'+id); }).then(loadState); }
+
+  /**
+   * Instant edits.
+   *
+   * Every save used to wait for the server and then reload the entire term -- every
+   * class, file, note and assignment -- before the screen showed the change. Two
+   * round trips before a ticked checkbox moved. The helpers below change the page
+   * first, send the change second, and fold the saved row back in when it lands.
+   *
+   * The rules that keep that honest:
+   *  - what is painted locally is exactly what is being sent, so the screen cannot
+   *    show something the server was never asked for;
+   *  - the saved row wins when it arrives, and only redraws if it differs;
+   *  - a failure puts the old row back and redraws, so a refused write never leaves
+   *    the page claiming it worked.
+   */
+  function rowIndex(list, id){
+    for(var i=0;i<list.length;i++){ if(list[i].id===id) return i; }
+    return -1;
+  }
+  function clone(v){ return v==null ? v : JSON.parse(JSON.stringify(v)); }
+  /** Replace or add one row, and say whether the page needs redrawing for it. */
+  function applyRow(list, row){
+    if(!row || !row.id) return false;
+    var i = rowIndex(list, row.id);
+    var before = i>=0 ? JSON.stringify(list[i]) : null;
+    if(i>=0) list[i] = row; else list.push(row);
+    return before !== JSON.stringify(row);
+  }
+  /**
+   * Paint `patch` onto the row now, send it, and reconcile.
+   * `list` is the local array, `send` returns the promise carrying the saved row.
+   */
+  function eagerSave(list, id, patch, send){
+    var i = rowIndex(list, id);
+    var previous = i>=0 ? clone(list[i]) : null;
+    if(i>=0){ Object.assign(list[i], patch); render(); }
+    return send().then(function(row){
+      if(applyRow(list, row)) render();
+      return row;
+    }).catch(function(err){
+      if(previous){ var j = rowIndex(list, id); if(j>=0) list[j] = previous; render(); }
+      throw err;
+    });
+  }
+  /** A new row: no id to paint with, so the saved row is added the moment it lands. */
+  function eagerAdd(list, send){
+    return send().then(function(row){
+      if(row && row.id && rowIndex(list, row.id)<0){ list.push(row); render(); return row; }
+      return loadState().then(function(){ return row; });
+    });
+  }
+  /** Gone from the page at once; put back if the server refuses. */
+  function eagerDelete(list, id, send){
+    var i = rowIndex(list, id);
+    var previous = i>=0 ? clone(list[i]) : null;
+    if(i>=0){ list.splice(i,1); render(); }
+    return send().then(function(r){
+      // A delete can cascade -- a class takes its files, notes and assignments with
+      // it -- so the term is refreshed quietly afterwards. Nothing waits on it.
+      loadState();
+      return r;
+    }).catch(function(err){
+      if(previous){ list.splice(Math.max(0,i), 0, previous); render(); }
+      throw err;
+    });
+  }
+
+  function addClass(data){
+    if(BE && typeof BE.addClass === 'function') return BE.addClass(data).then(loadState);
+    return eagerAdd(classes, function(){ return apiPost('/api/classes', data); });
+  }
+  function updateClass(id, data){
+    if(BE && typeof BE.updateClass === 'function') return BE.updateClass(id, data).then(loadState);
+    return eagerSave(classes, id, data, function(){ return apiPut('/api/classes/'+id, data); });
+  }
+  function deleteClass(id){
+    if(BE && typeof BE.deleteClass === 'function') return BE.deleteClass(id).then(loadState);
+    return eagerDelete(classes, id, function(){ return apiDelete('/api/classes/'+id); });
+  }
+  function addItem(data){
+    if(BE && typeof BE.addItem === 'function') return BE.addItem(data).then(loadState);
+    return eagerAdd(items, function(){ return apiPost('/api/items', data); });
+  }
+  function updateItem(id, data){
+    if(BE && typeof BE.updateItem === 'function') return BE.updateItem(id, data).then(loadState);
+    return eagerSave(items, id, data, function(){ return apiPut('/api/items/'+id, data); });
+  }
+  function deleteItem(id){
+    if(BE && typeof BE.deleteItem === 'function') return BE.deleteItem(id).then(loadState);
+    return eagerDelete(items, id, function(){ return apiDelete('/api/items/'+id); });
+  }
+  /**
+   * The same instant edit, for rows that live inside a class rather than at the top
+   * level: files, notes, folders, syllabus topics and events. Their routes answer
+   * `{ok:true}` rather than the saved row, so the term is reloaded quietly afterwards
+   * and the local change is what the screen shows until it lands.
+   */
+  function nestedLists(){
+    var out = [events];
+    classes.concat([inbox]).forEach(function(home){
+      if(!home) return;
+      ['materials','notesList','fileFolders','noteFolders','syllabus'].forEach(function(k){
+        if(Array.isArray(home[k])) out.push(home[k]);
+      });
+    });
+    return out;
+  }
+  function eagerNested(id, patch, send){
+    var lists = nestedLists(), hit = null, previous = null;
+    for(var i=0;i<lists.length && !hit;i++){
+      var j = rowIndex(lists[i], id);
+      if(j>=0){ hit = { list:lists[i], at:j }; previous = clone(lists[i][j]); }
+    }
+    if(hit){ Object.assign(hit.list[hit.at], patch); render(); }
+    return send().then(function(r){ loadState(); return r; })
+      .catch(function(err){
+        if(hit && previous){ hit.list[hit.at] = previous; render(); }
+        throw err;
+      });
+  }
+  function eagerNestedDelete(id, send){
+    var lists = nestedLists(), hit = null, previous = null;
+    for(var i=0;i<lists.length && !hit;i++){
+      var j = rowIndex(lists[i], id);
+      if(j>=0){ hit = { list:lists[i], at:j }; previous = clone(lists[i][j]); }
+    }
+    if(hit){ hit.list.splice(hit.at,1); render(); }
+    return send().then(function(r){ loadState(); return r; })
+      .catch(function(err){
+        if(hit && previous){ hit.list.splice(hit.at, 0, previous); render(); }
+        throw err;
+      });
+  }
+
   function toggleItemDone(id){
     var it = items.find(function(i){ return i.id===id; });
     if(!it) return Promise.resolve();
@@ -3368,12 +3528,19 @@
     if(title) fd.append('title', title);
     return fetch('/api/classes/'+classId+'/materials', { method:'POST', body: fd }).then(checkOk).then(loadState);
   }
-  function removeMaterial(id){ return route('removeMaterial', [id], function(){ return apiDelete('/api/materials/'+id); }).then(loadState); }
+  function removeMaterial(id){
+    if(BE && typeof BE.removeMaterial === 'function') return BE.removeMaterial(id).then(loadState);
+    return eagerNestedDelete(id, function(){ return apiDelete('/api/materials/'+id); });
+  }
   function addNote(classId, data){
     if(classId === INBOX_ID) return apiPost('/api/notes', data).then(loadState);
     return route('addNote', [classId, data], function(){ return apiPost('/api/classes/'+classId+'/notes', data); }).then(loadState);
   }
-  function updateNote(id, data){ return route('updateNote', [id, data], function(){ return apiPut('/api/notes/'+id, data); }).then(loadState); }
+  function updateNote(id, data){
+    if(BE && typeof BE.updateNote === 'function') return BE.updateNote(id, data).then(loadState);
+    if('classId' in (data||{})) return apiPut('/api/notes/'+id, data).then(loadState);
+    return eagerNested(id, data, function(){ return apiPut('/api/notes/'+id, data); });
+  }
   function updateNoteQuiet(id, data){ return route('updateNote', [id, data], function(){ return apiPut('/api/notes/'+id, data); }); }
   function addNoteFolder(classId, name, opts){
     opts = opts || {};
@@ -3382,25 +3549,49 @@
                      { name:name, kind:opts.kind || 'custom', parentId:opts.parentId || null });
     }).then(loadState);
   }
-  function renameNoteFolder(id, name){ return route('renameNoteFolder', [id, name], function(){ return apiPut('/api/note-folders/'+id, { name:name }); }).then(loadState); }
-  function deleteNoteFolder(id){ return route('deleteNoteFolder', [id], function(){ return apiDelete('/api/note-folders/'+id); }).then(loadState); }
-  function removeNote(id){ return route('removeNote', [id], function(){ return apiDelete('/api/notes/'+id); }).then(loadState); }
+  function renameNoteFolder(id, name){
+    if(BE && typeof BE.renameNoteFolder === 'function') return BE.renameNoteFolder(id, name).then(loadState);
+    return eagerNested(id, { name:name }, function(){ return apiPut('/api/note-folders/'+id, { name:name }); });
+  }
+  function deleteNoteFolder(id){
+    if(BE && typeof BE.deleteNoteFolder === 'function') return BE.deleteNoteFolder(id).then(loadState);
+    return eagerNestedDelete(id, function(){ return apiDelete('/api/note-folders/'+id); });
+  }
+  function removeNote(id){
+    if(BE && typeof BE.removeNote === 'function') return BE.removeNote(id).then(loadState);
+    return eagerNestedDelete(id, function(){ return apiDelete('/api/notes/'+id); });
+  }
   function restoreNote(id){ return route('restoreNote', [id], function(){ return apiPost('/api/notes/'+id+'/restore', {}); }).then(loadState); }
   function purgeNote(id){ return route('purgeNote', [id], function(){ return apiDelete('/api/notes/'+id+'?permanent=1'); }).then(loadState); }
   function duplicateNote(id){ return route('duplicateNote', [id], function(){ return apiPost('/api/notes/'+id+'/duplicate', {}); }).then(loadState); }
   function fetchTrashedNotes(){ return route('listTrashedNotes', [], function(){ return apiGet('/api/notes/trash'); }); }
   function fetchNoteVersions(id){ return route('listNoteVersions', [id], function(){ return apiGet('/api/notes/'+id+'/versions'); }); }
   function restoreNoteVersion(id, vid){ return route('restoreNoteVersion', [id, vid], function(){ return apiPost('/api/notes/'+id+'/versions/'+vid+'/restore', {}); }).then(loadState); }
-  function updateNoteFolder(fid, data){ return route('updateNoteFolder', [fid, data], function(){ return apiPut('/api/note-folders/'+fid, data); }).then(loadState); }
+  function updateNoteFolder(fid, data){
+    if(BE && typeof BE.updateNoteFolder === 'function') return BE.updateNoteFolder(fid, data).then(loadState);
+    return eagerNested(fid, data, function(){ return apiPut('/api/note-folders/'+fid, data); });
+  }
   function fetchNoteLinks(id){ return route('listNoteLinks', [id], function(){ return apiGet('/api/notes/'+id+'/links'); }); }
   function addNoteLink(id, target){ return route('linkNote', [id, target], function(){ return apiPost('/api/notes/'+id+'/links', target); }); }
   function removeNoteLink(lid){ return route('unlinkNote', [lid], function(){ return apiDelete('/api/note-links/'+lid); }); }
   function addTopic(classId, title){ return route('addTopic', [classId, title], function(){ return apiPost('/api/classes/'+classId+'/syllabus', { title:title }); }).then(loadState); }
-  function toggleTopic(id, done){ return route('toggleTopic', [id, done], function(){ return apiPut('/api/syllabus/'+id, { done:done }); }).then(loadState); }
-  function removeTopic(id){ return route('removeTopic', [id], function(){ return apiDelete('/api/syllabus/'+id); }).then(loadState); }
+  function toggleTopic(id, done){
+    if(BE && typeof BE.toggleTopic === 'function') return BE.toggleTopic(id, done).then(loadState);
+    return eagerNested(id, { done:done }, function(){ return apiPut('/api/syllabus/'+id, { done:done }); });
+  }
+  function removeTopic(id){
+    if(BE && typeof BE.removeTopic === 'function') return BE.removeTopic(id).then(loadState);
+    return eagerNestedDelete(id, function(){ return apiDelete('/api/syllabus/'+id); });
+  }
   function addEvent(data){ return route('addEvent', [data], function(){ return apiPost('/api/events', data); }).then(loadState); }
-  function updateEvent(id, data){ return route('updateEvent', [id, data], function(){ return apiPut('/api/events/'+id, data); }).then(loadState); }
-  function deleteEventRec(id){ return route('deleteEvent', [id], function(){ return apiDelete('/api/events/'+id); }).then(loadState); }
+  function updateEvent(id, data){
+    if(BE && typeof BE.updateEvent === 'function') return BE.updateEvent(id, data).then(loadState);
+    return eagerNested(id, data, function(){ return apiPut('/api/events/'+id, data); });
+  }
+  function deleteEventRec(id){
+    if(BE && typeof BE.deleteEvent === 'function') return BE.deleteEvent(id).then(loadState);
+    return eagerNestedDelete(id, function(){ return apiDelete('/api/events/'+id); });
+  }
   function saveTermSettings(data){ return route('saveTermSettings', [data], function(){ return apiPut('/api/term', data); }).then(loadState); }
   function fetchHeadstarts(itemId){ return route('fetchHeadstarts', [itemId], function(){ return apiGet('/api/items/'+itemId+'/headstarts'); }); }
   function generateHeadstart(itemId, kind, mode, instructions){
@@ -3410,7 +3601,13 @@
   }
   function updateHeadstart(id, data){ return route('updateHeadstart', [id, data], function(){ return apiPut('/api/headstarts/'+id, data); }); }
   function deleteHeadstart(id){ return route('deleteHeadstart', [id], function(){ return apiDelete('/api/headstarts/'+id); }); }
-  function updateMaterial(id, data){ return route('updateMaterial', [id, data], function(){ return apiPut('/api/materials/'+id, data); }).then(loadState); }
+  function updateMaterial(id, data){
+    if(BE && typeof BE.updateMaterial === 'function') return BE.updateMaterial(id, data).then(loadState);
+    // Moving a file to another class changes which list it belongs in, which the patch
+    // alone cannot show, so that one waits for the reload rather than lying for 200ms.
+    if('classId' in (data||{})) return apiPut('/api/materials/'+id, data).then(loadState);
+    return eagerNested(id, data, function(){ return apiPut('/api/materials/'+id, data); });
+  }
   function addFileFolder(classId, name, opts){
     opts = opts || {};
     return route('addFileFolder', [classId, name, opts], function(){
@@ -3418,8 +3615,14 @@
                      { name:name, parentId:opts.parentId || null });
     }).then(loadState);
   }
-  function updateFileFolder(fid, data){ return route('updateFileFolder', [fid, data], function(){ return apiPut('/api/file-folders/'+fid, data); }).then(loadState); }
-  function deleteFileFolder(fid){ return route('deleteFileFolder', [fid], function(){ return apiDelete('/api/file-folders/'+fid); }).then(loadState); }
+  function updateFileFolder(fid, data){
+    if(BE && typeof BE.updateFileFolder === 'function') return BE.updateFileFolder(fid, data).then(loadState);
+    return eagerNested(fid, data, function(){ return apiPut('/api/file-folders/'+fid, data); });
+  }
+  function deleteFileFolder(fid){
+    if(BE && typeof BE.deleteFileFolder === 'function') return BE.deleteFileFolder(fid).then(loadState);
+    return eagerNestedDelete(fid, function(){ return apiDelete('/api/file-folders/'+fid); });
+  }
 
   // ---- reading the folder tree ----
   // Folders arrive on their class as a flat list with parentId, the same shape the
@@ -11946,7 +12149,9 @@
       + threadComposerHtml()
       + '</div>';
 
-    return '<div class="th-screen">'
+    var full = threadFullOn();
+    thFullLast = full;
+    return '<div class="th-screen'+(full ? ' fullscreen' : '')+'">'
       + '<div class="th-screen-head">'
       + '<button type="button" class="th-back" data-action="hs-home">‹ Headstart</button>'
       + '<div class="th-screen-title">'
@@ -11954,6 +12159,9 @@
       + '<h2>'+escapeHtml(d.title||'Thread')+'</h2>'
       + '<span class="type-badge">'+escapeHtml(classLabel(d.classId))+'</span></div>'
       + '<div class="th-screen-acts">'+hsSpendChipHtml()
+      + '<button type="button" class="btn th-full-btn" data-action="th-full"'
+      + ' title="'+(full ? 'Leave full screen (Esc)' : 'Full screen (⌘⇧F)')+'">'
+      + iconSvg(full ? 'shrink' : 'expand')+'<span>'+(full ? 'Exit full screen' : 'Full screen')+'</span></button>'
       // A drafted thread has nothing to rename or delete yet: it is written the first
       // time you say something, so both would be acting on a row that does not exist.
       + (TH.id
@@ -12131,6 +12339,19 @@
       });
     }
     return pump();
+  }
+
+  /** Full screen: the account's choice, or on for a phone when nothing has been chosen. */
+  function threadFullOn(){
+    var p = PREFS && PREFS.threadFullscreen;
+    if(p === 'on') return true;
+    if(p === 'off') return false;
+    return window.innerWidth <= 720;
+  }
+  var thFullLast = null;
+  function toggleThreadFull(){
+    savePrefs({ threadFullscreen: threadFullOn() ? 'off' : 'on' });
+    renderThread();
   }
 
   function threadFastOn(){ return !(PREFS && PREFS.threadFast === false); }
@@ -13250,6 +13471,11 @@
     if(document.visibilityState === 'hidden') flushFocusTime();
   });
 
+  // In automatic mode, full screen follows the window across phone width.
+  window.addEventListener('resize', function(){
+    if(!(activeTab === 'headstart' && hsScreen && hsScreen.kind === 'thread' && TH)) return;
+    if(threadFullOn() !== thFullLast) renderThread();
+  });
   // A marked habit and its entry in the list light up together.
   document.addEventListener('mouseover', function(e){
     var el = e.target.closest && e.target.closest('.hz-run [data-hz-i]');
@@ -14699,6 +14925,7 @@
     }
     if(action==='hs-all-threads'){ openThreadList(t.dataset.class); return; }
     if(action==='th-send'){ threadSend(null, t.dataset.confirmed === '1'); return; }
+    if(action==='th-full'){ toggleThreadFull(); return; }
     if(action==='th-stop'){ if(TH && TH.stream && TH.stream.ctrl) TH.stream.ctrl.abort(); return; }
     if(action==='th-fast'){
       var thFast = !threadFastOn();
@@ -15295,6 +15522,10 @@
       if(saveBtn) saveItemFromForm(saveBtn.dataset.id || null);
       return;
     }
+    if(hsScreen && hsScreen.kind === 'thread' && TH && (e.metaKey||e.ctrlKey) && e.shiftKey
+       && e.key.toLowerCase() === 'f'){
+      e.preventDefault(); toggleThreadFull(); return;
+    }
     if((e.metaKey||e.ctrlKey) && e.key === '\\'){ e.preventDefault(); setSidebarCollapsed(!sidebarCollapsed); return; }
     if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); openSearch(); return; }
     if(e.key==='Escape'){
@@ -15309,6 +15540,9 @@
       if(document.getElementById('search-root').firstElementChild){ closeSearch(); return; }
       if(document.getElementById('modal-root').firstElementChild){ closeModal(); return; }
       if(notesFullscreen){ notesFullscreen = false; notesZen = false; render(); return; }
+      if(activeTab === 'headstart' && hsScreen && hsScreen.kind === 'thread' && TH && threadFullOn()){
+        toggleThreadFull(); return;
+      }
       closeModal();
     }
   });
