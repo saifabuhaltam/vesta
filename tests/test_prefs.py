@@ -147,3 +147,13 @@ def test_a_long_custom_focus_image_is_kept_whole(signed_in):
     url = "https://images.example.com/photo-1500000000000?auto=format&fit=crop&w=2400&q=80&" + "x" * 200
     body = signed_in.put("/api/prefs", json={"focus": {"customScene": url}}).get_json()
     assert body["focus"]["customScene"] == url
+
+
+def test_thread_full_screen_is_automatic_until_chosen(signed_in):
+    body = signed_in.get("/api/prefs").get_json()
+    assert body["threadFullscreen"] == "auto"
+    assert body["threadFast"] is True
+    body = signed_in.put("/api/prefs", json={"threadFullscreen": "on"}).get_json()
+    assert body["threadFullscreen"] == "on"
+    body = signed_in.put("/api/prefs", json={"threadFullscreen": "sideways"}).get_json()
+    assert body["threadFullscreen"] == "on"             # a value it does not know is ignored

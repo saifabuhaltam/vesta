@@ -372,6 +372,11 @@ anything happens: what it is working on, what it will read, and what it will cos
 - Thinking shows as one italic line under "Vesta" (`.th-live-status`): the latest line
   of the model's summary while it thinks, then "Thought for N seconds". A reply that
   was stopped keeps a small "Stopped" label under it.
+- **Full screen** (`.th-screen.fullscreen`) lays the thread over the whole window, the
+  way Notes' editor goes full screen: no sidebar, no page header, the rail kept so
+  switching threads is one click. A labelled button in the title row, ⌘⇧F, and Esc
+  (after any open dialog) toggle it. `threadFullscreen` is "auto" until chosen: on for
+  a phone, off otherwise. On a phone the title row stacks so no action is cut off.
 
 ### Study: the Humanizer
 

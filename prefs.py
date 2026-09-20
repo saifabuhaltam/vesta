@@ -70,6 +70,9 @@ DEFAULTS = {
     # thinking; off, the model takes its time. On by default, because a blank wait is
     # what made threads feel slow.
     "threadFast": True,
+    # Full screen for a thread: "auto" is on for a phone and off otherwise, until the
+    # student picks for themselves with the button or the shortcut.
+    "threadFullscreen": "auto",
 }
 
 _CHOICES = {
@@ -79,6 +82,7 @@ _CHOICES = {
     "editorFontSize": ("small", "medium", "large"),
     "filesDefaultLayout": ("grid", "list"),
     "headstartView": ("cards", "list"),
+    "threadFullscreen": ("auto", "on", "off"),
 }
 
 _FOCUS_RANGES = {
