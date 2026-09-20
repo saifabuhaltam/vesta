@@ -1022,6 +1022,13 @@
   .today-row .dot{ margin-top:5px; }
   .today-row .t-title{ font-size:12.5px; font-weight:600; }
   .today-row .t-meta{ font-size:11px; color:var(--text-muted); margin-top:1px; }
+  /* Finished work, in the same language as a done chip on the month grid: struck
+     through and stepped back, so a packed day reads at a glance. */
+  .today-row.is-done .t-title{ text-decoration:line-through; color:var(--text-faint); }
+  .today-row.is-done{ opacity:.72; }
+  .today-row .t-check{ margin-top:3px; width:14px; height:14px; flex:none;
+    accent-color:var(--accent); cursor:pointer; }
+  .today-row .t-done{ color:var(--success); font-weight:650; }
 
   /* ---------- Dashboard ---------- */
   .tiles.icon-tiles .tile{ display:flex; align-items:center; gap:14px; }
@@ -4940,6 +4947,23 @@
     return html + '</div>';
   }
 
+  /**
+   * What a day amounts to: how much is on it, and how much is already finished.
+   *
+   * "6 events" on a packed day says nothing about whether the day is under control.
+   * Only work can be done -- a lecture cannot -- so the count of finished things is
+   * out of the assignments, not out of everything on the day.
+   */
+  function calDaySummary(entries){
+    var n = entries.length;
+    var work = entries.filter(function(e){ return e.itemId; });
+    var done = work.filter(function(e){ return e.done; }).length;
+    var base = n + ' event' + (n===1?'':'s');
+    if(!work.length) return base;
+    if(done === work.length) return base + ' \u00b7 all done';
+    return base + ' \u00b7 ' + done + ' of ' + work.length + ' done';
+  }
+
   function calDayPanelHtml(){
     var iso = calSelectedDay || todayIso();
     var entries = calEntriesForDate(iso);
@@ -4948,14 +4972,23 @@
       var time = e.allDay ? 'All day' : (e.start ? fmtTime(e.start)+(e.end?' – '+fmtTime(e.end):'') : '');
       var attrs = e.itemId ? ' data-action="open-item-detail" data-id="'+e.itemId+'"'
                 : e.eventId ? ' data-action="open-event-modal" data-id="'+e.eventId+'"' : '';
-      return '<div class="today-row"'+attrs+(attrs?' style="cursor:pointer;"':'')+'>'
-        + '<span class="dot" style="--c:'+(e.color||eventKind(e.kind).color)+'"></span>'
+      // Work you can finish gets a checkbox; a lecture or an event cannot be "done",
+      // so it keeps its dot. On a packed day the panel was a list of titles with no
+      // way to tell what was already handled, and no way to handle it from here.
+      var mark = e.itemId
+        ? '<input type="checkbox" class="check t-check" data-action="toggle-item" data-id="'+e.itemId+'"'
+          + (e.done?' checked':'')+' title="'+(e.done?'Mark as not done':'Mark as done')+'">'
+        : '<span class="dot" style="--c:'+(e.color||eventKind(e.kind).color)+'"></span>';
+      return '<div class="today-row'+(e.done?' is-done':'')+'"'+attrs+(attrs?' style="cursor:pointer;"':'')+'>'
+        + mark
         + '<div><div class="t-title">'+escapeHtml(e.title)+'</div>'
         + '<div class="t-meta">'+(e.cls?escapeHtml(e.cls.code||e.cls.name):eventKind(e.kind).label.replace(/s$/,''))
-        + (time?' · '+time:'') + (e.location?' · '+escapeHtml(e.location):'') + '</div></div></div>';
+        + (time?' · '+time:'') + (e.location?' · '+escapeHtml(e.location):'')
+        + (e.done?' · <span class="t-done">Done</span>':'') + '</div></div></div>';
     }).join('') : '<div class="hint">Nothing on this day.</div>';
     return '<div class="rail-card">'
-      + '<div class="mini-cal-head" style="margin-bottom:6px;"><h3>'+label+'</h3><span class="hint">'+entries.length+' event'+(entries.length===1?'':'s')+'</span></div>'
+      + '<div class="mini-cal-head" style="margin-bottom:6px;"><h3>'+label+'</h3>'
+      + '<span class="hint">'+calDaySummary(entries)+'</span></div>'
       + rows
       + '<button type="button" class="btn" data-action="open-event-modal" data-date="'+iso+'" style="width:100%;margin-top:12px;">+ Add event</button>'
       + '</div>';
