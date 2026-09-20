@@ -131,6 +131,7 @@
 
   #app{ display:flex; height:100vh; position:relative; }
 
+
   /* ---------- Sidebar ---------- */
   #sidebar{
     width:240px; flex:none; height:100%;
@@ -2633,11 +2634,150 @@
     .set-avatar{ width:44px; height:44px; font-size:16px; }
     .set-row{ flex-direction:column; align-items:flex-start; gap:8px; }
   }
+
+  /* ---------- Phones ----------
+     Vesta was built for a laptop: a 240px sidebar beside a 1120px page. On a phone
+     that leaves about 90px of usable width, so below 820px the sidebar becomes a
+     drawer, a top bar carries the way into it, and the page gets the whole screen.
+     Nothing is removed and nothing moves somewhere new -- the same nav, the same
+     pages, reachable with a thumb. */
+
+  .m-top{ display:none; }
+
+  @media (max-width:820px){
+    .tiles{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+    /* dvh, so the iOS address bar appearing does not cut the page off */
+    #app{ height:100vh; height:100dvh; }
+
+    .m-top{
+      display:flex; align-items:center; gap:10px;
+      position:fixed; top:0; left:0; right:0; height:56px; z-index:55;
+      padding:0 12px; background:var(--surface);
+      border-bottom:1px solid var(--border);
+    }
+    .m-top .m-brand{ display:flex; align-items:center; gap:8px; font-weight:800;
+      font-size:17px; letter-spacing:-0.01em; }
+    .m-top .m-brand img{ width:24px; height:24px; object-fit:contain; }
+    .m-btn{
+      width:40px; height:40px; flex:none; border-radius:var(--r-md);
+      border:1px solid var(--border); background:var(--surface); color:var(--text);
+      display:flex; align-items:center; justify-content:center; cursor:pointer;
+      box-shadow:var(--shadow-card);
+    }
+    .m-btn svg{ width:19px; height:19px; }
+    .m-top .m-spacer{ flex:1; }
+
+    /* the sidebar, as a drawer */
+    #sidebar{
+      position:fixed; top:0; bottom:0; left:0; width:272px; z-index:70;
+      transform:translateX(-100%); transition:transform .18s ease;
+      box-shadow:none; padding-top:16px;
+    }
+    #app.nav-open #sidebar{ transform:none; box-shadow:0 0 40px rgba(0,0,0,.25); }
+    #app.side-collapsed #sidebar{ width:272px; padding:16px 14px; }   /* the rail makes no sense here */
+    #app.side-collapsed .brand-mark > span,
+    #app.side-collapsed .tab-btn .lbl,
+    #app.side-collapsed .nav-extra .lbl,
+    #app.side-collapsed .side-search span:not(.ic),
+    #app.side-collapsed .sync-row span:not(.sync-dot){ display:inline; }
+    #app.side-collapsed .tab-btn,
+    #app.side-collapsed .nav-extra,
+    #app.side-collapsed .side-search{ justify-content:flex-start; padding-left:10px; padding-right:10px; }
+    .side-toggle{ display:none; }
+
+    .m-scrim{
+      position:fixed; inset:0; z-index:65; background:rgba(15,17,21,.44);
+      opacity:0; pointer-events:none; transition:opacity .18s ease;
+    }
+    #app.nav-open .m-scrim{ opacity:1; pointer-events:auto; }
+
+    /* the page itself */
+    #main{ padding:68px 16px 90px; }
+    #main > *{ max-width:none; }
+    #view-header{ flex-direction:column; gap:6px; }
+    #view-header h1{ font-size:21px; }
+    .header-right{ width:100%; justify-content:space-between; }
+    #view-actions{ flex-wrap:wrap; justify-content:flex-start; }
+
+    /* touch targets, and controls that fit the width they have */
+    .btn{ min-height:38px; }
+    .seg-tabs{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .seg-tabs::-webkit-scrollbar{ display:none; }
+
+    /* modals become sheets: full width, anchored to the bottom, scrollable */
+    .overlay{ align-items:flex-end; padding:0; }
+    .modal, .modal.modal-wide, .dlg{
+      max-width:none; width:100%; max-height:92vh; max-height:92dvh;
+      border-radius:18px 18px 0 0; display:flex; flex-direction:column;
+    }
+    .modal-body{ overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    .modal-foot{ position:sticky; bottom:0; background:var(--surface); }
+    .modal-foot .btn{ flex:1; justify-content:center; }
+
+    /* the field rows that sit side by side on a laptop */
+    .field-row{ grid-template-columns:1fr; }
+  }
+
+  @media (max-width:620px){
+    /* The calendar.
+       A seven column month grid on a 393px screen gives each day 46px, which is not
+       a day, it is a stripe. Month and Week keep working -- the choice stays on
+       screen, as every filter in this app does -- but the grid scrolls sideways
+       inside its own box at a width where a date and a chip actually fit, and the
+       page behind it does not move. The day panel and the legend stack underneath
+       instead of sitting in a 290px column that no longer exists. */
+    .cal-layout{ grid-template-columns:minmax(0,1fr); }
+    #main:has(.cal-grid){ display:block; overflow:visible; }
+    #main:has(.cal-grid) #view{ display:block; overflow:visible; }
+    .cal-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .cal-grid{ min-width:620px; }
+    #main:has(.cal-grid) .cal-grid{ grid-template-rows:auto repeat(6, minmax(84px, auto)); }
+
+    /* the assignments table: the columns that do not earn their width go, and what
+       is left reads as a row of cards rather than a squeezed spreadsheet */
+    .asg-row, .asg-row.no-course, .asg-row.has-grade:not(.no-course){
+      grid-template-columns:30px minmax(0,1fr) auto;
+      row-gap:4px; padding:11px 10px;
+    }
+    .asg-head{ display:none; }
+    .asg-col-course, .asg-col-type, .asg-col-weight, .asg-col-grade{ display:none; }
+    .asg-col-due{ grid-column:2; font-size:11.5px; color:var(--text-muted); }
+    .asg-col-status{ grid-column:3; grid-row:1; }
+    .asg-row-menu{ grid-column:3; }
+
+    /* one column everywhere a grid was doing two or three */
+    .dash-row, .folder-grid, .file-grid, .cp-grid, .nt-card-grid,
+    .set-modes, .th-start-items{ grid-template-columns:minmax(0,1fr) !important; }
+    .tiles{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
+    .tiles .tile{ padding:12px; }
+    .tiles.icon-tiles .tile{ gap:10px; }
+    .tile .n{ font-size:22px; }
+
+    .qz-q{ padding:13px 13px; }
+    .learn-input{ font-size:16px; }          /* 16px or iOS zooms the page in */
+    input, textarea, select{ font-size:16px; }
+    .files-inside-row{ padding:10px; }
+  }
+
+
 </style>
 </head>
 <body>
 
 <div id="app">
+  <div class="m-top">
+    <button type="button" class="m-btn" data-action="toggle-nav" aria-label="Menu" title="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <span class="m-brand"><img src="/vesta-mark.png" alt="">Vesta</span>
+    <span class="m-spacer"></span>
+    <button type="button" class="m-btn" data-action="open-search" aria-label="Search" title="Search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2"/></svg>
+    </button>
+  </div>
+  <div class="m-scrim" data-action="close-nav"></div>
   <button type="button" class="side-toggle" id="side-toggle"
     data-action="toggle-sidebar" title="Collapse the sidebar" aria-label="Collapse the sidebar">‹</button>
   <aside id="sidebar">
@@ -3360,6 +3500,19 @@
   // redrawing the page. Background reconciles run after most saves and after every
   // calendar sync, and a redraw costs a caret, a hover and a scroll position.
   var lastStateSig = null;
+
+  /**
+   * The phone drawer.
+   *
+   * Below 820px the sidebar is off screen until it is asked for. It closes on
+   * choosing a page, on the scrim, and on Escape, because a drawer that stays open
+   * over the thing you just opened is worse than no drawer.
+   */
+  var navOpen = false;
+  function setNavOpen(open){
+    navOpen = !!open;
+    document.getElementById('app').classList.toggle('nav-open', navOpen);
+  }
 
   function loadState(){
     return (BE ? BE.loadState() : apiGet('/api/state')).then(function(data){
@@ -4668,7 +4821,8 @@
     var firstOfMonth = new Date(year, month, 1);
     var gridStart = new Date(year, month, 1 - firstOfMonth.getDay());
     var todayS = todayIso();
-    var html = '<div class="cal-grid">';
+    // The wrapper is what scrolls on a narrow screen; see the phone styles.
+    var html = '<div class="cal-scroll"><div class="cal-grid">';
     DOW_SHORT.forEach(function(d){ html += '<div class="cal-dow">'+d+'</div>'; });
     for(var i=0;i<42;i++){
       var d = new Date(gridStart); d.setDate(gridStart.getDate()+i);
@@ -4683,7 +4837,7 @@
             ? '<div class="cal-more">+'+(entries.length-calShown)+' more</div>' : '')
         + '</div>';
     }
-    return html + '</div>';
+    return html + '</div></div>';
   }
 
   function weekGridHtml(){
@@ -14445,10 +14599,14 @@
       if(!keepShare && !keepMenu && !onMenuControl) closeNoteMenus();
     }
     if(action==='toggle-sidebar'){ setSidebarCollapsed(!sidebarCollapsed); return; }
+    if(action==='toggle-nav'){ setNavOpen(!navOpen); return; }
+    if(action==='close-nav'){ setNavOpen(false); return; }
     if(action==='switch-tab'){
       if(t.dataset.tab !== 'headstart'){ hsScreen = null; TH = null; }
       if(t.dataset.tab !== 'study'){ studyScreen = null; HZ.run = null; }
-      activeTab = t.dataset.tab; render(); return;
+      activeTab = t.dataset.tab;
+      setNavOpen(false);          // on a phone the drawer has done its job
+      render(); return;
     }
     if(action==='set-theme'){ setTheme(t.dataset.themeChoice); return; }
     if(action==='rte-cmd'){
@@ -16240,6 +16398,7 @@
       }
       if(document.getElementById('search-root').firstElementChild){ closeSearch(); return; }
       if(document.getElementById('modal-root').firstElementChild){ closeModal(); return; }
+      if(navOpen){ setNavOpen(false); return; }
       if(notesFullscreen){ notesFullscreen = false; notesZen = false; render(); return; }
       if(activeTab === 'headstart' && hsScreen && hsScreen.kind === 'thread' && TH && threadFullOn()){
         toggleThreadFull(); return;
