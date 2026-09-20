@@ -16,6 +16,7 @@ user turn, so a second pass within a few minutes reads the prompt from cache.
 import json
 import os
 import queue
+import re
 import tempfile
 import threading
 import uuid
@@ -37,7 +38,12 @@ SKILL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # 63, so 4,000 is roughly three minutes. That only works because the run is streamed on
 # a threaded worker: the old sync worker was killed at 120 seconds, which is what held
 # the ceiling at 1,500. A longer paper still goes through in sections.
-MAX_WORDS = 4000
+# A paper longer than this is run in pieces rather than refused. The ceiling on one
+# piece is what a single call handles well; the paper itself has no limit beyond
+# patience and the daily spend cap.
+SECTION_WORDS = 2000
+# Sanity, not capability: a whole thesis in one press would be a surprise bill.
+MAX_WORDS = 40000
 # Seconds between keep-alive comments while the model is quiet, so nothing between the
 # browser and the app decides the connection has gone idle.
 HEARTBEAT_SECONDS = 10
@@ -218,6 +224,39 @@ def call_model(conn, cfg, text, voice, max_tokens, on_progress=None):
                   "cacheReadTokens": cread, "cacheWriteTokens": cwrite}
 
 
+def split_sections(text, max_words=SECTION_WORDS):
+    """A long paper in runnable pieces, split where the writing already breaks.
+
+    Paragraph boundaries only: a rewrite that starts mid-paragraph loses the thread of
+    the argument, and the skill's whole job is to keep the meaning. Paragraphs are
+    gathered until the next one would push the piece past `max_words`. A single
+    paragraph longer than that is sent whole rather than cut mid-thought -- it is rare,
+    and the model handles it better than an arbitrary break would.
+
+    Returns [(offset_in_original, section_text)], so a habit marked in a section can be
+    placed back into the whole paper.
+    """
+    if word_count(text) <= max_words:
+        return [(0, text)]
+    out, start, taken, cursor = [], 0, 0, 0
+    for para in re.split(r"(\n\s*\n)", text):
+        if not para:
+            continue
+        if para.strip() == "":                  # a separator: it belongs to the piece
+            cursor += len(para)
+            continue
+        n = word_count(para)
+        if taken and taken + n > max_words:
+            out.append((start, text[start:cursor].rstrip()))
+            start, taken = cursor, 0
+        taken += n
+        cursor += len(para)
+    tail = text[start:].rstrip()
+    if tail:
+        out.append((start, tail))
+    return out or [(0, text)]
+
+
 def place_tells(original, tells):
     """Where each marked habit sits in the original, so the screen can highlight it.
 
@@ -231,7 +270,9 @@ def place_tells(original, tells):
         quote = (t.get("quote") or "").strip()
         start = -1
         if quote:
-            at = original.find(quote)
+            # A tell from a section is searched from where that section began, so the
+            # same phrase earlier in the paper does not claim the mark.
+            at = original.find(quote, t.get("_offset") or 0)
             while at != -1 and at in claimed:
                 at = original.find(quote, at + 1)
             if at != -1:
@@ -369,8 +410,38 @@ def run():
 
 
 def do_run(conn, text, source, voice, cfg, max_tokens, on_progress=None):
-    """Call the model and keep the result. Returns the stored row."""
-    data, usage = call_model(conn, cfg, text, voice, max_tokens, on_progress)
+    """Call the model and keep the result. Returns the stored row.
+
+    A long paper goes through in sections, split at paragraph boundaries, and the
+    pieces are stitched back into one rewrite. Each section's marked habits are
+    shifted by where that section sat in the original, so the highlighting still
+    lines up with the paper the student pasted in.
+    """
+    sections = split_sections(text)
+    if len(sections) == 1:
+        data, usage = call_model(conn, cfg, text, voice, max_tokens, on_progress)
+    else:
+        finals, tells, still_off, questions = [], [], [], []
+        totals = {"model": cfg["model"], "inputTokens": 0, "outputTokens": 0,
+                  "cacheReadTokens": 0, "cacheWriteTokens": 0}
+        for i, (offset, part) in enumerate(sections):
+            def progress(phase, chars, where=None, i=i):
+                if on_progress:
+                    on_progress(phase, chars, {"section": i + 1, "sections": len(sections)})
+            part_data, part_usage = call_model(conn, cfg, part, voice,
+                                               max_tokens, progress)
+            finals.append((part_data.get("final") or "").strip())
+            for t in part_data.get("tells") or []:
+                t = dict(t)
+                t["_offset"] = offset
+                tells.append(t)
+            still_off += [x for x in part_data.get("stillOff") or [] if x]
+            questions += [q for q in part_data.get("questions") or [] if q]
+            for k in ("inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"):
+                totals[k] += part_usage[k]
+        data = {"final": "\n\n".join(f for f in finals if f),
+                "tells": tells, "stillOff": still_off, "questions": questions}
+        usage = totals
     rid = str(uuid.uuid4())
     kind = source.get("kind") if source.get("kind") in ("paste", "note", "thread", "file") else "paste"
     label = (source.get("label") or "").strip()
@@ -403,7 +474,8 @@ def stream_run(user_id, run_args):
         conn = get_db(user_id=user_id)
         try:
             row = do_run(conn, *run_args,
-                         on_progress=lambda phase, chars: events.put(("progress", {"phase": phase, "chars": chars})))
+                         on_progress=lambda phase, chars, where=None: events.put(
+                             ("progress", dict({"phase": phase, "chars": chars}, **(where or {})))))
             events.put(("done", serialize_run(row)))
         except ai.AiRefused as e:
             events.put(("error", dict(e.payload, status=e.status)))

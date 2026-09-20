@@ -5642,7 +5642,8 @@
              pick:null };      // an open picker: {kind:'note', filter} or {kind:'thread', thread}
 
   var HZ_SOURCES = [['paste','Paste or type','pen'], ['note','From a note','notes'],
-                    ['thread','From a chat','chat'], ['file','Upload a file','upload']];
+                    ['thread','From a chat','chat'], ['library','From my files','files'],
+                    ['file','Upload a file','upload']];
 
   function hzLoad(){
     if(HZ.loading) return;
@@ -5948,6 +5949,32 @@
                   + '</button>';
               }).join('') + '</div>'
             : '<div class="hs-none">'+(allNotes().length ? 'No notes match that.' : 'You have no notes yet.')+'</div>');
+    } else if(p.kind === 'library'){
+      // Everything already uploaded, with its text pulled out at upload time, so a
+      // draft that is already in Vesta does not have to be uploaded a second time.
+      title = 'Which file?';
+      var fq = (p.filter||'').toLowerCase();
+      var files = allMaterials().filter(function(m){
+        if(!m.hasText) return false;
+        var hay = ((m.title||'')+' '+(m.filename||'')+' '+(m.cls.code||'')).toLowerCase();
+        return !fq || hay.indexOf(fq) >= 0;
+      });
+      body = '<input type="text" id="hz-pick-filter" data-action="hz-pick-filter" class="hz-pick-filter" placeholder="Filter by name or class"'
+        + ' value="'+escapeHtml(p.filter||'')+'">'
+        + (files.length
+            ? '<div class="hz-pick-list">' + files.slice(0, 80).map(function(m){
+                var nm = m.title || m.filename || 'File';
+                return '<button type="button" class="hz-pick" data-action="hz-pick-file" data-id="'+m.id+'">'
+                  + '<span class="dot" style="--c:'+(m.cls.color||'var(--none)')+'"></span>'
+                  + '<b>'+escapeHtml(nm)+'</b>'
+                  + '<span class="hz-pick-sub">'+escapeHtml(m.cls.code||m.cls.name||'Inbox')+'</span>'
+                  + '</button>';
+              }).join('') + '</div>'
+            : '<div class="hs-none">'
+              + (allMaterials().length
+                  ? 'None of your files have readable text. Scanned PDFs have no text layer to pull out.'
+                  : 'You have not uploaded any files yet.')
+              + '</div>');
     } else if(!p.thread){
       title = 'Which chat?';
       body = hsThreads.length
@@ -6022,6 +6049,9 @@
     var label = p.phase === 'writing' ? 'Writing the rewrite'
               : p.phase === 'thinking' ? 'Reading it and marking the AI habits'
               : 'Sending it over';
+    // A long paper is rewritten a section at a time. Saying which section it is on
+    // is the difference between "it is working" and "it has hung".
+    if(p.sections > 1) label += ' \u00b7 part '+p.section+' of '+p.sections;
     return '<div class="hz-progress-head"><i class="th-spin"></i><b>'+label+'…</b>'
       + (p.phase === 'writing' ? '<span>'+pct+'%</span>' : '')+'</div>'
       + '<div class="hz-bar"><i style="width:'+(p.phase === 'writing' ? pct : (p.phase === 'thinking' ? 2 : 0))+'%"></i></div>'
@@ -15956,6 +15986,18 @@
       return;
     }
     if(action==='hz-clear'){ HZ.source = null; HZ.text = ''; HZ.confirm = null; renderView(); paintIcons(); return; }
+    if(action==='hz-pick-file'){
+      var hzMid = t.dataset.id;
+      var hzMat = findMaterial(hzMid);
+      hzPickClose();
+      HZ.extracting = true; renderView(); paintIcons();
+      apiGet('/api/materials/'+hzMid+'/text').then(function(r){
+        HZ.extracting = false;
+        hzLoadText(r.text || '', { kind:'file', id:hzMid,
+                                   label:(hzMat && (hzMat.title || hzMat.filename)) || 'File' });
+      }).catch(function(err){ HZ.extracting = false; renderView(); paintIcons(); reportError(err); });
+      return;
+    }
     if(action==='hz-pick-note'){
       var hzNote = allNotes().filter(function(n){ return n.id === t.dataset.id; })[0];
       hzPickClose();

@@ -1149,6 +1149,27 @@ def update_class(cid):
     return jsonify(out)
 
 
+@app.route("/api/materials/<mid>/text")
+def material_text(mid):
+    """The text pulled out of a file when it was uploaded.
+
+    The Humanizer used to make you upload a draft again even when it was already in
+    Vesta. Every PDF and Word file already carries its text, so this hands that back
+    rather than re-reading the bytes.
+    """
+    conn = get_db()
+    row = conn.execute("SELECT title, filename, extracted_text FROM materials WHERE id=?",
+                       (mid,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    text = row["extracted_text"] or ""
+    if not text.strip():
+        return jsonify({"error": "There is no readable text in that file. A scanned PDF "
+                                 "has no text layer to pull out."}), 422
+    return jsonify({"text": text, "filename": row["filename"] or row["title"] or ""})
+
+
 @app.route("/api/search/files")
 def search_file_contents():
     """Find a file by a phrase inside it, not just by its name.
