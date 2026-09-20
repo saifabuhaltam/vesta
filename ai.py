@@ -24,7 +24,7 @@ import sqlite3
 import uuid
 from datetime import datetime, timedelta
 
-from flask import Blueprint, abort, jsonify, request
+from flask import Blueprint, Response, abort, jsonify, request, stream_with_context
 
 import anthropic
 
@@ -415,6 +415,75 @@ def stream_claude_chat(conn, cfg, kind, context, history, fast=True, max_tokens=
                          started["cread"], started["cwrite"])
 
 
+def prompt_guard(conn, prompt, max_tokens, confirmed):
+    """Refuse a one-shot tool before it costs anything, the way chat_guard does.
+
+    Same two refusals as call_claude, pulled out so a streamed run can be refused with
+    an ordinary JSON answer before the stream opens rather than halfway into one.
+    """
+    cfg = settings(conn)
+    in_tokens = estimate_tokens(prompt)
+    est = estimate_cost(cfg, in_tokens, max_tokens)
+    used = spent_today(conn, cfg)
+
+    if cfg["daily_cap_usd"] and used["usd"] >= cfg["daily_cap_usd"]:
+        raise AiRefused({"error": "You have reached today's AI limit.", "reason": "daily_cap",
+                         "spentToday": used["usd"], "dailyCap": cfg["daily_cap_usd"]})
+    everyone = spent_today_everyone(cfg)
+    if GLOBAL_CAP_USD and everyone is not None and everyone >= GLOBAL_CAP_USD:
+        raise AiRefused({"error": "Vesta has reached today's AI limit across all accounts.",
+                         "reason": "global_cap", "spentTodayEveryone": everyone,
+                         "globalCap": GLOBAL_CAP_USD})
+    if not confirmed and cfg["confirm_over_usd"] and est > cfg["confirm_over_usd"]:
+        raise AiRefused({"error": "This is a big one.", "reason": "confirm",
+                         "estimateUsd": round(est, 4), "inputTokens": in_tokens,
+                         "maxOutputTokens": max_tokens, "spentToday": used["usd"],
+                         "dailyCap": cfg["daily_cap_usd"]}, status=409)
+    return cfg, in_tokens
+
+
+def stream_claude(conn, cfg, kind, prompt, max_tokens=4000):
+    """One prompt, streamed: yields ("text", s), then ("done", usage) or ("error", p).
+
+    The same shape as stream_claude_chat so the page can read either with one reader.
+    A one-shot tool has no conversation and no cached prefix, so this sends a single
+    user message and nothing else. Closing it part way still records what was billed.
+    """
+    started = {"in": 0}
+    produced = 0
+    finished = False
+    try:
+        with anthropic.Anthropic().messages.stream(
+                model=cfg["model"], max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}]) as stream:
+            for ev in stream:
+                if ev.type == "message_start":
+                    started["in"] = getattr(ev.message.usage, "input_tokens", 0) or 0
+                elif ev.type == "content_block_delta" and ev.delta.type == "text_delta":
+                    produced += len(ev.delta.text)
+                    yield ("text", ev.delta.text)
+            final = stream.get_final_message()
+        tin, tout, cread, cwrite = usage_from(final, started["in"], estimate_tokens("x" * produced))
+        record_usage(conn, kind, cfg["model"], tin, tout, cread, cwrite)
+        finished = True
+        yield ("done", {"inputTokens": tin, "outputTokens": tout, "model": cfg["model"],
+                        "stopReason": final.stop_reason})
+    except anthropic.AuthenticationError:
+        yield ("error", {"error": "The Anthropic API key is missing or was rejected.", "status": 503})
+    except anthropic.RateLimitError:
+        yield ("error", {"error": "Rate limited by Anthropic. Wait a moment and try again.", "status": 429})
+    except anthropic.APIConnectionError:
+        yield ("error", {"error": "Lost the connection to the Anthropic API.", "status": 502})
+    except anthropic.APIStatusError as e:
+        yield ("error", {"error": f"Anthropic error: {e.message}", "status": 502})
+    except Exception as e:
+        yield ("error", {"error": f"AI call failed ({e}).", "status": 503})
+    finally:
+        if not finished and (started["in"] or produced):
+            record_usage(conn, kind, cfg["model"], started["in"],
+                         estimate_tokens("x" * produced), 0, 0)
+
+
 def usage_from(response, fallback_in, fallback_out):
     """The four token counts off a response, whatever the SDK hands back."""
     u = getattr(response, "usage", None)
@@ -802,6 +871,112 @@ def ai_run():
         return jsonify(e.payload), e.status
     finally:
         conn.close()
+
+
+# The five tools whose output still lives on the assignment, under the names the rest
+# of the app already reads. The other five are transient, and always were.
+LEGACY_KINDS = {"outline": "essay_outline", "explain": "explain", "draft": "draft",
+                "study_plan": "study_outline", "summarize": "synthesis"}
+
+
+def save_tool_output(conn, item, tool_key, content, used):
+    """Keep a tool's output on its assignment, if it is one of the five that belong there."""
+    if not item or tool_key not in LEGACY_KINDS:
+        return None
+    kind = LEGACY_KINDS[tool_key]
+    now = datetime.utcnow().isoformat()
+    existing = conn.execute(
+        "SELECT id FROM headstarts WHERE item_id=? AND kind=?", (item["id"], kind)).fetchone()
+    if existing:
+        saved_id = existing["id"]
+        conn.execute("UPDATE headstarts SET content=?, status='ready', updated_at=? WHERE id=?",
+                     (content, now, saved_id))
+    else:
+        saved_id = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO headstarts (id, item_id, kind, content, status, instructions, created_at, updated_at)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            (saved_id, item["id"], kind, content, "ready", "", now, now))
+    conn.execute("DELETE FROM headstart_sources WHERE headstart_id=?", (saved_id,))
+    for src in used:
+        conn.execute(
+            "INSERT INTO headstart_sources (id, headstart_id, material_id, note_id, created_at)"
+            " VALUES (?,?,?,?,?)",
+            (str(uuid.uuid4()), saved_id,
+             src["id"] if src["type"] == "file" else None,
+             src["id"] if src["type"] == "note" else None, now))
+    conn.commit()
+    return saved_id
+
+
+@bp.route("/api/ai/run/stream", methods=["POST"])
+def ai_run_stream():
+    """The same tools, written out as they are generated.
+
+    Threads and the Humanizer have streamed since 2026-09-19; the one-shot tools were
+    the last place left showing nothing for thirty seconds, which reads as broken
+    however good the answer is when it lands. A refusal is still an ordinary JSON
+    answer, decided before the stream opens, so the cost gate still works.
+    """
+    data = request.get_json(force=True) or {}
+    tool_key = data.get("tool")
+    if tool_key not in TOOLS:
+        return jsonify({"error": "Unknown tool."}), 400
+
+    conn = get_db()
+    handed_off = False
+    try:
+        brief, item, cls = assignment_brief(conn, data.get("itemId"))
+        class_id = data.get("classId") or (item["class_id"] if item else None)
+        context, used = collect_sources(conn, data.get("selection"), class_id, data.get("itemId"))
+        user_text = (data.get("text") or "").strip()
+        if tool_key in ("revise", "refine") and not user_text:
+            return jsonify({"error": "Paste the writing you want me to work on first."}), 400
+
+        prompt = build_tool_prompt(tool_key, brief, context, user_text, data.get("instructions"))
+        max_tokens = TOOLS[tool_key]["max_tokens"]
+        try:
+            cfg, _ = prompt_guard(conn, prompt, max_tokens, bool(data.get("confirmed")))
+        except AiRefused as e:
+            return jsonify(e.payload), e.status
+
+        def events():
+            parts, error = [], None
+            inner = stream_claude(conn, cfg, tool_key, prompt, max_tokens)
+            try:
+                try:
+                    yield sse_event("start", {"sources": used})
+                    for kind, payload in inner:
+                        if kind == "text":
+                            parts.append(payload)
+                            yield sse_event("text", {"t": payload})
+                        elif kind == "error":
+                            error = payload
+                finally:
+                    # Closed first, so its usage record lands while the connection is open.
+                    inner.close()
+                    text = "".join(parts).strip()
+                    saved_id = save_tool_output(conn, item, tool_key, text, used) if text else None
+                if error:
+                    yield sse_event("error", error)
+                yield sse_event("done", {"content": "".join(parts).strip(), "sources": used,
+                                         "savedId": saved_id,
+                                         "usage": spent_today(conn, settings(conn))})
+            finally:
+                conn.close()
+
+        handed_off = True
+        return Response(stream_with_context(events()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    except AiRefused as e:
+        return jsonify(e.payload), e.status
+    finally:
+        if not handed_off:
+            conn.close()
+
+
+def sse_event(event, data):
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
 # ---------------------------------------------------------------------------

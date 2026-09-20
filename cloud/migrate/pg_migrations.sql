@@ -341,3 +341,21 @@ create index if not exists flashcard_decks_by_item on flashcard_decks("item_id")
 -- level security from the base schema.
 
 alter table flashcards add column if not exists "learn_level" integer default 0;
+
+
+-- migration: 008_headstart_threads
+-- Which chat a saved Headstart became.
+--
+-- Generated work grew two homes: the `headstarts` table, written by the one-shot
+-- tools, and threads, written by the conversations that replaced them. Saif chose one
+-- home. `migrate_headstarts_to_threads()` in db.py rewrites every saved result as a
+-- chat with the tool's output as its first message, and records here which chat it
+-- became, so it can run again harmlessly and an old link still finds its content.
+--
+-- The rows themselves are kept. Nothing in this app deletes a student's work to tidy
+-- a schema.
+
+alter table headstarts add column if not exists "thread_id" text
+  references threads(id) on delete set null;
+
+create index if not exists headstarts_by_thread on headstarts("thread_id");

@@ -5353,11 +5353,29 @@
     }).join('') + '</div>';
   }
 
+  /**
+   * How much has been generated for this assignment.
+   *
+   * Saved Headstarts were carried across into chats, so counting the old table alone
+   * would say "1 saved" about work that now lives in a conversation, and nothing at
+   * all about a chat started since. Counts both, without counting a migrated result
+   * twice: a carried-across row names the chat it became.
+   */
+  function savedWorkCount(it){
+    var old = (it.headstarts || []);
+    var moved = {};
+    old.forEach(function(h){ if(h.threadId) moved[h.threadId] = true; });
+    var chats = (hsThreads || []).filter(function(t){
+      return t.itemId === it.id && !moved[t.id];
+    }).length;
+    return old.length + chats;
+  }
+
   function hsCardHtml(it){
     var col = classColor(it.classId) || 'var(--none)';
     var st = statusOf(it);
     var urgency = st==='overdue' ? 'overdue' : (st==='today' ? 'today' : '');
-    var done = (it.headstarts||[]).length;
+    var done = savedWorkCount(it);
     return '<button type="button" class="hs-card" style="--c:'+col+'" '
       + 'data-action="hs-open-item" data-id="'+it.id+'">'
       + '<div class="hs-card-title">'+escapeHtml(it.title||'Untitled')+'</div>'
@@ -5377,7 +5395,7 @@
     var col = classColor(it.classId) || 'var(--none)';
     var st = statusOf(it);
     var urgency = st==='overdue' ? 'overdue' : (st==='today' ? 'today' : '');
-    var done = (it.headstarts||[]).length;
+    var done = savedWorkCount(it);
     return '<div class="todo-row hs-list-row" data-action="hs-open-item" data-id="'+it.id+'">'
       + '<span class="dot" style="--c:'+col+'"></span>'
       + '<div class="row-main">'
@@ -5473,7 +5491,7 @@
     var col = classColor(it.classId) || 'var(--none)';
     var st = statusOf(it);
     var urgency = st==='overdue' ? 'overdue' : (st==='today' ? 'today' : '');
-    var done = (it.headstarts||[]).length;
+    var done = savedWorkCount(it);
     return '<div class="hs-due-row" data-action="hs-open-item" data-id="'+it.id+'">'
       + '<span class="dot" style="--c:'+col+'"></span>'
       + '<span class="hs-due-class">'+escapeHtml(c ? (c.code || c.name || '') : '')+'</span>'
@@ -11441,7 +11459,8 @@
     var hs = it.headstarts || [];
     var rows = hs.map(function(h){
       return '<button type="button" class="hs-saved" style="width:100%;margin-bottom:6px;" '
-        + 'data-action="hs-open-saved" data-id="'+it.id+'" data-hs="'+(h.id||'')+'">'
+        + 'data-action="hs-open-saved" data-id="'+it.id+'" data-hs="'+(h.id||'')+'"'
+        + ' data-thread="'+(h.threadId||'')+'">'
         + '<b>'+escapeHtml(HEADSTART_LABELS[h.kind] || h.kind)+'</b>'
         + '<span class="hs-saved-sub">'+escapeHtml(h.updatedAt ? 'saved '+relTimeAgo(h.updatedAt) : 'saved earlier')+'</span></button>';
     }).join('');
@@ -11880,8 +11899,13 @@
               + '<button type="button" class="btn ghost" data-action="hs-dismiss-confirm">Cancel</button></div>')
         + '</div>';
     }
-    if(HW.busy){
-      return '<div class="hs-thinking"><i></i>Working through your material. This can take a minute.</div>';
+    if(HW.busy && !HW.result){
+      return '<div class="hs-thinking"><i></i>Reading your material\u2026</div>';
+    }
+    if(HW.streaming && HW.result){
+      // Written out as it arrives. No buttons yet: copying half an answer is a trap.
+      return '<div class="hs-outbar"><span class="hs-thinking" style="margin:0;"><i></i>Writing\u2026</span></div>'
+        + '<div class="hs-out" id="hs-out">'+mdLite(HW.result)+'</div>';
     }
     if(HW.result){
       return '<div class="hs-outbar">'
@@ -12047,25 +12071,62 @@
     if(i) HW.instructions = i.value;
   }
 
+  /**
+   * Run a tool, and show the answer as it is written.
+   *
+   * Threads and the Humanizer have streamed since 2026-09-19. This was the last
+   * place that sat blank for half a minute and then produced everything at once,
+   * which reads as broken however good the answer is. A refusal still arrives as
+   * ordinary JSON before the stream opens, so the cost gate is unchanged.
+   */
   function hsRun(confirmed){
     hsCaptureInputs();
     if(HS_NEEDS_TEXT[HW.tool] && !HW.text.trim()){
       reportError(new Error('Paste the writing you want me to work on first.'));
       return;
     }
-    HW.busy = true; HW.confirm = null; HW.result = null;
+    HW.busy = true; HW.confirm = null; HW.result = null; HW.streaming = true;
     hsPaintOutput();
-    apiPostRaw('/api/ai/run', hsRunBody({ confirmed: !!confirmed })).then(function(r){
-      HW.busy = false;
-      if(r.status === 409 || r.status === 402){ HW.confirm = r.body; hsPaintOutput(); return; }
-      if(!r.ok) throw new Error(r.body.error || 'That did not work.');
-      HW.result = r.body.content;
-      HW.sources = r.body.sources;
-      if(r.body.usage){ hsUsage = r.body.usage; hsPaintSpend(); }
-      hsPaintOutput();
-      if(r.body.savedId) loadState();
+
+    var mine = HW;                       // the tool could be switched mid-run
+    fetch('/api/ai/run/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(hsRunBody({ confirmed: !!confirmed }))
+    }).then(function(r){
+      if(!r.ok || (r.headers.get('content-type') || '').indexOf('text/event-stream') < 0){
+        // A refusal, or a plain error: both are JSON, decided before any spending.
+        return r.json().catch(function(){ return {}; }).then(function(body){
+          if(HW !== mine) return;
+          HW.busy = false; HW.streaming = false;
+          if(r.status === 409 || r.status === 402){ HW.confirm = body; hsPaintOutput(); return; }
+          hsPaintOutput();
+          reportError(new Error(body.error || 'That did not work.'));
+        });
+      }
+      return readEventStream(r, function(name, data){
+        if(HW !== mine) return;
+        if(name === 'start'){ HW.sources = data.sources; }
+        else if(name === 'text'){
+          HW.result = (HW.result || '') + data.t;
+          hsPaintOutput();
+        }
+        else if(name === 'error'){ reportError(new Error(data.error || 'That did not work.')); }
+        else if(name === 'done'){
+          HW.busy = false; HW.streaming = false;
+          if(data.content) HW.result = data.content;
+          HW.sources = data.sources || HW.sources;
+          if(data.usage){ hsUsage = data.usage; hsPaintSpend(); }
+          hsPaintOutput();
+          if(data.savedId) loadState();
+        }
+      }).then(function(){
+        if(HW !== mine) return;
+        if(HW.streaming){ HW.busy = false; HW.streaming = false; hsPaintOutput(); }
+      });
     }).catch(function(err){
-      HW.busy = false;
+      if(HW !== mine) return;
+      HW.busy = false; HW.streaming = false;
       hsPaintOutput();
       reportError(err);
     });
@@ -15688,7 +15749,10 @@
       return;
     }
     if(action==='hs-open-saved'){
-      // Open the workspace for this assignment, then show the result that was clicked.
+      // Saved work is a chat now. Anything generated before that change was carried
+      // across at boot and carries the chat it became, so one click opens the
+      // conversation rather than a dead result pane.
+      if(t.dataset.thread){ openThread(t.dataset.thread); return; }
       hsBackItemId = document.querySelector('.ac-modal') ? t.dataset.id : null;
       var wantHs = t.dataset.hs;
       openHeadstartWorkspace({ itemId:t.dataset.id });

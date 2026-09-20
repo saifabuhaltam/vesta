@@ -221,3 +221,50 @@ def test_moving_a_class_to_a_term_that_does_not_exist_is_refused():
     cid = seed(alice, "PHIL", classes=1, items_per_class=0, files_per_class=0)[0]
     r = alice.put(f"/api/classes/{cid}/semester", json={"semesterId": "nope"})
     assert r.status_code == 404
+
+
+def test_saved_headstarts_become_chats_once_per_account():
+    """The boot migration that gives generated work one home.
+
+    Two things matter and neither can be shown against SQLite: it has to write the
+    chat as the account that owns the assignment, which is the class of bug that made
+    Office previews silently do nothing; and running twice must not produce two chats
+    for one saved result.
+    """
+    import app as vesta_app
+
+    alice = signed_in(ALICE, "alice@example.com")
+    bob = signed_in(BOB, "bob@example.com")
+    a_class = seed(alice, "PHIL", classes=1, items_per_class=1, files_per_class=0)[0]
+    seed(bob, "CMPT", classes=1, items_per_class=1, files_per_class=0)
+    a_item = alice.get("/api/state").get_json()["items"][0]["id"]
+    b_item = bob.get("/api/state").get_json()["items"][0]["id"]
+
+    for uid, iid, text in ((ALICE, a_item, "Alice's outline"), (BOB, b_item, "Bob's outline")):
+        conn = vdb.get_db(user_id=uid)
+        conn.execute(
+            "INSERT INTO headstarts (id, item_id, kind, content, status, instructions,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+            (f"hs-{uid[:4]}", iid, "essay_outline", text, "ready", "",
+             "2026-09-01T00:00:00", "2026-09-01T00:00:00"))
+        conn.commit()
+        conn.close()
+
+    vesta_app.migrate_headstarts_to_chats()
+    vesta_app.migrate_headstarts_to_chats()          # a redeploy must change nothing
+
+    a_threads = alice.get("/api/threads").get_json()
+    b_threads = bob.get("/api/threads").get_json()
+    assert len(a_threads) == 1, a_threads
+    assert len(b_threads) == 1, b_threads
+    assert "Generate essay outline" in a_threads[0]["title"]
+
+    a_msgs = alice.get(f"/api/threads/{a_threads[0]['id']}").get_json()["messages"]
+    assert [m["content"] for m in a_msgs] == ["Alice's outline"]
+    assert a_msgs[0]["role"] == "assistant"
+
+    # each account sees only its own, and the old row points at the chat it became
+    assert alice.get(f"/api/threads/{b_threads[0]['id']}").status_code == 404
+    state = alice.get("/api/state").get_json()
+    saved = state["items"][0]["headstarts"]
+    assert saved and saved[0]["threadId"] == a_threads[0]["id"]

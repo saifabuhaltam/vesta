@@ -275,7 +275,7 @@ def state_children(conn, class_ids, item_ids, extra_material_ids=()):
         "subtasks": group_by(by_item(
             "SELECT * FROM subtasks WHERE item_id IN ({marks})"), "item_id"),
         "headstarts": group_by(by_item(
-            "SELECT id, item_id, kind, status, updated_at FROM headstarts"
+            "SELECT id, item_id, kind, status, updated_at, thread_id FROM headstarts"
             " WHERE item_id IN ({marks}) ORDER BY updated_at DESC"), "item_id"),
         "rubrics": group_by(by_item(
             "SELECT * FROM rubrics WHERE item_id IN ({marks})"), "item_id"),
@@ -516,7 +516,7 @@ def serialize_item(conn, row, pre=None):
             "SELECT * FROM subtasks WHERE item_id=?", (row["id"],)
         ).fetchall()
         headstarts = conn.execute(
-            "SELECT id, kind, status, updated_at FROM headstarts WHERE item_id=? ORDER BY updated_at DESC",
+            "SELECT id, kind, status, updated_at, thread_id FROM headstarts WHERE item_id=? ORDER BY updated_at DESC",
             (row["id"],)
         ).fetchall()
         rubric_row = conn.execute(
@@ -548,7 +548,10 @@ def serialize_item(conn, row, pre=None):
         # every state load would be a large payload for something rarely opened.
         # `GET /api/items/<id>/headstarts` fetches the content when one is clicked.
         "headstarts": [{"id": h["id"], "kind": h["kind"], "status": h["status"],
-                        "updatedAt": h["updated_at"]} for h in headstarts],
+                        "updatedAt": h["updated_at"],
+                        # which chat it was carried across into, so one click opens it
+                        "threadId": (h["thread_id"] if "thread_id" in h.keys() else None)}
+                       for h in headstarts],
         "rubric": serialize_rubric(rubric_row),
     }
 
@@ -646,6 +649,65 @@ def _backfill_extracted_text_for(uid):
 
 
 backfill_extracted_text()
+
+
+def migrate_headstarts_to_chats():
+    """Every saved Headstart becomes a chat, so generated work lives in one place.
+
+    Two homes grew up: `headstarts`, written by the one-shot tools, and threads,
+    written by the conversations that replaced them. The assignment card listed one,
+    the Study page counted the other, and "where did that outline go" had two answers
+    depending on which button made it.
+
+    Each saved result is rewritten as a chat carrying the tool's name and its output
+    as the first message, and the row records which chat it became. Nothing is
+    deleted: the rows stay, and an old link still resolves through `thread_id`.
+    Runs at boot, once per account, and skips anything already carried across, so a
+    redeploy is a no-op.
+    """
+    for_each_account(_migrate_headstarts_for)
+
+
+def _migrate_headstarts_for(uid):
+    conn = get_db(user_id=uid)
+    try:
+        rows = conn.execute(
+            "SELECT h.*, i.title AS item_title, i.class_id AS item_class, i.semester_id AS item_sem"
+            " FROM headstarts h LEFT JOIN items i ON i.id = h.item_id"
+            " WHERE (h.thread_id IS NULL OR h.thread_id = '')"
+            " AND h.content IS NOT NULL AND h.content != ''").fetchall()
+    except Exception:
+        conn.close()                     # a database that predates the column
+        return
+    now = datetime.utcnow().isoformat()
+    for r in rows:
+        tid = str(uuid.uuid4())
+        label = HEADSTART_LABELS.get(r["kind"], r["kind"] or "Headstart")
+        title = (r["item_title"] or "Saved work") + " \u00b7 " + label
+        conn.execute(
+            "INSERT INTO threads (id, semester_id, class_id, item_id, title, archived,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,0,?,?)",
+            (tid, r["item_sem"], r["item_class"], r["item_id"], title[:200],
+             r["created_at"] or now, r["updated_at"] or now))
+        conn.execute(
+            "INSERT INTO thread_messages (id, thread_id, role, content, tool, created_at)"
+            " VALUES (?,?,?,?,?,?)",
+            (str(uuid.uuid4()), tid, "assistant", r["content"], r["kind"],
+             r["updated_at"] or now))
+        # What it read, so the chat can be carried on without attaching it all again.
+        for src in conn.execute(
+                "SELECT material_id, note_id FROM headstart_sources WHERE headstart_id=?",
+                (r["id"],)).fetchall():
+            conn.execute(
+                "INSERT INTO thread_sources (id, thread_id, material_id, note_id, created_at)"
+                " VALUES (?,?,?,?,?)",
+                (str(uuid.uuid4()), tid, src["material_id"], src["note_id"], now))
+        conn.execute("UPDATE headstarts SET thread_id=? WHERE id=?", (tid, r["id"]))
+    conn.commit()
+    conn.close()
+
+
+migrate_headstarts_to_chats()
 
 
 # ---------------- frontend ----------------

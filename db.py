@@ -738,6 +738,13 @@ def init_db():
         if col not in ucols:
             conn.execute(f"ALTER TABLE ai_usage ADD COLUMN {col} INTEGER DEFAULT 0")
 
+    # Which chat a saved Headstart became. Generated work now lives in one place, and
+    # this is how an old saved result finds the conversation it turned into.
+    # Partner block: 008_headstart_threads in cloud/migrate/pg_migrations.sql.
+    hcols = [r["name"] for r in conn.execute("PRAGMA table_info(headstarts)").fetchall()]
+    if "thread_id" not in hcols:
+        conn.execute("ALTER TABLE headstarts ADD COLUMN thread_id TEXT REFERENCES threads(id) ON DELETE SET NULL")
+
     # How well each card is learned, for the Learn mode: 0 not started, 1 recognised
     # from four choices, 2 typed correctly, which is what counts as learned. Separate
     # from the spaced-repetition columns on purpose: those schedule a review over days,
