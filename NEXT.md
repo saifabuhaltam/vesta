@@ -52,6 +52,15 @@ channels are alive.
       and that a list of signed-in devices would be nice later. Not built. It needs a
       sessions table; the session is a signed cookie today and nothing records where it
       was issued.
+- [ ] **The last round trip before the calendar appears.** A return visit now draws
+      the term the moment the server says who is signed in: one request, about 1.3
+      seconds on a connection holding every response for 1.2 seconds. Removing even
+      that means trusting the device's copy *before* the answer arrives, which needs a
+      readable marker cookie set beside the session cookie so the page can check the
+      account itself. It would make the calendar appear instantly on every visit. The
+      cost is a window -- an expired session on a shared browser -- where the previous
+      account's term is on screen for one round trip before the sign-in screen
+      replaces it. Saif's call, because it is his friends' accounts.
 - [ ] **Amend the bad commit message** on `7b5d88f`, whose message is a Python script
       (a heredoc nesting error; the code in it is correct). Fixing it means a
       force-push, which rewrites pushed history. Saif's call, and leaving it is fine.
@@ -122,6 +131,43 @@ channels are alive.
 
 The whole of this session, in the order it happened. Each is live unless it says
 otherwise.
+
+### The calendar stopped waiting for the server
+
+Everything inside the calendar already redrew in under 10 ms. What was slow was
+everything that had to reach the server first, and the calendar was where it showed.
+
+Adding an event cost two round trips with the modal frozen in front of it: the write,
+and then a reload of the entire term. Measured against a server holding every response
+for 1.2 seconds, that was **2,448 ms** of nothing happening. Events, and assignments
+created from the form, are now painted under a temporary id the moment Save is pressed
+and the saved row takes their place when it lands: **6-22 ms**, one write, no reload.
+Editing and deleting were already painted immediately but kept the modal open until
+the round trip finished; the modal closes with the change now. A refused write puts
+the row back and says so, which is the contract the edit path already kept.
+
+A row is not clickable for the one request it takes its real id to arrive, because a
+second write against a temporary id would 404 and roll the row off the screen, which
+would look like the app eating what was just typed.
+
+Opening Vesta drew an empty shell until `/api/state` answered -- **2.3 seconds** on
+that same held connection, because the term is the big query. Two things changed. The
+last answer and the preferences that draw it are kept on the device and painted as
+soon as the server says who is signed in, address-bar route and all; the fresh copy
+folds in behind them and redraws nothing when it matches, which is the usual case.
+And the term and the preferences no longer wait for the "who is signed in" answer to
+be asked for -- the cookie decides all three, so they go out together. A return visit
+is **1,272 ms**, one round trip, and it draws a usable calendar offline.
+
+The device copy is a cache and nothing else: it is only ever painted for the account
+it was saved under, signing out removes it, a browser that has never been signed in
+does not prefetch, and nothing is ever written back to the server from it.
+
+### The calendar's List view is an agenda
+
+It listed every dated thing in the term, finished work included, which made it a
+second copy of the month grid rather than something to work from. It now shows today
+onward, plus anything overdue that is not done. Past work that is done is left out.
 
 ### Everything got faster
 

@@ -3521,29 +3521,101 @@
     document.getElementById('app').classList.toggle('nav-open', navOpen);
   }
 
-  function loadState(){
-    return (BE ? BE.loadState() : apiGet('/api/state')).then(function(data){
-      // The connection is good, whatever the payload says, so the indicator is set
-      // before the early return below.
+  /**
+   * Take a payload as what the page is showing, and say whether that changed anything.
+   * Identical to what is already drawn is the ordinary case once a term is painted
+   * from the device's copy first, and redrawing then would only make the page flicker.
+   */
+  function adoptState(data){
+    var sig = JSON.stringify(data);
+    if(sig === lastStateSig) return false;
+    lastStateSig = sig;
+    classes = data.classes; items = data.items; events = data.events || []; termSettings = data.term;
+    semesters = data.semesters || [];
+    semester = data.semester || null;
+    termLocked = !!data.locked;
+    gpaHistory = null;            // a switch or an archive can change every term's numbers
+    inbox = data.unfiled || { notesList:[], materials:[] };
+    pendingImports = data.pendingImports || [];
+    pendingCalImports = data.pendingCalendarImports || [];
+    render();
+    return true;
+  }
+
+  // ---------------- opening onto what was there ----------------
+  //
+  // /api/state is one request, but it is the big one: every class, assignment, file,
+  // note and event in the term. Until it answered, Vesta was an empty shell, so
+  // reopening the calendar on a phone connection meant a second or two of nothing.
+  //
+  // The last answer, and the preferences that decide how it is drawn, are kept on the
+  // device and painted the moment the server says who is signed in. The fresh copy
+  // folds in behind them, and redraws nothing at all when it matches -- which it
+  // usually does, because most of the time nothing changed since the last visit.
+  //
+  // It is a cache of this device, not a source of truth. It is only ever painted for
+  // the account it was saved under, signing out removes it, and nothing is ever
+  // written back to the server from it.
+  var STATE_CACHE_KEY = 'vesta-last-state';
+
+  function cacheOwner(){ return (authState.user && authState.user.id) || 'local'; }
+
+  function rememberState(data){
+    try{
+      // The term and the preferences arrive in separate requests, so whichever lands
+      // second must not blank out what the first one already wrote.
+      var prev = null;
+      try{ prev = JSON.parse(localStorage.getItem(STATE_CACHE_KEY) || 'null'); }catch(e){}
+      var mine = prev && prev.user === cacheOwner();
+      localStorage.setItem(STATE_CACHE_KEY, JSON.stringify({
+        user: cacheOwner(),
+        prefs: PREFS || (mine ? prev.prefs : null),
+        state: data || (mine ? prev.state : null)
+      }));
+    }catch(e){
+      // Over the quota, or storage refused outright. Drop what is there rather than
+      // leave an old copy behind to be painted on every visit from now on.
+      forgetState();
+    }
+  }
+  function forgetState(){ try{ localStorage.removeItem(STATE_CACHE_KEY); }catch(e){} }
+
+  /** Draw the last visit's term, if this device has one for this account. */
+  function paintRememberedState(){
+    var snap = null;
+    try{ snap = JSON.parse(localStorage.getItem(STATE_CACHE_KEY) || 'null'); }catch(e){}
+    if(!snap || !snap.state || snap.user !== cacheOwner()) return false;
+    try{
+      if(snap.prefs && !PREFS){ PREFS = snap.prefs; applyPrefs(); applyStartupPrefs(); }
+      applySidebarPref();
+      adoptState(snap.state);
+      // Land on the screen the address bar names while the copy is being painted,
+      // rather than showing the dashboard until the server answers. The route is
+      // consumed here, so the load that follows does not move the page again.
+      applyPendingRoute();
+      return true;
+    }catch(e){
+      // A snapshot from an older version of the page. Drop it and wait for the server.
+      forgetState();
+      return false;
+    }
+  }
+
+  function loadState(pre){
+    return (pre || (BE ? BE.loadState() : apiGet('/api/state'))).then(function(data){
+      if(!data && pre) return loadState();         // a refused prefetch, asked for properly
+      // The connection is good, whatever the payload turns out to say.
       document.getElementById('sync-dot').classList.remove('off');
       document.getElementById('sync-label').textContent = BE ? 'Synced to your account' : 'Saved to your server';
-      var sig = JSON.stringify(data);
-      if(sig === lastStateSig) return;
-      lastStateSig = sig;
-      classes = data.classes; items = data.items; events = data.events || []; termSettings = data.term;
-      semesters = data.semesters || [];
-      semester = data.semester || null;
-      termLocked = !!data.locked;
-      gpaHistory = null;            // a switch or an archive can change every term's numbers
-      inbox = data.unfiled || { notesList:[], materials:[] };
-      pendingImports = data.pendingImports || [];
-      pendingCalImports = data.pendingCalendarImports || [];
-      // First state load with a connected account starts the background sync and asks
-      // once immediately, so opening Vesta is itself a reason to be up to date.
+      // Read before adopting: a term painted from the device's copy can make the
+      // fresh payload identical, and the sync would never be started behind it.
       var wasOn = gsyncOn;
       gsyncOn = !!data.googleSync;
+      adoptState(data);
+      rememberState(data);
+      // First state load with a connected account starts the background sync and asks
+      // once immediately, so opening Vesta is itself a reason to be up to date.
       if(gsyncOn && !wasOn){ startGoogleSync(); setTimeout(function(){ runGoogleSync('open'); }, 600); }
-      render();
     }).catch(function(err){
       document.getElementById('sync-dot').classList.add('off');
       document.getElementById('sync-label').textContent =
@@ -3604,6 +3676,42 @@
     return send().then(function(row){
       if(row && row.id && rowIndex(list, row.id)<0){ list.push(row); render(); return row; }
       return loadState().then(function(){ return row; });
+    });
+  }
+  /**
+   * A new row that is on the screen before the server has agreed to it.
+   *
+   * eagerAdd has to wait for the answer because it has nothing to paint with. A row
+   * built from a form is different: every field is already known, so it goes up under
+   * a temporary id and the saved row takes its place when it lands. Adding an event
+   * used to cost two round trips with the modal frozen in front of it -- the write,
+   * then a reload of the entire term -- which on a bad connection was two and a half
+   * seconds of nothing happening.
+   *
+   * A refused write takes the row back off the screen and says so, the same contract
+   * eagerSave keeps for edits.
+   */
+  var tmpSeq = 0;
+  function tempId(){ tmpSeq++; return 'tmp-' + tmpSeq + '-' + Date.now(); }
+  function isTempId(id){ return typeof id === 'string' && id.slice(0,4) === 'tmp-'; }
+  function eagerCreate(list, row, send){
+    row.id = row.id || tempId();
+    list.push(row);
+    render();
+    return send().then(function(saved){
+      var at = rowIndex(list, row.id);
+      if(at < 0) return saved;                       // already taken off the screen
+      // Create routes answer with either the whole saved row or just its id.
+      var isRow = saved && saved.id && Object.keys(saved).length > 1;
+      var real = isRow ? saved : Object.assign({}, row, { id: (saved && saved.id) || row.id });
+      var before = JSON.stringify(list[at]);
+      list[at] = real;
+      if(JSON.stringify(real) !== before) render();
+      return real;
+    }).catch(function(err){
+      var at = rowIndex(list, row.id);
+      if(at >= 0){ list.splice(at, 1); render(); }
+      throw err;
     });
   }
   /** Gone from the page at once; put back if the server refuses. */
@@ -3772,7 +3880,17 @@
     if(BE && typeof BE.removeTopic === 'function') return BE.removeTopic(id).then(loadState);
     return eagerNestedDelete(id, function(){ return apiDelete('/api/syllabus/'+id); });
   }
-  function addEvent(data){ return route('addEvent', [data], function(){ return apiPost('/api/events', data); }).then(loadState); }
+  function addEvent(data){
+    if(BE && typeof BE.addEvent === 'function') return BE.addEvent(data).then(loadState);
+    // The shape serialize_event() answers with, so the grid draws the same square
+    // before and after the save.
+    var row = Object.assign({
+      classId: null, title: '', kind: 'other', date: todayIso(), start: null, end: null,
+      allDay: false, location: '', notes: '', source: '', readOnly: false,
+      createdAt: new Date().toISOString()
+    }, data);
+    return eagerCreate(events, row, function(){ return apiPost('/api/events', data); });
+  }
   function updateEvent(id, data){
     if(BE && typeof BE.updateEvent === 'function') return BE.updateEvent(id, data).then(loadState);
     return eagerNested(id, data, function(){ return apiPut('/api/events/'+id, data); });
@@ -3934,8 +4052,9 @@
   var PREFS = null;
   var PREFS_MIGRATED_KEY = 'vesta_prefs_migrated';
 
-  function loadPrefs(){
-    return apiGet('/api/prefs').then(function(p){
+  function loadPrefs(pre){
+    return (pre || apiGet('/api/prefs')).then(function(p){
+      if(!p) return pre ? loadPrefs() : null;      // a refused prefetch, asked for properly
       PREFS = p;
       applyPrefs();
       return p;
@@ -4204,10 +4323,12 @@
     // The avatar shows an initial taken from the profile and the whole app is themed
     // from the preferences, so fetch both before the first render rather than letting
     // the letter and the colours change under the user a moment later.
+    paintRememberedState();
     Promise.all([loadProfile(), loadPrefs()]).then(function(){
       applyStartupPrefs();
       applySidebarPref();
       render();
+      rememberState(null);
       return migratePrefs();
     });
     loadState().then(function(){
@@ -4332,10 +4453,33 @@
       .catch(function(){ authState.error = 'Could not reach Vesta.'; return false; });
   }
 
+  /**
+   * Neither the term nor the preferences depend on the answer to "who is signed in":
+   * the cookie the browser is already sending decides that, and the server answers
+   * both from it. Asking for them alongside that question rather than after it takes
+   * a round trip out of every visit.
+   *
+   * Only a device that has been signed in before asks early. A first visit lands on a
+   * sign-in screen, and two requests that are certain to be refused are worse than
+   * nothing.
+   */
+  function prefetchTerm(){
+    if(BE) return null;
+    var seen = false;
+    try{ seen = !!localStorage.getItem(STATE_CACHE_KEY); }catch(e){}
+    if(!seen) return null;
+    if((location.hash || '').indexOf('access_token') >= 0) return null;   // signing in right now
+    return {
+      prefs: apiGet('/api/prefs').catch(function(){ return null; }),
+      state: apiGet('/api/state').catch(function(){ return null; })
+    };
+  }
+
   function init(){
     initSidebar();
     initTheme();
     paintIcons();
+    var early = prefetchTerm();
     // A Google sign-in lands back here with the token in the fragment, so deal with
     // that before asking the server who is signed in.
     return consumeAuthFragment().then(function(justSignedIn){
@@ -4347,16 +4491,20 @@
         authState.inviteOnly = !!(a && a.inviteOnly);
         authState.user = (a && a.user) || null;
         if(authState.accounts && !authState.user){ showLogin(); return; }
+        // Last visit's term, drawn now, so the calendar is there to read while the
+        // three requests below are still in the air.
+        paintRememberedState();
         Promise.all([
           authState.accounts ? loadProfile() : Promise.resolve(null),
-          loadPrefs()
+          loadPrefs(early && early.prefs)
         ]).then(function(){
           applyStartupPrefs();
           applySidebarPref();
           render();
+          rememberState(null);
           return migratePrefs();
         });
-        return loadState().then(function(){
+        return loadState(early && early.state).then(function(){
           notifyDueSoon();
           // A link to a chat, a set or a quiz, and a plain refresh: land where the
           // address bar says once there is data to land on.
@@ -5054,8 +5202,16 @@
 
 
   function listAgendaHtml(){
-    var visible = items.filter(function(it){ return it.dueDate && isVisibleInCalendar(it); });
+    // Agenda = what still needs attention: today onward, plus anything overdue and not done.
+    // Past items that are already done are left out so the list doesn't become the whole calendar.
+    var today = todayIso();
+    var anyDated = items.some(function(it){ return it.dueDate && isVisibleInCalendar(it); });
+    var visible = items.filter(function(it){
+      if(!it.dueDate || !isVisibleInCalendar(it)) return false;
+      return it.dueDate >= today || it.status !== 'done';
+    });
     if(visible.length===0){
+      if(anyDated) return '<div class="empty">Nothing upcoming. Everything before today is done.</div>';
       return '<div class="empty">Nothing on the calendar yet.'+(classes.length===0 ? '<div><button class="btn primary" data-action="open-add-class">+ Add a class</button></div>' : '')+'</div>';
     }
     visible.sort(function(a,b){ return a.dueDate.localeCompare(b.dueDate) || (a.dueTime||'').localeCompare(b.dueTime||''); });
@@ -9126,8 +9282,11 @@
       location: document.getElementById('f-ev-loc').value.trim(),
       notes: document.getElementById('f-ev-notes').value.trim()
     };
+    // Both paths paint the change before the request goes out, so the modal closes
+    // now rather than a round trip later. A refused write puts the old row back.
     var p = id ? updateEvent(id, data) : addEvent(data);
-    p.then(closeModal).catch(reportError);
+    closeModal();
+    p.catch(reportError);
   }
 
   function openSyllabusModal(classId){
@@ -11847,7 +12006,8 @@
       var st = document.getElementById('f-status').value;
       var patch = Object.assign({ dueDate: dueDate, status: st }, base);
       patch.completedAt = st==='done' ? (items.find(function(i){return i.id===id;}) || {}).completedAt || todayIso() : null;
-      updateItem(id, patch).then(closeModal).catch(reportError);
+      updateItem(id, patch).catch(reportError);
+      closeModal();
       return;
     }
 
@@ -11872,9 +12032,31 @@
     } else {
       creates.push(Object.assign({}, base, { dueDate: dueDate, status:newStatus, completedAt:newDone }));
     }
+    if(BE && typeof BE.addItem === 'function'){
+      Promise.all(creates.map(function(d){ return BE.addItem(d); }))
+        .then(loadState).then(closeModal).catch(reportError);
+      return;
+    }
+    // Every new assignment is on the calendar and in the lists before the first
+    // request leaves, and the saved rows fold in behind them.
     Promise.all(creates.map(function(d){
-      return route('addItem', [d], function(){ return apiPost('/api/items', d); });
-    })).then(loadState).then(closeModal).catch(reportError);
+      return eagerCreate(items, newItemRow(d), function(){ return apiPost('/api/items', d); });
+    })).catch(reportError);
+    closeModal();
+  }
+
+  /** What serialize_item() will answer with, filled in locally so it can be drawn now. */
+  function newItemRow(d){
+    return Object.assign({
+      classId: null, title: '', type: 'assignment', dueDate: null, dueTime: null,
+      status: 'todo', completedAt: null, weight: null, score: null, categoryId: null,
+      location: '', importKey: null, notes: '', focusSeconds: 0,
+      createdAt: new Date().toISOString(), headstarts: [], rubric: null
+    }, d, {
+      subtasks: (d.subtasks || []).map(function(sub){
+        return { id: sub.id || tempId(), title: sub.title, done: !!sub.done };
+      })
+    });
   }
 
   // ---------------- The Headstart workspace ----------------
@@ -14905,6 +15087,13 @@
     if(!t){ if(!e.target.closest('.cp-menu')) closeNoteMenus(); return; }
     var action = t.dataset.action;
 
+    // A row drawn a moment ago still carries the temporary id it was painted under,
+    // for as long as its own create is in flight. A second write against that id
+    // would 404 and roll the row back off the screen, which looks like the app
+    // eating what was just typed, so the click is dropped instead. The window is the
+    // one request it takes for the real id to arrive.
+    if(t.dataset && isTempId(t.dataset.id)) return;
+
     if(action==='class-menu-toggle'){
       openMenuId = (openMenuId===t.dataset.id) ? null : t.dataset.id;
       renderView();
@@ -15554,7 +15743,14 @@
     if(action==='save-event'){ saveEventFromForm(t.dataset.id||null); return; }
     if(action==='delete-event'){
       confirmAction('Delete this event?', "This can't be undone.")
-        .then(function(ok){ if(ok) deleteEventRec(t.dataset.id).then(closeModal).catch(reportError); });
+        .then(function(ok){
+          // The row is off the screen before the request goes out, so the modal has
+          // nothing to wait for either. A refused delete puts it back and says so.
+          if(!ok) return;
+          var gone = deleteEventRec(t.dataset.id);
+          closeModal();
+          gone.catch(reportError);
+        });
       return;
     }
     if(action==='cal-pick-day'){ calSelectedDay = t.dataset.date; renderView(); paintIcons(); return; }
@@ -15689,7 +15885,12 @@
     }
     if(action==='save-item-delete'){
       confirmAction('Delete this item?', 'This can\'t be undone.')
-        .then(function(ok){ if(ok) deleteItem(t.dataset.id).then(closeModal).catch(reportError); });
+        .then(function(ok){
+          if(!ok) return;
+          var gone = deleteItem(t.dataset.id);
+          closeModal();
+          gone.catch(reportError);
+        });
       return;
     }
     if(action==='save-class-delete'){
@@ -15706,6 +15907,7 @@
     if(action==='add-schedule-row'){ editingSchedule.push({day:1, start:'', end:'', location:''}); renderScheduleRows(); return; }
     if(action==='remove-schedule-row'){ editingSchedule.splice(Number(t.dataset.idx),1); renderScheduleRows(); return; }
     if(action==='sign-out'){
+      forgetState();
       apiPostRaw('/api/auth/logout', {}).then(function(){
         // A full reload rather than tearing the app down by hand: it guarantees no
         // fragment of the previous account's data is left on screen.
@@ -15961,7 +16163,12 @@
     if(action==='edit-from-detail'){ openItemModal(items.find(function(i){ return i.id===t.dataset.id; })); return; }
     if(action==='detail-delete-item'){
       confirmAction('Delete this item?', 'This can\'t be undone.')
-        .then(function(ok){ if(ok) deleteItem(t.dataset.id).then(closeModal).catch(reportError); });
+        .then(function(ok){
+          if(!ok) return;
+          var gone = deleteItem(t.dataset.id);
+          closeModal();
+          gone.catch(reportError);
+        });
       return;
     }
     if(action==='open-rubric'){ openRubricModal(t.dataset.mid, t.dataset.class); return; }
