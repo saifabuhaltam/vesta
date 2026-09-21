@@ -97,6 +97,10 @@ channels are alive.
       shipped have no default folders until something is uploaded into them, because
       `folder_id_for_kind` creates them on demand. Files keep their `category` either
       way, so nothing is lost or hidden.
+- [ ] **A redraw held back while writing happens 400 ms after the caret leaves the
+      editor**, so if a background sync landed mid-sentence, clicking away can scroll
+      the notes page back to the top once. Any click that redraws on its own cancels
+      it, so it is only visible when you click something inert.
 - [ ] **Multi-section SFU courses** were only exercised against four real courses, and
       the SFU exam fallback in `syllabus.py` has never fired across 16 real sections.
       Both are documented guards rather than fixes for observed bugs.
@@ -124,6 +128,52 @@ channels are alive.
 - **Two-factor sign-in and a profile photo.** Saif said Settings is good as it is.
 - **Categorising assignments added by a later syllabus document.** Saif does not need
   them categorised.
+
+---
+
+## Built on 2026-09-21
+
+### Notes stopped throwing away what was being typed
+
+Saif: *"notes keep cutting out while typing and resetting the page and resets the last
+thing that i was trying to type."* Four separate things were doing it.
+
+Autosave held the **latest patch only**, on a 700 ms timer that restarted on every
+keystroke. So typing without a 700 ms pause never saved at all; editing the title and
+then the body inside one window threw the title away; and `flushNoteSave()`, called
+whenever you left a note, **cancelled the pending write instead of sending it** — the
+last thing typed before clicking anywhere was discarded on purpose. Autosave now holds
+one merged patch per note, sends it after 700 ms idle *or* 2.5 seconds regardless, and
+flushing actually writes. It also flushes on `pagehide` and when the tab is hidden.
+
+And any full redraw landed on top of the editor. `adoptState` called `render()`
+unconditionally, so a Google Calendar poll — every three minutes, and on every window
+focus — rebuilt the note from the server's copy: scroll to the top, caret gone, the
+last few seconds of writing painted over. Now the cached note is patched on every
+keystroke, so a redraw paints what is on screen rather than what the server last heard;
+and while the caret is inside any rich-text editor the redraw is held back entirely
+until writing stops.
+
+### The editor answers the keyboard
+
+`cmd/ctrl + B`, `I`, `U`, `shift+X` for strikethrough, and `shift+7` / `shift+8` for
+numbered and bulleted lists. Applied by hand rather than left to the browser, whose own
+shortcuts differ between Chrome and Safari and tell the autosave nothing changed.
+
+Markers now fire on **space**, the way Notion does: `- `, `* ` and `+ ` open a bullet,
+`1. ` a numbered list, `# ` `## ` `### ` headings, `> ` a quote, `[] ` a checklist,
+``` ``` ``` a code block, `--- ` a divider. Tab still finishes a marker too, and still
+nests inside a list.
+
+None of this worked on the first line of a note, which is the line people actually
+start a list on. The marker was looked for on the *block element* around the caret, and
+text typed into a note that has never been formatted has no block element — it sits
+directly under the editor. The caret's own text run is read instead, and the line is
+given a paragraph when a command needs one (`formatBlock` cannot work without one,
+which is why `# ` did nothing while `- ` worked).
+
+Checked in a browser by `reference/speed/test_notes_editor.py` — 12 checks, each named
+after the original complaint.
 
 ---
 

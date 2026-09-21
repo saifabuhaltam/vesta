@@ -3538,9 +3538,56 @@
     inbox = data.unfiled || { notesList:[], materials:[] };
     pendingImports = data.pendingImports || [];
     pendingCalImports = data.pendingCalendarImports || [];
+    // A background sync landing mid-sentence used to rebuild the page under the
+    // caret: the scroll jumped, the caret vanished, and anything typed since the
+    // last write was painted back over with the server's older copy. The payload is
+    // taken, what is on screen is put back on top of it, and the redraw waits.
+    if(rteHasCaret()){
+      keepLiveNoteText();
+      holdRender();
+      return true;
+    }
     render();
     return true;
   }
+
+  /** True while the caret is inside a note's title or any rich-text editor. */
+  function rteHasCaret(){
+    var el = document.activeElement;
+    if(!el) return false;
+    if(el.id === 'nt-title') return true;
+    return !!(el.closest && el.closest('.rte-editor'));
+  }
+
+  /**
+   * Put what is on screen back into the cached copy of the note.
+   *
+   * Every state refresh replaces the note arrays with the server's copy, which is
+   * always a few keystrokes behind whatever is being typed right now. Without this,
+   * the next redraw -- whenever it comes -- would show the older text.
+   */
+  function keepLiveNoteText(){
+    var body = document.getElementById('nt-body');
+    if(body && body.dataset.noteId) patchCachedNote(body.dataset.noteId, { text: noteHtmlForSave(body) });
+    var title = document.getElementById('nt-title');
+    if(title && title.dataset.id) patchCachedNote(title.dataset.id, { title: title.value });
+  }
+
+  // A redraw that was held back while writing happens once the caret leaves, unless
+  // something else redraws first -- render() cancels it, so a click that does its own
+  // work is never rebuilt out from under itself.
+  var heldRender = false;
+  var heldRenderTimer = null;
+  function holdRender(){ heldRender = true; }
+  document.addEventListener('focusout', function(){
+    if(!heldRender || heldRenderTimer) return;
+    heldRenderTimer = setTimeout(function(){
+      heldRenderTimer = null;
+      if(!heldRender || rteHasCaret()) return;
+      heldRender = false;
+      render();
+    }, 400);
+  });
 
   // ---------------- opening onto what was there ----------------
   //
@@ -4537,6 +4584,8 @@
 
   // ---------------- render: shell ----------------
   function render(){
+    heldRender = false;
+    if(heldRenderTimer){ clearTimeout(heldRenderTimer); heldRenderTimer = null; }
     var navTab = (activeTab==='class') ? 'classes' : activeTab;
     document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.tab===navTab); });
     renderTermBanner();
@@ -8271,19 +8320,102 @@
 
   // ---- insertion helpers -------------------------------------------------
   // ---- markdown-style shortcuts ------------------------------------------
-  // Type the marker, press Tab, get the block. This is how people already write
-  // in chat apps and markdown editors, so it needs no explaining.
+  // Type the marker and press space, the way Notion works: "- " opens a bullet,
+  // "1. " a numbered list, "# " a title. Tab finishes a marker too, for anyone who
+  // learned it that way. Undo puts the literal characters back.
   var MD_TRIGGERS = [
-    { re: /^\s*[*\-+]$/,  apply: function(){ document.execCommand('insertUnorderedList'); } },
-    { re: /^\s*1\.$/,     apply: function(){ document.execCommand('insertOrderedList'); } },
-    { re: /^\s*\[\s*\]$/, apply: function(ed){ rteInsertCommand(ed, 'checklist'); } },
-    { re: /^\s*#$/,       apply: function(){ document.execCommand('formatBlock', false, 'H1'); } },
-    { re: /^\s*##$/,      apply: function(){ document.execCommand('formatBlock', false, 'H2'); } },
-    { re: /^\s*###$/,     apply: function(){ document.execCommand('formatBlock', false, 'H3'); } },
-    { re: /^\s*>$/,       apply: function(){ document.execCommand('formatBlock', false, 'BLOCKQUOTE'); } },
-    { re: /^\s*```$/,     apply: function(){ document.execCommand('formatBlock', false, 'PRE'); } },
-    { re: /^\s*---$/,     apply: function(ed){ rteInsertCommand(ed, 'hr'); } }
+    { re: /^\s*[*\-+]\s*$/,  apply: function(){ document.execCommand('insertUnorderedList'); } },
+    { re: /^\s*1\.\s*$/,     apply: function(){ document.execCommand('insertOrderedList'); } },
+    { re: /^\s*\[\s*\]\s*$/, apply: function(ed){ rteInsertCommand(ed, 'checklist'); } },
+    { re: /^\s*#\s*$/,       apply: function(){ document.execCommand('formatBlock', false, 'H1'); } },
+    { re: /^\s*##\s*$/,      apply: function(){ document.execCommand('formatBlock', false, 'H2'); } },
+    { re: /^\s*###\s*$/,     apply: function(){ document.execCommand('formatBlock', false, 'H3'); } },
+    { re: /^\s*>\s*$/,       apply: function(){ document.execCommand('formatBlock', false, 'BLOCKQUOTE'); } },
+    { re: /^\s*```\s*$/,     apply: function(){ document.execCommand('formatBlock', false, 'PRE'); } },
+    { re: /^\s*---\s*$/,     apply: function(ed){ rteInsertCommand(ed, 'hr'); } }
   ];
+
+  /**
+   * The marker sitting between the start of the line and the caret, if there is one.
+   *
+   * This reads the caret's own text run rather than the block element around it. A
+   * note that has only ever been typed into has no block wrapper at all -- its text
+   * sits directly under the editor -- so looking for a wrapper meant the first line
+   * of every note, the one people actually start a list on, could never match.
+   */
+  function rteMarkerBefore(editor){
+    var sel = window.getSelection();
+    if(!sel || !sel.rangeCount || !sel.isCollapsed) return null;
+    var node = sel.anchorNode;
+    if(!node || node.nodeType !== 3 || !editor.contains(node)) return null;
+    // Only the first run on a line can carry a marker.
+    var prev = node.previousSibling;
+    while(prev && prev.nodeType === 3 && !prev.textContent) prev = prev.previousSibling;
+    if(prev && prev.nodeName !== 'BR') return null;
+    var text = node.textContent.slice(0, sel.anchorOffset).replace(/\u00a0/g, ' ');
+    if(!text.trim()) return null;
+    var trigger = MD_TRIGGERS.find(function(t){ return t.re.test(text); });
+    return trigger ? { trigger: trigger, node: node, offset: sel.anchorOffset } : null;
+  }
+
+  /**
+   * Give the caret's line a block element if it has none.
+   *
+   * Text typed into a note that has never been formatted sits directly under the
+   * editor with no wrapper of its own, and formatBlock has nothing to change. That
+   * is why "# " at the top of a fresh note did nothing at all, while "- " worked:
+   * the list commands build their own wrapper, formatBlock does not.
+   */
+  function rteEnsureBlock(editor){
+    var sel = window.getSelection();
+    if(!sel || !sel.rangeCount) return null;
+    var node = sel.anchorNode, offset = sel.anchorOffset;
+    if(!node || !editor.contains(node) || rteBlockOf(editor, node)) return null;
+    // This line is everything between the line breaks around it.
+    var start = node;
+    while(start.previousSibling && start.previousSibling.nodeName !== 'BR') start = start.previousSibling;
+    var line = [], cur = start;
+    while(cur && cur.nodeName !== 'BR'){ line.push(cur); cur = cur.nextSibling; }
+    if(!line.length) return null;
+    var para = document.createElement('p');
+    editor.insertBefore(para, line[0]);
+    line.forEach(function(el){ para.appendChild(el); });
+    var back = document.createRange();
+    back.setStart(node, Math.min(offset, node.nodeType === 3 ? node.textContent.length : node.childNodes.length));
+    back.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(back);
+    return para;
+  }
+
+  /** Swap a typed marker for the block it names. False when there is no marker. */
+  function rteApplyMarker(editor, e){
+    var hit = rteMarkerBefore(editor);
+    if(!hit) return false;
+    e.preventDefault();
+    var cut = document.createRange();
+    cut.setStart(hit.node, 0);
+    cut.setEnd(hit.node, hit.offset);
+    cut.deleteContents();
+    var sel = window.getSelection();
+    var caret = document.createRange();
+    caret.setStart(hit.node, 0);
+    caret.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caret);
+    var wrapper = rteEnsureBlock(editor);
+    hit.trigger.apply(editor);
+    // A list builds its own block and leaves the wrapper behind empty, which would
+    // read as a blank line under every list started this way.
+    if(wrapper && wrapper.parentNode && !wrapper.textContent.trim() && !wrapper.querySelector('*')){
+      var live = window.getSelection();
+      var anchor = live && live.anchorNode;
+      if(!(anchor && wrapper.contains(anchor))) wrapper.parentNode.removeChild(wrapper);
+    }
+    rteChanged(editor);
+    syncBlockLabel(editor);
+    return true;
+  }
 
   /** The block-level element the caret sits in, directly under the editor. */
   function rteBlockOf(editor, node){
@@ -8298,24 +8430,7 @@
   function rteHandleTab(e, editor){
     var sel = window.getSelection();
     if(!sel || !sel.rangeCount) return;
-    var block = rteBlockOf(editor, sel.anchorNode);
-    var text = block ? block.textContent.replace(/ /g, ' ') : '';
-    var trigger = block && MD_TRIGGERS.find(function(t){ return t.re.test(text); });
-
-    if(trigger){
-      e.preventDefault();
-      // clear the marker, then put the caret back where it was
-      block.textContent = '';
-      var range = document.createRange();
-      range.setStart(block, 0);
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
-      trigger.apply(editor);
-      rteChanged(editor);
-      syncBlockLabel(editor);
-      return;
-    }
+    if(rteApplyMarker(editor, e)) return;
 
     // Tab must never move focus out of a document. Inside a list it changes the
     // level, which is what it does in every other editor.
@@ -14728,8 +14843,38 @@
     return (BE ? BE.loadState() : apiGet('/api/state')).then(function(d){
       classes = d.classes; items = d.items; events = d.events||[];
       inbox = d.unfiled || { notesList:[], materials:[] };
+      keepLiveNoteText();   // the answer left before the last few keystrokes did
     });
   }
+  //
+  // Autosave holds one pending write per note.
+  //
+  // It used to hold the *latest patch* and nothing else, on a timer that restarted on
+  // every keystroke. Three things fell through that: typing without a 700ms pause
+  // never saved at all, editing the title and then the body inside one window threw
+  // the title away, and leaving a note cancelled the timer outright -- so the last
+  // thing typed before clicking anywhere was silently discarded.
+  //
+  var notePending = null;          // { id, patch } written but not yet sent
+  var noteSaveDeadline = 0;
+  var NOTE_SAVE_IDLE = 700;        // a pause this long means the thought is finished
+  var NOTE_SAVE_MAX = 2500;        // ...but nothing is ever held unwritten longer
+
+  function writePendingNote(){
+    if(noteSaveTimer){ clearTimeout(noteSaveTimer); noteSaveTimer = null; }
+    noteSaveDeadline = 0;
+    var job = notePending;
+    notePending = null;
+    if(!job) return Promise.resolve();
+    return updateNoteQuiet(job.id, job.patch).then(function(){
+      noteSavedAt = new Date().toLocaleTimeString(undefined,{hour:'numeric', minute:'2-digit'});
+      noteSaveStatus('Saved '+noteSavedAt);
+      // refresh cached state without redrawing the editor out from under the cursor,
+      // then see whether what was just written points at anything
+      return refreshCachedState().then(function(){ loadNoteSuggestions(); });
+    }).catch(function(){ noteSaveStatus("Couldn't save"); });
+  }
+
   function queueNoteSave(id, patch){
     // The cloud backend owns debouncing, the offline copy and the status text,
     // so that a dropped connection keeps the writing instead of losing it.
@@ -14737,26 +14882,26 @@
       noteSaveStatus('Saving…');
       return BE.notes.save(id, patch);
     }
-    if(noteSaveTimer) clearTimeout(noteSaveTimer);
+    // Anything still unwritten for a different note goes out now rather than being
+    // replaced by this one.
+    if(notePending && notePending.id !== id) writePendingNote();
+    // The cached copy is patched as it is typed, so a redraw from anywhere paints
+    // what is on screen rather than what the server last heard.
+    patchCachedNote(id, patch);
+    notePending = { id: id, patch: Object.assign((notePending && notePending.patch) || {}, patch) };
     noteSaveStatus('Saving…');
-    noteSaveTimer = setTimeout(function(){
-      noteSaveTimer = null;
-      updateNoteQuiet(id, patch).then(function(){
-        noteSavedAt = new Date().toLocaleTimeString(undefined,{hour:'numeric', minute:'2-digit'});
-        noteSaveStatus('Saved '+noteSavedAt);
-        // refresh cached state without redrawing the editor out from under the cursor,
-        // then see whether what was just written points at anything
-        return refreshCachedState().then(function(){ loadNoteSuggestions(); });
-      }).catch(function(){ noteSaveStatus("Couldn't save"); });
-    }, 700);
-  }
-  function flushNoteSave(){
-    if(noteSaveTimer){ clearTimeout(noteSaveTimer); noteSaveTimer = null; }
+    if(!noteSaveDeadline) noteSaveDeadline = Date.now() + NOTE_SAVE_MAX;
+    if(noteSaveTimer) clearTimeout(noteSaveTimer);
+    noteSaveTimer = setTimeout(writePendingNote,
+      Math.max(0, Math.min(NOTE_SAVE_IDLE, noteSaveDeadline - Date.now())));
   }
 
-  window.addEventListener('pagehide', function(){ flushFocusTime(); });
+  /** Write anything still held. Called before leaving a note, a page, or the tab. */
+  function flushNoteSave(){ return writePendingNote(); }
+
+  window.addEventListener('pagehide', function(){ flushFocusTime(); flushNoteSave(); });
   document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'hidden') flushFocusTime();
+    if(document.visibilityState === 'hidden'){ flushFocusTime(); flushNoteSave(); }
   });
 
   // In automatic mode, full screen follows the window across phone width.
@@ -16919,6 +17064,32 @@
     }
     if(learnHandleKey(e)) return;
     if(fcHandleKey(e)) return;
+    // Formatting shortcuts, applied by hand rather than left to the browser: the
+    // browser's own are inconsistent across Chrome and Safari, they do not tell the
+    // autosave anything changed, and strikethrough and lists have no shortcut at all.
+    if((e.metaKey || e.ctrlKey) && !e.altKey && e.key && e.key.length === 1){
+      var shEd = e.target.closest && e.target.closest('.rte-editor');
+      var shKey = e.key.toLowerCase();
+      var shCmd = null;
+      if(!e.shiftKey && shKey === 'b') shCmd = 'bold';
+      else if(!e.shiftKey && shKey === 'i') shCmd = 'italic';
+      else if(!e.shiftKey && shKey === 'u') shCmd = 'underline';
+      else if(e.shiftKey && (shKey === 'x' || shKey === 's')) shCmd = 'strikeThrough';
+      else if(e.shiftKey && (shKey === '8' || shKey === '*')) shCmd = 'insertUnorderedList';
+      else if(e.shiftKey && (shKey === '7' || shKey === '&')) shCmd = 'insertOrderedList';
+      if(shEd && shCmd){
+        e.preventDefault();
+        try{ document.execCommand('styleWithCSS', false, false); }catch(err){}
+        try{ document.execCommand(shCmd); }catch(err){}
+        rteChanged(shEd);
+        syncBlockLabel(shEd);
+        return;
+      }
+    }
+    if(e.key === ' ' && !e.metaKey && !e.ctrlKey && !e.altKey){
+      var spEd = e.target.closest && e.target.closest('.rte-editor');
+      if(spEd && rteApplyMarker(spEd, e)) return;
+    }
     if(e.key === 'Tab'){
       var ed = e.target.closest && e.target.closest('.rte-editor');
       if(ed){ rteHandleTab(e, ed); return; }
