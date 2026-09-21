@@ -101,6 +101,15 @@ channels are alive.
       editor**, so if a background sync landed mid-sentence, clicking away can scroll
       the notes page back to the top once. Any click that redraws on its own cancels
       it, so it is only visible when you click something inert.
+- [ ] **needs Saif** — The device copy in `localStorage` holds the whole term,
+      including the full text of every note. It is only painted for the account it
+      was saved under and `forgetState()` clears it on sign-out, but closing the
+      browser without signing out leaves it on disk, and it is only overwritten when
+      someone else signs in on that browser. On your own machine that is fine. If a
+      friend uses Vesta on a shared or library computer it is worth knowing about.
+      Dropping note bodies from the cache would cut most of the size and all of the
+      sensitive part, at the cost of a blank note for one round trip when a link
+      opens straight onto one. Your call, because it is the feature's whole point.
 - [ ] **Multi-section SFU courses** were only exercised against four real courses, and
       the SFU exam fallback in `syllabus.py` has never fired across 16 real sections.
       Both are documented guards rather than fixes for observed bugs.
@@ -153,6 +162,33 @@ last few seconds of writing painted over. Now the cached note is patched on ever
 keystroke, so a redraw paints what is on screen rather than what the server last heard;
 and while the caret is inside any rich-text editor the redraw is held back entirely
 until writing stops.
+
+### A new assignment stopped vanishing a second after it appeared
+
+Found while reviewing the eager-create work rather than reported. Every eager write
+closes over the array it painted into, so it can drop the saved row in or take a
+refused one back out. A state load replaced those arrays outright, so a reload landing
+between "Save" and the server's answer -- a Google poll, or any other save that
+reloads the term -- left the create holding an array nothing draws from. The
+assignment appeared, vanished, and only came back on the next reload. It was on the
+server the whole time, which is the worst version: the screen said the work was lost
+when it was not.
+
+State loads now refill the arrays in place instead of replacing them, which fixes the
+same latent problem in every eager write, not just creates. And a create whose
+temporary row was swept away by a reload puts the saved row back rather than dropping
+it, unless that reload was late enough to carry it already.
+
+Reproduced first, in `reference/speed/test_eager_reload.py`: hold `POST /api/items`
+inside the page for three seconds, create a note in the gap to force a reload, and
+watch the row disappear from a screen whose server has it. Six checks.
+
+### The device copy is written only when it changed
+
+`rememberState` stringified the whole term and wrote it to `localStorage` on every
+state load -- every three-minute poll and every save that reloads -- on the main
+thread, when the stored copy was almost always already that exact payload. It now
+writes when the signature has actually moved.
 
 ### The editor answers the keyboard
 

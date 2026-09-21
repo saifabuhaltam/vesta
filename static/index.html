@@ -3522,6 +3522,22 @@
   }
 
   /**
+   * Put new rows into the arrays the page is already holding, rather than swapping in
+   * new arrays.
+   *
+   * Every eager write closes over the array it painted into, so that it can drop the
+   * saved row in or take a refused one back out. Replacing the array left those
+   * closures holding one that nothing draws from any more: a create that the server
+   * then refused could no longer take its own row off the screen, and the row stayed
+   * there, unclickable because of its temporary id, until the next full reload.
+   */
+  function refill(list, rows){
+    list.length = 0;
+    if(rows && rows.length) list.push.apply(list, rows);
+    return list;
+  }
+
+  /**
    * Take a payload as what the page is showing, and say whether that changed anything.
    * Identical to what is already drawn is the ordinary case once a term is painted
    * from the device's copy first, and redrawing then would only make the page flicker.
@@ -3530,12 +3546,15 @@
     var sig = JSON.stringify(data);
     if(sig === lastStateSig) return false;
     lastStateSig = sig;
-    classes = data.classes; items = data.items; events = data.events || []; termSettings = data.term;
+    refill(classes, data.classes);
+    refill(items, data.items);
+    refill(events, data.events || []);
+    termSettings = data.term;
     semesters = data.semesters || [];
     semester = data.semester || null;
     termLocked = !!data.locked;
     gpaHistory = null;            // a switch or an archive can change every term's numbers
-    inbox = data.unfiled || { notesList:[], materials:[] };
+    refillInbox(data.unfiled);
     pendingImports = data.pendingImports || [];
     pendingCalImports = data.pendingCalendarImports || [];
     // A background sync landing mid-sentence used to rebuild the page under the
@@ -3607,6 +3626,7 @@
 
   function cacheOwner(){ return (authState.user && authState.user.id) || 'local'; }
 
+  var lastRememberedSig = null;
   function rememberState(data){
     try{
       // The term and the preferences arrive in separate requests, so whichever lands
@@ -3619,13 +3639,24 @@
         prefs: PREFS || (mine ? prev.prefs : null),
         state: data || (mine ? prev.state : null)
       }));
+      if(data) lastRememberedSig = lastStateSig;
     }catch(e){
       // Over the quota, or storage refused outright. Drop what is there rather than
       // leave an old copy behind to be painted on every visit from now on.
       forgetState();
     }
   }
-  function forgetState(){ try{ localStorage.removeItem(STATE_CACHE_KEY); }catch(e){} }
+  function forgetState(){
+    lastRememberedSig = null;
+    try{ localStorage.removeItem(STATE_CACHE_KEY); }catch(e){}
+  }
+
+  /** The Inbox is an object rather than an array, so it is refilled field by field. */
+  function refillInbox(next){
+    next = next || {};
+    refill(inbox.notesList, next.notesList || []);
+    refill(inbox.materials, next.materials || []);
+  }
 
   /** Draw the last visit's term, if this device has one for this account. */
   function paintRememberedState(){
@@ -3659,7 +3690,10 @@
       var wasOn = gsyncOn;
       gsyncOn = !!data.googleSync;
       adoptState(data);
-      rememberState(data);
+      // The whole term, stringified and written to disk on the main thread. Doing it
+      // on every poll and every save that reloads was work for nothing, because the
+      // stored copy is usually already this exact payload.
+      if(lastStateSig !== lastRememberedSig) rememberState(data);
       // First state load with a connected account starts the background sync and asks
       // once immediately, so opening Vesta is itself a reason to be up to date.
       if(gsyncOn && !wasOn){ startGoogleSync(); setTimeout(function(){ runGoogleSync('open'); }, 600); }
@@ -3746,11 +3780,19 @@
     list.push(row);
     render();
     return send().then(function(saved){
-      var at = rowIndex(list, row.id);
-      if(at < 0) return saved;                       // already taken off the screen
       // Create routes answer with either the whole saved row or just its id.
       var isRow = saved && saved.id && Object.keys(saved).length > 1;
       var real = isRow ? saved : Object.assign({}, row, { id: (saved && saved.id) || row.id });
+      var at = rowIndex(list, row.id);
+      if(at < 0){
+        // A state load landed while this create was in the air and swept the
+        // temporary row away with it -- the server did not know about the row yet, so
+        // it could not have come back in that payload. Dropping the saved row here is
+        // what made a new assignment appear, vanish, and only return on the next
+        // reload. Unless that payload was late enough to carry it already, it goes in.
+        if(rowIndex(list, real.id) < 0){ list.push(real); render(); }
+        return real;
+      }
       var before = JSON.stringify(list[at]);
       list[at] = real;
       if(JSON.stringify(real) !== before) render();
@@ -14841,8 +14883,10 @@
   /** Update the cached arrays without redrawing the editor out from under the caret. */
   function refreshCachedState(){
     return (BE ? BE.loadState() : apiGet('/api/state')).then(function(d){
-      classes = d.classes; items = d.items; events = d.events||[];
-      inbox = d.unfiled || { notesList:[], materials:[] };
+      refill(classes, d.classes);
+      refill(items, d.items);
+      refill(events, d.events || []);
+      refillInbox(d.unfiled);
       keepLiveNoteText();   // the answer left before the last few keystrokes did
     });
   }
