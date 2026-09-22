@@ -1759,12 +1759,6 @@
     color:var(--border); font-size:15px; line-height:1; padding:2px; }
   .file-star.on{ color:#F5B301; }
   .file-star:hover{ color:#F5B301; }
-  /* sits under the star, and stays out of the way until the tile is pointed at */
-  .file-tile-x{ position:absolute; top:33px; right:10px; border:none; background:transparent;
-    cursor:pointer; color:var(--text-faint); font-size:12px; line-height:1; padding:2px;
-    opacity:0; transition:opacity .12s ease; }
-  .file-tile:hover .file-tile-x, .file-tile-x:focus-visible{ opacity:1; }
-  .file-tile-x:hover{ color:var(--danger); }
 
   .file-row-t{ display:grid; grid-template-columns:minmax(0,2.1fr) .9fr 1fr .8fr .7fr .9fr 76px; gap:12px;
     align-items:center; padding:11px 16px; border-bottom:1px solid var(--border); font-size:13px; }
@@ -3693,9 +3687,22 @@
     }
   }
 
+  /**
+   * Load the term.
+   *
+   * `pre` is a prefetch: a promise for the state payload that was already in flight
+   * before this ran. It has to be checked for rather than trusted, because a dozen
+   * call sites say `.then(loadState)`, and a `.then` handler is handed the resolved
+   * *value* of the call before it, not a promise. Any route that answers with a body
+   * -- `{id:...}`, `{ok:true}`, a saved row -- therefore arrived here as a plain
+   * object, which is truthy, and `pre.then(...)` threw "(intermediate value).then is
+   * not a function". Moving a file was the visible case: the move itself succeeded on
+   * the server and the screen still reported that something went wrong.
+   */
   function loadState(pre){
-    return (pre || (BE ? BE.loadState() : apiGet('/api/state'))).then(function(data){
-      if(!data && pre) return loadState();         // a refused prefetch, asked for properly
+    var prefetch = (pre && typeof pre.then === 'function') ? pre : null;
+    return (prefetch || (BE ? BE.loadState() : apiGet('/api/state'))).then(function(data){
+      if(!data && prefetch) return loadState();    // a refused prefetch, asked for properly
       // The connection is good, whatever the payload turns out to say.
       document.getElementById('sync-dot').classList.remove('off');
       document.getElementById('sync-label').textContent = BE ? 'Synced to your account' : 'Saved to your server';
@@ -7510,10 +7517,6 @@
           + '<div class="file-tile-meta">'+escapeHtml(m.cls.code||'')+' · '+fileSizeLabel(m)+'</div>'
           + (filesSearch ? '<div class="file-tile-where">'+escapeHtml(fileFolderLabel(m))+'</div>' : '')
           + '<button type="button" class="file-star'+(filesStarred.has(m.id)?' on':'')+'" data-action="toggle-star" data-id="'+m.id+'" title="Star">★</button>'
-          // Delete lived only in the list layout, and the grid is what the page opens
-          // on, so a file looked undeletable unless you happened to switch layouts.
-          + '<button type="button" class="file-tile-x" data-action="remove-material"'
-          + ' data-class="'+m.cls.id+'" data-mid="'+m.id+'" title="Delete file">✕</button>'
           + '</div>';
       }).join('') + '</div>';
     }

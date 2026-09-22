@@ -142,6 +142,30 @@ channels are alive.
 
 ## Built on 2026-09-21
 
+### Moving a file reported failure after succeeding
+
+With the 500s gone, the move itself worked and the page still said *"Something went
+wrong — (intermediate value).then is not a function"*. The 500 had been hiding it.
+
+`loadState(pre)` takes an optional **prefetch**: a promise for the state payload that
+was already in flight. A dozen call sites say `.then(loadState)`, and a `.then` handler
+is handed the resolved *value* of the call before it, not a promise. So any route that
+answers with a body -- `{id:...}`, `{ok:true}`, a saved row -- arrived as a plain
+object, which is truthy, and `pre.then(...)` threw. `loadState` now treats `pre` as a
+prefetch only when it is actually thenable, which repairs every one of those call sites
+at once rather than one at a time.
+
+`reference/speed/test_file_move.py` drives the real drag in a browser and fails on the
+unfixed page with Saif's exact message. A unit test could not have caught this: nothing
+is wrong on the server, and the entire symptom is a dialog.
+
+### The file tile's delete button came back out
+
+Added earlier the same day, removed at Saif's request: the `✕` sat directly under the
+star on a small tile and was too easy to hit by accident. Deleting a file is still in
+the Files page's list layout. If the grid needs one again it should be the `⋯` menu the
+folder cards already use, where a second click confirms the intent.
+
 ### Uploading and moving files stopped returning 500
 
 Saif: *"why am i getting a request failed (500) everytime i try to upload a file or move
