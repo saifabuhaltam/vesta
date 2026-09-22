@@ -142,6 +142,24 @@ channels are alive.
 
 ## Built on 2026-09-21
 
+### Uploading and moving files stopped returning 500
+
+Saif: *"why am i getting a request failed (500) everytime i try to upload a file or move
+it around in my class"*, then, usefully, the order it happened in: five readings went
+into PSYC 300W, the sixth failed, a different file worked, and moving that file into the
+Readings folder failed too.
+
+Three separate causes, every one of them Postgres-only and invisible locally. `IS ?` in
+`create_file_folder` and `add_material`; `folder_id` assigned twice in one UPDATE when a
+drag sends `classId` and `folderId` together; and a NUL byte in the text `pypdf`
+extracted from that sixth reading. They are written up under **SQL that runs on SQLite is
+not SQL that runs on Postgres** above.
+
+Separately: a file looked undeletable. The `✕` existed only in the Files page's *list*
+layout, and the page opens in *grid*, so unless you switched layouts there was no delete
+anywhere. The tile now carries one, revealed on hover.
+
+
 ### Notes stopped throwing away what was being typed
 
 Saif: *"notes keep cutting out while typing and resetting the page and resets the last
@@ -338,6 +356,28 @@ reach production with none of its schema; the failure is not at boot, it is
 `schema_migrations`. A failed migration is a failed deploy, because the app raises at
 boot rather than serving a half-migrated database: deploy one when there is time to
 read the log.
+
+### SQL that runs on SQLite is not SQL that runs on Postgres
+
+Schema is not the only thing the two paths disagree about, and the statement-level
+differences are worse, because they are invisible until one particular request is made
+in production. Three have bitten, all of them found only from Saif's bug reports:
+
+* **`col IS ?`** is SQLite's null-safe equality. Postgres takes `IS` only before NULL,
+  TRUE, FALSE or DISTINCT FROM, so `IS $1` is a syntax error. Branch on the value and
+  emit `IS NULL` or `= ?`.
+* **The same column assigned twice in one `SET`** is last-one-wins in SQLite and
+  `multiple assignments to same column` in Postgres. `PUT /api/materials/<id>` built
+  one of these whenever `classId` and `folderId` arrived together, which is exactly
+  what dragging a file onto a folder sends, and nothing else.
+* **A NUL byte in a text value** stores fine in SQLite; psycopg refuses it outright
+  with "PostgreSQL text fields cannot contain NUL (0x00) bytes". `pypdf` returns them
+  from some PDFs, so one reading in six would 500 on upload and the rest were fine.
+  `db_safe_text()` strips them, and everything that extracts text runs through it.
+
+`tests/test_postgres_dialect.py` guards all three, and runs on SQLite: the point is to
+catch the production-only shape without a Postgres to test against. Add to it whenever
+a fourth turns up.
 
 ### Anything that runs outside a request must go through `for_each_account`
 

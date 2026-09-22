@@ -556,6 +556,21 @@ def serialize_item(conn, row, pre=None):
     }
 
 
+def db_safe_text(text):
+    """Text a Postgres `text` column will accept.
+
+    PDF extraction regularly returns NUL bytes, and psycopg refuses them outright:
+    "PostgreSQL text fields cannot contain NUL (0x00) bytes". SQLite stores them
+    happily, so a file that uploads locally can still 500 in production, and only that
+    one file does, which makes it look like nothing to do with the database. The other
+    C0 controls are dropped in the same pass: Postgres would store them, but they are
+    noise in a search index and in anything the text is later shown in.
+    """
+    if not text:
+        return text
+    return "".join(c for c in text if c >= " " or c in "\t\n\r")
+
+
 def extract_pdf_text(filepath):
     """Read a PDF's text, or None. Shared by uploads and by Office conversions.
 
@@ -567,7 +582,7 @@ def extract_pdf_text(filepath):
 
         reader = PdfReader(filepath)
         text = "\n".join((page.extract_text() or "") for page in reader.pages)
-        return text[:200000]
+        return db_safe_text(text[:200000])
     except Exception:
         return None
 
@@ -602,14 +617,14 @@ def extract_text(filepath, filename):
                         if cells:
                             lines.append(" | ".join(cells))
                     lines.append("")
-            return "\n".join(lines)[:200000]
+            return db_safe_text("\n".join(lines)[:200000])
         if ext in PLAIN_TEXT_EXTS:
             with open(filepath, "r", encoding="utf-8", errors="replace") as fh:
                 text = fh.read(400000)
             if ext in ("html", "htm"):
                 text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", text, flags=re.S | re.I)
                 text = re.sub(r"<[^>]+>", " ", text)
-            return text[:200000]
+            return db_safe_text(text[:200000])
     except Exception:
         return None
     return None
@@ -1965,8 +1980,17 @@ def update_material(mid):
         # A folder belongs to one class, so moving between classes has to drop the
         # old folder or the file would claim to sit in a folder that cannot show it.
         # An explicit folderId in the same request is applied after this and wins.
+        #
+        # It has to *replace* this assignment rather than follow it. A drag onto a
+        # folder sends classId and folderId together, and appending both put
+        # `folder_id` in the SET clause twice: last-one-wins in SQLite, and
+        # "multiple assignments to same column" in Postgres, which is why the drag
+        # worked locally and 500ed in production.
+        folder_value_at = len(values)
         fields.append("folder_id=?")
         values.append(None)
+    else:
+        folder_value_at = None
     if "folderId" in data:
         folder = data["folderId"] or None
         if folder:
@@ -1976,8 +2000,11 @@ def update_material(mid):
             if not fr or fr["class_id"] != target_class:
                 conn.close()
                 return jsonify({"error": "that folder is not in this file's class"}), 400
-        fields.append("folder_id=?")
-        values.append(folder)
+        if folder_value_at is None:
+            fields.append("folder_id=?")
+            values.append(folder)
+        else:
+            values[folder_value_at] = folder
     if fields:
         values.append(mid)
         conn.execute(f"UPDATE materials SET {', '.join(fields)} WHERE id=?", values)

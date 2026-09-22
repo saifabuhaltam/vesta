@@ -1759,6 +1759,12 @@
     color:var(--border); font-size:15px; line-height:1; padding:2px; }
   .file-star.on{ color:#F5B301; }
   .file-star:hover{ color:#F5B301; }
+  /* sits under the star, and stays out of the way until the tile is pointed at */
+  .file-tile-x{ position:absolute; top:33px; right:10px; border:none; background:transparent;
+    cursor:pointer; color:var(--text-faint); font-size:12px; line-height:1; padding:2px;
+    opacity:0; transition:opacity .12s ease; }
+  .file-tile:hover .file-tile-x, .file-tile-x:focus-visible{ opacity:1; }
+  .file-tile-x:hover{ color:var(--danger); }
 
   .file-row-t{ display:grid; grid-template-columns:minmax(0,2.1fr) .9fr 1fr .8fr .7fr .9fr 76px; gap:12px;
     align-items:center; padding:11px 16px; border-bottom:1px solid var(--border); font-size:13px; }
@@ -7504,6 +7510,10 @@
           + '<div class="file-tile-meta">'+escapeHtml(m.cls.code||'')+' · '+fileSizeLabel(m)+'</div>'
           + (filesSearch ? '<div class="file-tile-where">'+escapeHtml(fileFolderLabel(m))+'</div>' : '')
           + '<button type="button" class="file-star'+(filesStarred.has(m.id)?' on':'')+'" data-action="toggle-star" data-id="'+m.id+'" title="Star">★</button>'
+          // Delete lived only in the list layout, and the grid is what the page opens
+          // on, so a file looked undeletable unless you happened to switch layouts.
+          + '<button type="button" class="file-tile-x" data-action="remove-material"'
+          + ' data-class="'+m.cls.id+'" data-mid="'+m.id+'" title="Delete file">✕</button>'
           + '</div>';
       }).join('') + '</div>';
     }
