@@ -1753,9 +1753,13 @@ def create_file_folder(cid):
             "SELECT 1 FROM file_folders WHERE id=? AND class_id=?", (parent, cid)).fetchone():
         conn.close()
         return jsonify({"error": "parent folder is not in this class"}), 400
+    # `parent_id IS ?` reads fine in SQLite and is a syntax error in Postgres, where IS
+    # only accepts NULL / TRUE / FALSE / DISTINCT FROM. The nullable comparison has to
+    # be branched instead of bound.
     nxt = conn.execute(
         "SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM file_folders WHERE class_id=?"
-        " AND parent_id IS ?", (cid, parent)).fetchone()["n"]
+        + (" AND parent_id IS NULL" if parent is None else " AND parent_id=?"),
+        (cid,) if parent is None else (cid, parent)).fetchone()["n"]
     fid = str(uuid.uuid4())
     conn.execute(
         "INSERT INTO file_folders (id, class_id, parent_id, name, kind, sort_order, created_at)"
@@ -1868,8 +1872,12 @@ def add_material(cid):
     # one. A folder belonging to another class is ignored rather than honoured.
     asked_folder = (request.form.get("folderId")
                     or (request.get_json(silent=True) or {}).get("folderId") or None)
+    # Same nullable comparison as in create_file_folder: an unfiled upload has cid None,
+    # and `class_id IS ?` is a Postgres syntax error rather than a null-safe equality.
     if asked_folder and not conn.execute(
-            "SELECT 1 FROM file_folders WHERE id=? AND class_id IS ?", (asked_folder, cid)).fetchone():
+            "SELECT 1 FROM file_folders WHERE id=?"
+            + (" AND class_id IS NULL" if cid is None else " AND class_id=?"),
+            (asked_folder,) if cid is None else (asked_folder, cid)).fetchone():
         asked_folder = None
 
     if "file" in request.files and request.files["file"].filename:
