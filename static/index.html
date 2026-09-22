@@ -1544,8 +1544,16 @@
   .nt-class-pill:hover{ background:var(--surface-2); color:var(--text); }
   .nt-class-pill.active{ background:var(--accent-soft); border-color:transparent; color:var(--accent-ink); }
   .nt-class-pill .dot{ width:8px; height:8px; }
-  .nt-class-pill .nt-count{ background:var(--surface-2); }
-  .nt-class-pill.active .nt-count{ background:rgba(255,255,255,.65); }
+  /* the count is a rounded chip, not a bare tinted rectangle: without the radius and
+     padding the fill traced the digits as a hard square, which dark mode made obvious */
+  .nt-class-pill .nt-count{ background:var(--surface-2); color:var(--text-muted);
+    padding:1px 7px; border-radius:999px; line-height:1.6; }
+  .nt-class-pill:hover .nt-count{ background:var(--surface-3); }
+  .nt-class-pill.active .nt-count{ background:rgba(255,255,255,.65); color:var(--accent-ink); }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) .nt-class-pill.active .nt-count{ background:rgba(255,255,255,.10); }
+  }
+  :root[data-theme="dark"] .nt-class-pill.active .nt-count{ background:rgba(255,255,255,.10); }
   .nt-backbar{ flex-wrap:wrap; }
 
   .nt-classhead{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
