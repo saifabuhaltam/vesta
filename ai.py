@@ -633,7 +633,43 @@ def assignment_brief(conn, item_id):
         bits.append(f"Worth: {it['weight']}% of the course grade")
     if it["notes"]:
         bits.append("What the student recorded about it:\n" + it["notes"])
+    state = assignment_state(conn, it)
+    if state:
+        bits.append("Where the student is with it: " + state)
     return "\n".join(bits), it, cls
+
+
+def assignment_state(conn, it):
+    """How far along this assignment already is, in one line for the prompt.
+
+    Without it every generation treats the work as untouched, so an outline asked for
+    on day six arrives identical to the one from day one and ignores the 900 words
+    already written. Days left, time logged and work already generated are all things
+    Vesta knows; saying them changes the answer.
+    """
+    bits = []
+    left = days_until(it["due_date"])
+    if left is not None:
+        bits.append("due today" if left == 0
+                    else (f"{-left} day(s) overdue" if left < 0 else f"{left} day(s) left"))
+    secs = (it["focus_seconds"] or 0) if "focus_seconds" in it.keys() else 0
+    if secs >= 300:
+        bits.append(f"{round(secs / 60)} minutes of focused work already logged on it")
+
+    made = conn.execute(
+        "SELECT COUNT(*) AS n FROM headstarts WHERE item_id=?", (it["id"],)).fetchone()["n"]
+    turns = conn.execute(
+        "SELECT COUNT(*) AS n FROM thread_messages m JOIN threads t ON t.id=m.thread_id"
+        " WHERE t.item_id=? AND m.role='assistant'", (it["id"],)).fetchone()["n"]
+    if made or turns:
+        bits.append(f"{made + turns} piece(s) of Vesta output already exist for it, so "
+                    "build on that rather than starting over")
+
+    decks = conn.execute(
+        "SELECT COUNT(*) AS n FROM flashcard_decks WHERE item_id=?", (it["id"],)).fetchone()["n"]
+    if decks:
+        bits.append(f"{decks} set(s) of flashcards already made for it")
+    return "; ".join(bits)
 
 
 # ---------------------------------------------------------------------------
@@ -1114,7 +1150,6 @@ def ai_flashcards():
             return jsonify({"error": "The model did not return usable cards. Try again."}), 502
 
         now = datetime.utcnow().isoformat()
-        today = datetime.utcnow().strftime("%Y-%m-%d")
         did = str(uuid.uuid4())
         conn.execute(
             "INSERT INTO flashcard_decks (id, semester_id, class_id, item_id, name, description,"
@@ -1128,7 +1163,7 @@ def ai_flashcards():
                 " VALUES (?,?,?,?,?,?,?,?)",
                 (str(uuid.uuid4()), did, c.get("front") or "", c.get("back") or "",
                  c.get("kind") if c.get("kind") in ("term", "question", "concept") else "term",
-                 today, i, now))
+                 None, i, now))
         conn.commit()
         return jsonify({"id": did, "count": len(cards), "sources": used,
                         "usage": spent_today(conn, settings(conn))}), 201
@@ -1295,6 +1330,83 @@ def today_str():
     return datetime.utcnow().strftime("%Y-%m-%d")
 
 
+def days_until(iso):
+    """Whole days from today to an ISO date, or None. Negative means it has passed."""
+    if not iso:
+        return None
+    try:
+        then = datetime.strptime(iso[:10], "%Y-%m-%d")
+    except (TypeError, ValueError):
+        return None
+    return (then - datetime.strptime(today_str(), "%Y-%m-%d")).days
+
+
+# A card that has been forgotten this many times is stuck rather than merely hard, and
+# is worth showing the student by name instead of leaving in the rotation.
+STUCK_LAPSES = 3
+
+
+# Easy is a bigger step than Good, not just a better ease factor. Plain SM-2 gives
+# both the same interval and only diverges at the review after next, which means the
+# two buttons predict the same date on the card in front of you and the choice looks
+# like it does not matter. These are Anki's steps and its easy bonus, which is the
+# same algorithm with the difference made visible today.
+FIRST_STEP = {"good": 1, "easy": 4}
+SECOND_STEP = {"good": 6, "easy": 10}
+EASY_BONUS = 1.3
+
+
+def sm2_next(ease, reps, interval, lapses, grade):
+    """The next sighting of a card, given how the last one went.
+
+    SM-2, the algorithm behind Anki and SuperMemo. 0-2 is a miss and sends the card
+    back to the bottom of the ladder; 3-5 is a hit and pushes the next sighting
+    further out, scaled by how easy the card has proven to be.
+
+    `fcPredictDays` in static/index.html mirrors this so the buttons can say what
+    each grade costs before it is pressed. Change one and change the other.
+    """
+    ease = ease if ease else 2.5
+    reps = reps or 0
+    interval = interval or 0
+    lapses = lapses or 0
+    if grade < 3:
+        reps, interval, lapses = 0, 1, lapses + 1
+    else:
+        easy = grade >= 5
+        reps += 1
+        if reps == 1:
+            interval = FIRST_STEP["easy" if easy else "good"]
+        elif reps == 2:
+            interval = SECOND_STEP["easy" if easy else "good"]
+        else:
+            interval = max(1, round(interval * ease * (EASY_BONUS if easy else 1.0)))
+        ease = max(1.3, ease + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02)))
+    return {"ease": round(ease, 3), "interval": interval, "repetitions": reps,
+            "lapses": lapses}
+
+
+def apply_review(conn, cid, grade, deck_id=None):
+    """Record one grade against one card. Returns the updated row, or None."""
+    grade = max(0, min(5, int(grade)))
+    if deck_id:
+        c = conn.execute("SELECT * FROM flashcards WHERE id=? AND deck_id=?",
+                         (cid, deck_id)).fetchone()
+    else:
+        c = conn.execute("SELECT * FROM flashcards WHERE id=?", (cid,)).fetchone()
+    if not c:
+        return None
+    nxt = sm2_next(c["ease"], c["repetitions"], c["interval_days"], c["lapses"], grade)
+    now = datetime.utcnow()
+    due = (now + timedelta(days=nxt["interval"])).strftime("%Y-%m-%d")
+    conn.execute(
+        "UPDATE flashcards SET ease=?, interval_days=?, repetitions=?, lapses=?, due_date=?,"
+        " last_reviewed_at=? WHERE id=?",
+        (nxt["ease"], nxt["interval"], nxt["repetitions"], nxt["lapses"], due,
+         now.isoformat(), cid))
+    return conn.execute("SELECT * FROM flashcards WHERE id=?", (cid,)).fetchone()
+
+
 def card_json(r):
     return {"id": r["id"], "deckId": r["deck_id"], "front": r["front"], "back": r["back"],
             "kind": r["kind"], "ease": r["ease"], "interval": r["interval_days"],
@@ -1325,20 +1437,42 @@ def decks():
     where, args = " WHERE d.semester_id=?", [active_semester_id(conn)]
     if request.args.get("classId"):
         where, args = " WHERE d.class_id=?", [request.args["classId"]]
+    today = today_str()
+    # The counts a study decision is actually made from: what is due, what has never
+    # been seen, what is learned, what keeps being forgotten, and the next exam in the
+    # same course. Without that last one a set says "nothing due" three days before a
+    # midterm, which is true and useless.
     rows = conn.execute(
         "SELECT d.*, "
         " (SELECT COUNT(*) FROM flashcards c WHERE c.deck_id=d.id) AS n_cards, "
         " (SELECT COUNT(*) FROM flashcards c WHERE c.deck_id=d.id AND c.suspended=0"
         "   AND (c.due_date IS NULL OR c.due_date<=?)) AS n_due, "
-        " (SELECT COUNT(*) FROM flashcards c WHERE c.deck_id=d.id AND c.repetitions=0) AS n_new "
+        " (SELECT COUNT(*) FROM flashcards c WHERE c.deck_id=d.id AND c.repetitions=0) AS n_new, "
+        " (SELECT COUNT(*) FROM flashcards c WHERE c.deck_id=d.id"
+        "   AND COALESCE(c.learn_level,0)>=2) AS n_learned, "
+        " (SELECT COUNT(*) FROM flashcards c WHERE c.deck_id=d.id"
+        "   AND COALESCE(c.lapses,0)>=" + str(STUCK_LAPSES) + ") AS n_stuck, "
+        " (SELECT MAX(c.last_reviewed_at) FROM flashcards c WHERE c.deck_id=d.id) AS seen_at, "
+        " (SELECT i.due_date FROM items i WHERE i.class_id=d.class_id"
+        "   AND COALESCE(i.status,'')<>'done' AND i.type IN ('exam','quiz')"
+        "   AND i.due_date IS NOT NULL AND i.due_date<>'' AND i.due_date>=?"
+        "   ORDER BY i.due_date LIMIT 1) AS exam_date, "
+        " (SELECT i.title FROM items i WHERE i.class_id=d.class_id"
+        "   AND COALESCE(i.status,'')<>'done' AND i.type IN ('exam','quiz')"
+        "   AND i.due_date IS NOT NULL AND i.due_date<>'' AND i.due_date>=?"
+        "   ORDER BY i.due_date LIMIT 1) AS exam_title "
         "FROM flashcard_decks d" + where + " ORDER BY d.updated_at DESC",
-        [today_str()] + args).fetchall()
+        [today, today, today] + args).fetchall()
     conn.close()
     return jsonify([{"id": r["id"], "classId": r["class_id"],
                      "itemId": r["item_id"] if "item_id" in r.keys() else None,
                      "name": r["name"],
                      "description": r["description"], "cardCount": r["n_cards"],
                      "dueCount": r["n_due"], "newCount": r["n_new"],
+                     "learnedCount": r["n_learned"], "stuckCount": r["n_stuck"],
+                     "lastReviewed": r["seen_at"],
+                     "examDate": r["exam_date"], "examTitle": r["exam_title"],
+                     "examDays": days_until(r["exam_date"]),
                      "createdAt": r["created_at"], "updatedAt": r["updated_at"]} for r in rows])
 
 
@@ -1428,9 +1562,12 @@ def add_card(did):
     conn.execute(
         "INSERT INTO flashcards (id, deck_id, front, back, kind, due_date, sort_order, created_at)"
         " VALUES (?,?,?,?,?,?,?,?)",
+        # No due date means due now, which is what every query here already assumes.
+        # Stamping today's UTC date instead made a card written on a Sunday evening in
+        # Vancouver unreviewable until Monday, since the browser counts days locally.
         (cid, did, data.get("front") or "", data.get("back") or "",
          data.get("kind") if data.get("kind") in ("term", "question", "concept") else "term",
-         today_str(), nxt, now))
+         None, nxt, now))
     conn.execute("UPDATE flashcard_decks SET updated_at=? WHERE id=?", (now, did))
     conn.commit()
     row = conn.execute("SELECT * FROM flashcards WHERE id=?", (cid,)).fetchone()
@@ -1471,31 +1608,109 @@ def one_card(cid):
 def review_card(cid):
     """Record how a card went and schedule the next sighting (SM-2)."""
     conn = get_db()
-    c = conn.execute("SELECT * FROM flashcards WHERE id=?", (cid,)).fetchone()
-    if not c:
+    try:
+        grade = int((request.get_json(force=True) or {}).get("grade", 3))
+    except (TypeError, ValueError):
+        grade = 3
+    row = apply_review(conn, cid, grade)
+    if row is None:
         conn.close()
         abort(404)
-    grade = max(0, min(5, int((request.get_json(force=True) or {}).get("grade", 3))))
-
-    ease = c["ease"] or 2.5
-    reps = c["repetitions"] or 0
-    interval = c["interval_days"] or 0
-    lapses = c["lapses"] or 0
-
-    if grade < 3:
-        reps, interval, lapses = 0, 1, lapses + 1
-    else:
-        reps += 1
-        interval = 1 if reps == 1 else (6 if reps == 2 else max(1, round(interval * ease)))
-        ease = max(1.3, ease + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02)))
-
-    now = datetime.utcnow()
-    due = (now + timedelta(days=interval)).strftime("%Y-%m-%d")
-    conn.execute(
-        "UPDATE flashcards SET ease=?, interval_days=?, repetitions=?, lapses=?, due_date=?,"
-        " last_reviewed_at=? WHERE id=?",
-        (round(ease, 3), interval, reps, lapses, due, now.isoformat(), cid))
     conn.commit()
-    row = conn.execute("SELECT * FROM flashcards WHERE id=?", (cid,)).fetchone()
     conn.close()
     return jsonify(card_json(row))
+
+
+@bp.route("/api/cards/review-batch", methods=["POST"])
+def review_cards_batch():
+    """Several grades at once, so Learn and Test can feed the same schedule.
+
+    Learn and Test used to be sealed off from scheduling: getting a term wrong in a
+    test told Vesta nothing, so the card stayed months out while the student plainly
+    did not know it. Both now send what happened at the end of a round, in one
+    request, and a miss brings the card back tomorrow whichever mode found it.
+    """
+    data = request.get_json(force=True) or {}
+    reviews = data.get("reviews") or []
+    if not isinstance(reviews, list):
+        abort(400)
+    conn = get_db()
+    out = []
+    for r in reviews[:500]:
+        if not isinstance(r, dict) or not r.get("id"):
+            continue
+        try:
+            grade = int(r.get("grade", 3))
+        except (TypeError, ValueError):
+            continue
+        row = apply_review(conn, r["id"], grade)
+        if row is not None:
+            out.append(card_json(row))
+    conn.commit()
+    conn.close()
+    return jsonify({"cards": out})
+
+
+# ---------------------------------------------------------------------------
+# One queue across every set
+#
+# Cards are due per set, so a student with five sets had to remember to open five
+# things. Scope decides what goes in the queue rather than which set it came from:
+#
+#   due      everything ready for review right now, oldest first, new cards after
+#   cram     everything in scope regardless of schedule, least known first
+#   trouble  only the cards that keep being forgotten
+#
+# Every card carries the name of the set it came from, since a mixed queue otherwise
+# gives no clue which course you are being asked about.
+# ---------------------------------------------------------------------------
+QUEUE_LIMIT = 400
+
+
+@bp.route("/api/study/queue")
+def study_queue():
+    scope = request.args.get("scope") or "due"
+    class_id = request.args.get("classId")
+    deck_id = request.args.get("deckId")
+    conn = get_db()
+
+    where = ["c.suspended=0"]
+    args = []
+    if deck_id:
+        where.append("c.deck_id=?")
+        args.append(deck_id)
+    elif class_id:
+        where.append("d.class_id=?")
+        args.append(class_id)
+    else:
+        where.append("d.semester_id=?")
+        args.append(active_semester_id(conn))
+
+    if scope == "due":
+        where.append("(c.due_date IS NULL OR c.due_date<=?)")
+        args.append(today_str())
+        # Overdue first, then the ones that have never been seen.
+        order = "ORDER BY CASE WHEN c.due_date IS NULL THEN 1 ELSE 0 END, c.due_date, c.sort_order"
+    elif scope == "trouble":
+        where.append("COALESCE(c.lapses,0)>=?")
+        args.append(STUCK_LAPSES)
+        order = "ORDER BY c.lapses DESC, c.sort_order"
+    else:
+        # Cram: least known first, so the twenty minutes before a midterm go on the
+        # terms that are not there yet rather than the ones already known cold.
+        order = ("ORDER BY COALESCE(c.learn_level,0), COALESCE(c.lapses,0) DESC,"
+                 " c.repetitions, c.sort_order")
+
+    rows = conn.execute(
+        "SELECT c.*, d.name AS deck_name, d.class_id AS deck_class_id"
+        " FROM flashcards c JOIN flashcard_decks d ON d.id=c.deck_id"
+        " WHERE " + " AND ".join(where) + " " + order + " LIMIT " + str(QUEUE_LIMIT),
+        args).fetchall()
+    conn.close()
+    cards = []
+    for r in rows:
+        card = card_json(r)
+        card["deckName"] = r["deck_name"]
+        card["classId"] = r["deck_class_id"]
+        cards.append(card)
+    return jsonify({"scope": scope, "cards": cards})

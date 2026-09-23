@@ -3,7 +3,7 @@
 A running list so nothing is lost between sessions. **needs Saif** means it cannot be
 done from a terminal: a dashboard login, an email click, or a decision that is his.
 
-_Last updated: 2026-09-20. Rewritten from scratch: the old file had grown to 1,228
+_Last updated: 2026-09-21. Rewritten from scratch: the old file had grown to 1,228
 lines, most of it a record of work already finished, and 72 open boxes of which about
 ten were stale. What follows is what is actually open, and the history worth keeping._
 
@@ -45,6 +45,28 @@ channels are alive.
       real test is on vesta.study: connect the calendar, sync once, then check
       `/health` reports `calendarPush.channels`, and change something in Google to see
       whether it lands without pressing Sync.
+
+### Left open from the study rework
+
+- [ ] **The day boundary is still UTC on the server.** `today_str()` decides what
+      counts as due, so for the eight hours between 5pm Vancouver and midnight UTC the
+      server's idea of "today" is a day ahead of the browser's. The exam countdown and
+      new cards were fixed by moving the arithmetic into the browser and by leaving a
+      new card with no due date; `dueCount` in `/api/decks` still compares against UTC,
+      so a count can disagree with what the set screen filters by a day. The real fix
+      is storing the user's timezone and asking the database in it.
+- [ ] **AI quizzes still do not feed the card schedule.** Getting a term wrong in a
+      generated quiz tells Vesta nothing, because a quiz question is not a card and
+      there is no link between the two. Matching a question back to a card by its
+      prompt is the obvious route and is guesswork; asking the generator to name the
+      card it came from is the honest one.
+- [ ] **The new study screens have not been seen in dark mode by eye.** Everything is
+      built from the theme tokens, which are all redefined in the dark block, so it
+      should follow, but the browser run could not be forced into dark to confirm.
+- [ ] **Cross-set queues offer Flashcards only.** Learn and Test are built around one
+      set's terms and its stored learn level. A cram run across three sets cannot be
+      typed through, which is probably right, but it has not been thought about
+      properly.
 
 ### Decisions waiting on Saif
 
@@ -137,6 +159,116 @@ channels are alive.
 - **Two-factor sign-in and a profile photo.** Saif said Settings is good as it is.
 - **Categorising assignments added by a later syllabus document.** Saif does not need
   them categorised.
+
+---
+
+## Built on 2026-09-21 (later)
+
+### The flashcard grades were decorative, and now they are not
+
+Saif's question was the right one: what is the point of *Missed it / Hard / Good /
+Easy* if pressing one does nothing? The scheduling was real all along -- `sm2_next`
+in `ai.py` has always written ease, interval, repetitions, lapses and a due date --
+but four things hid it completely.
+
+The card left the screen whichever button you pressed. A miss set the due date to
+tomorrow, so the term you had just blanked on was not seen again that day, and
+*Missed it* and *Easy* did the same visible thing. A missed card now goes back into
+the queue four cards later and stays in the rotation until it comes back clean, and
+the count at the top reads *"6 to go · 1 coming back · 2 of 6 cleared"*.
+
+Nothing was ever shown before the press. Each button now carries what it costs:
+*Missed it · now*, *Good · 1d*, *Easy · 4d*. `fcPredictDays` mirrors `sm2_next` in the
+browser so no round trip is needed per card; the two are marked as each other's mirror
+in both files.
+
+Good and Easy predicted the same date anyway. Plain SM-2 gives a first review the same
+one-day interval whichever way it went and only diverges at the review after next, so
+the choice genuinely did not matter on the card in front of you. The steps are now
+Anki's -- 1d/4d, then 6d/10d, then an easy bonus of 1.3 on the interval -- which is
+the same algorithm with the difference made visible today.
+
+Nothing ever collected on the schedule. The due count existed only inside a set. There
+is now one **Review N due cards** button across every set, a *Cards To Review* tile on
+the dashboard, and a *Studying* card there that says what is due and which exam is
+close. Four grades became three: *Hard* went, because it is not a distinction anyone
+makes honestly at one in the morning.
+
+### Learn, Test and Flashcards now know about each other
+
+They were three views of the same terms that shared nothing. Missing a term in a test
+left it scheduled months out. `POST /api/cards/review-batch` takes a round's worth of
+grades in one request, and both modes report through it: right is a hit, wrong brings
+the card back tomorrow. Learn used to report only at the end of a round, and a round
+grows every time a term is missed, so walking away from a bad round lost every grade
+in it -- the round whose grades matter most. It now saves every five answers and on
+the way out.
+
+### One queue instead of five sets to remember
+
+`GET /api/study/queue?scope=due|cram|trouble` builds a run across sets, narrowable by
+class or set. Every card carries the name of the set it came from, since a mixed queue
+otherwise gives no clue which course is being asked about. **Cram** ignores the
+schedule and orders by least known first, which is what the twenty minutes before a
+midterm actually want. **Trouble terms** is only the cards forgotten three times or
+more; three lapses is not a hard card, it is a card being studied the wrong way, and
+the only useful thing to do with it is name it.
+
+The old fallback is gone: starting flashcards with nothing due used to hand over the
+whole set, which is precisely what made the due dates look decorative, since you got
+every card either way. It says nothing is due and points at Cram.
+
+### Exam dates and how much is learned, finally in the same sentence
+
+Vesta held both halves and never compared them. `/api/decks` now reports the next
+exam or quiz in a set's class alongside `learnedCount` and `stuckCount`, so a set can
+say *"Midterm 2 in 5 days. 6 of 6 terms in this set are not learned yet."* with a
+**Cram now** beside it. Sets sort by exam proximity before due count, because the card
+will still be there afterwards and the exam will not. The same comparison drives the
+radar on Study and the nudge on the dashboard.
+
+Days are counted in the browser, not on the server. `today_str()` is UTC, which reads
+one day out for a whole evening in Vancouver, and a dashboard saying *"in 4 days"*
+beside *"Due in 5 days"* about the same exam is simply wrong. The date comes from the
+server, the arithmetic from the browser.
+
+A new card no longer gets today's UTC date stamped on it either. It gets no due date,
+which is what every query here already treats as due now, and which fixes a card
+written on a Sunday evening being unreviewable until Monday.
+
+### Headstart says what to do instead of listing ten things it could do
+
+Ten tools as a menu asks you to decide what you need before you know, which is the
+hard part. A **Start here** card names the most pressing piece of work, why it is
+pressing, where it already stands -- *"2 pieces already made · 40 min logged"*, or
+*"nothing started on it yet"* -- and offers two or three tools chosen for its type and
+its state: nothing started offers to explain the instructions, work already generated
+offers to review the draft instead of writing over it. One click opens the chat with
+that tool armed, and the usual cost confirmation still appears, so nothing is spent by
+accident.
+
+`assignment_brief` now carries that state into the prompt. Without it every generation
+treated the work as untouched, so an outline asked for on day six arrived identical to
+the one from day one and ignored the 900 words already written.
+
+Study material made for an assignment also shows on the assignment: a set built from a
+midterm's readings was filed under Study and lost its connection to the midterm, so
+the thing you made and the reason you made it lived on different pages.
+
+### How it was checked
+
+`tests/test_study.py` holds 16 tests: the three grades giving three different dates on
+a new card, easy pulling ahead on a mature one, the ease floor, a new card being due
+immediately, each scope of the queue including cram's ordering, a batch surviving a
+stale id, and a set reporting the right exam while ignoring an essay and a finished
+one. 155 tests pass.
+
+Driven in a browser on a scratch database: a six-term set reviewed to the end with one
+deliberate miss, which reappeared five cards later and showed *1 coming back*; the
+summary reporting *6 terms cleared in 7 flips*; a Learn round left half way and its
+grades still landing; a test submitted and its wrong answers coming back as lapses;
+cram across a class pulling nine cards from two sets; the trouble queue holding exactly
+the two stuck terms; and the Headstart plan card picking the discussion due in two days.
 
 ---
 

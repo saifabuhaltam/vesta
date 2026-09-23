@@ -758,6 +758,171 @@
   .fc-grade .fc-picked .fc-key{ background:var(--accent-solid); color:#fff; }
   .fc-grade .btn{ min-width:96px; }
   .fc-hint{ font-size:11.5px; color:var(--text-faint); }
+  /* The sitting, above the card: what is left, what is coming back, what is cleared.
+     Without it a review is a stack of cards with no shape and no end in sight. */
+  .fc-track{ width:100%; max-width:540px; }
+  .fc-track-head{ display:flex; align-items:baseline; gap:10px; margin-bottom:7px;
+    font-size:11.5px; font-weight:650; color:var(--text-faint); }
+  .fc-track-left b{ color:var(--text); font-size:13px; font-weight:800; }
+  .fc-track-relearn{ color:var(--warn); }
+  .fc-track-done{ margin-left:auto; }
+  .fc-track .learn-bar{ margin-bottom:0; }
+  .fc-again-tag{ margin-left:8px; padding:2px 7px; border-radius:var(--r-pill);
+    background:var(--warn-soft); color:var(--warn); font-size:9.5px; font-weight:800;
+    letter-spacing:.02em; text-transform:uppercase; }
+
+  /* Each grade says what it costs before it is pressed, which is the whole reason
+     the three buttons differ from one another. */
+  .fc-grade .btn{ flex-direction:column; align-items:center; justify-content:center;
+    gap:2px; min-width:124px; padding:9px 16px 10px; position:relative; }
+  .fc-g-label{ font-size:13px; font-weight:650; line-height:1.2; }
+  .fc-g-when{ font-size:11px; font-weight:600; color:var(--text-faint);
+    font-variant-numeric:tabular-nums; }
+  .fc-grade .fc-key{ position:absolute; top:6px; right:7px; }
+  .fc-g-again .fc-g-when{ color:var(--danger); }
+  .fc-g-easy .fc-g-when{ color:var(--success); }
+  .fc-scope-sub{ font-size:12px; color:var(--text-faint); }
+
+  /* The end of a sitting: three numbers and a date. */
+  .fc-summary .fc-tally{ display:flex; gap:10px; justify-content:center; margin:14px 0 10px;
+    flex-wrap:wrap; }
+  .fc-tally-item{ display:flex; flex-direction:column; align-items:center; gap:1px;
+    min-width:74px; padding:9px 14px; border-radius:var(--r-md); background:var(--surface-2);
+    font-size:11.5px; font-weight:600; color:var(--text-muted); }
+  .fc-tally-item b{ font-size:19px; font-weight:800; color:var(--text); line-height:1.1; }
+  .fc-tally-item.again{ background:var(--danger-soft); color:var(--danger); }
+  .fc-tally-item.again b{ color:var(--danger); }
+  .fc-tally-item.easy{ background:var(--success-soft); color:var(--success); }
+  .fc-tally-item.easy b{ color:var(--success); }
+  .fc-summary-note{ color:var(--warn); }
+
+  /* How much of a set is actually known, as one bar rather than a number nobody has. */
+  .set-stats{ margin:18px 0 4px; }
+  .set-stats-bar{ display:flex; height:9px; border-radius:var(--r-pill); overflow:hidden;
+    background:var(--surface-2); }
+  .set-stats-bar i{ display:block; height:100%; }
+  .set-stats-bar .ss-learned{ background:var(--success); }
+  .set-stats-bar .ss-going{ background:var(--accent); }
+  .set-stats-bar .ss-fresh{ background:var(--surface-3); }
+  .set-stats-legend{ display:flex; gap:16px; flex-wrap:wrap; margin-top:9px; }
+  .ss-key{ display:inline-flex; align-items:baseline; gap:5px; font-size:12px;
+    color:var(--text-muted); }
+  .ss-key b{ font-size:14px; font-weight:800; color:var(--text); }
+  .ss-key::before{ content:''; width:8px; height:8px; border-radius:3px; background:var(--surface-3);
+    align-self:center; }
+  .ss-key.ss-learned::before{ background:var(--success); }
+  .ss-key.ss-going::before{ background:var(--accent); }
+  .ss-key.ss-stuck::before{ background:var(--danger); }
+  .ss-key.ss-stuck b{ color:var(--danger); }
+
+  .set-trouble{ margin-top:22px; padding:16px 18px; border-radius:var(--r-card);
+    border:1px solid var(--danger-soft); background:var(--danger-soft); }
+  .set-trouble .set-terms-head h3{ color:var(--danger); }
+  .set-trouble .set-term{ background:var(--surface); border-radius:var(--r-sm); }
+  .set-term.is-stuck .set-term-due{ color:var(--danger); font-weight:650; }
+
+  /* The exam this set is for, when it is close enough to change what you do today. */
+  .exam-banner{ display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    margin:16px 0 4px; padding:13px 16px; border-radius:var(--r-card);
+    border:1px solid var(--border); background:var(--surface-2); font-size:13px;
+    line-height:1.5; color:var(--text-muted); }
+  .exam-banner-main{ flex:1; min-width:200px; }
+  .exam-banner b{ color:var(--text); font-weight:700; }
+  .exam-banner.is-soonish{ background:var(--warn-soft); border-color:var(--warn-soft); }
+  .exam-banner.is-soonish b{ color:var(--warn); }
+  .exam-banner.is-urgent{ background:var(--danger-soft); border-color:var(--danger-soft); }
+  .exam-banner.is-urgent b{ color:var(--danger); }
+
+  /* One way in, across every set. */
+  .study-actions{ display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+    gap:12px; margin-bottom:16px; }
+  .study-cta{ display:flex; align-items:center; gap:14px; text-align:left; padding:16px 18px;
+    border-radius:var(--r-card); border:1px solid var(--accent); background:var(--accent-soft);
+    cursor:pointer; transition:transform .12s ease, box-shadow .12s ease; }
+  .study-cta:hover{ transform:translateY(-1px); box-shadow:var(--shadow-card); }
+  .study-cta:active{ transform:translateY(0); }
+  .study-cta svg{ width:22px; height:22px; flex:none; color:var(--accent); }
+  .sc-main{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .sc-main b{ font-size:14.5px; font-weight:700; color:var(--text); }
+  .sc-main span{ font-size:12.5px; color:var(--text-muted); }
+  .study-cta.secondary{ border-color:var(--danger-soft); background:var(--danger-soft); }
+  .study-cta.secondary svg{ color:var(--danger); }
+  .study-cta.is-quiet{ border-color:var(--border); background:var(--surface); cursor:default; }
+  .study-cta.is-quiet:hover{ transform:none; box-shadow:none; }
+  .study-cta.is-quiet svg{ color:var(--text-faint); }
+
+  /* Exam dates and term-by-term progress, finally in the same sentence. */
+  .study-radar{ display:flex; flex-direction:column; gap:8px; margin-bottom:20px; }
+  .radar-row{ display:flex; align-items:center; gap:11px; flex-wrap:wrap;
+    padding:12px 15px; border-radius:var(--r-card); border:1px solid var(--border);
+    background:var(--surface); font-size:13px; }
+  .radar-row.is-soonish{ border-color:var(--warn-soft); background:var(--warn-soft); }
+  .radar-row.is-urgent{ border-color:var(--danger-soft); background:var(--danger-soft); }
+  .radar-class{ font-size:11px; font-weight:800; color:var(--text-faint);
+    letter-spacing:.03em; text-transform:uppercase; }
+  .radar-what{ color:var(--text-muted); }
+  .radar-what b{ color:var(--text); font-weight:700; }
+  .radar-gap{ margin-left:auto; font-size:12.5px; color:var(--text-muted); }
+  .radar-row.is-urgent .radar-gap{ color:var(--danger); font-weight:650; }
+
+  .set-card-bar{ width:100%; height:5px; border-radius:var(--r-pill); background:var(--surface-3);
+    overflow:hidden; margin-top:8px; }
+  .set-card-bar i{ display:block; height:100%; background:var(--success);
+    border-radius:var(--r-pill); }
+  .set-card-sub{ font-size:11px; color:var(--text-faint); margin-top:4px; }
+  .set-card-exam{ margin-top:8px; padding:3px 9px; border-radius:var(--r-pill);
+    background:var(--warn-soft); color:var(--warn); font-size:11px; font-weight:700; }
+  .set-card-exam.is-urgent{ background:var(--danger-soft); color:var(--danger); }
+
+  /* What studying wants from you, on the page you open first. */
+  .study-nudge{ margin-bottom:22px; }
+  .nudge-rows{ display:flex; flex-direction:column; gap:8px; }
+  .nudge-row{ display:flex; align-items:center; gap:12px; padding:12px 14px;
+    border-radius:var(--r-md); background:var(--surface-2); }
+  .nudge-row.is-urgent{ background:var(--danger-soft); }
+  .nudge-main{ display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
+  .nudge-main b{ font-size:13.5px; font-weight:700; }
+  .nudge-main span{ font-size:12px; color:var(--text-muted); }
+  .nudge-row.is-urgent .nudge-main b{ color:var(--danger); }
+
+  /* Headstart's answer to "what do I even ask it". */
+  .hs-plan{ padding:18px 20px 16px; border-radius:var(--r-card);
+    border:1px solid var(--accent); background:var(--accent-soft); margin-bottom:22px; }
+  .hs-plan.is-urgent{ border-color:var(--danger); background:var(--danger-soft); }
+  .hs-plan-head{ display:flex; align-items:center; gap:9px; margin-bottom:7px; }
+  .hs-plan-eyebrow{ font-size:10.5px; font-weight:800; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--accent-ink); }
+  .hs-plan.is-urgent .hs-plan-eyebrow{ color:var(--danger); }
+  .hs-plan-class{ font-size:11px; font-weight:700; color:var(--text-faint); }
+  .hs-plan-title{ font-size:19px; font-weight:750; letter-spacing:-.01em; cursor:pointer;
+    line-height:1.25; }
+  .hs-plan-title:hover{ text-decoration:underline; }
+  .hs-plan-why{ font-size:12.5px; color:var(--text-muted); margin:5px 0 14px; }
+  .hs-plan-tools{ display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr));
+    gap:9px; }
+  .hs-plan-tool{ display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+    text-align:left; padding:11px 13px; border-radius:var(--r-md); cursor:pointer;
+    border:1px solid var(--border); background:var(--surface);
+    transition:border-color .12s ease, transform .12s ease; }
+  .hs-plan-tool:hover{ border-color:var(--accent); transform:translateY(-1px); }
+  .hs-plan-tool b{ font-size:13px; font-weight:650; color:var(--text); }
+  .hs-plan-tool span{ font-size:11.5px; color:var(--text-faint); line-height:1.4; }
+  .hs-plan-tool.is-plain{ background:transparent; border-style:dashed; }
+
+  .hs-study-badge{ display:inline-flex; align-items:center; gap:5px; flex:none;
+    padding:3px 9px; border-radius:var(--r-pill); border:1px solid var(--border);
+    background:var(--surface-2); color:var(--text-muted); font-size:11px; font-weight:650;
+    cursor:pointer; }
+  .hs-study-badge svg{ width:13px; height:13px; }
+  .hs-study-badge:hover{ border-color:var(--accent); color:var(--accent); }
+  .hs-study-badge.has-due{ background:var(--accent-soft); border-color:var(--accent-soft);
+    color:var(--accent-ink); }
+
+  @media (max-width:640px){
+    .fc-grade .btn{ min-width:0; flex:1; padding:9px 8px 10px; }
+    .radar-gap{ margin-left:0; width:100%; }
+    .exam-banner{ align-items:flex-start; }
+  }
   .fc-list{ display:flex; flex-direction:column; gap:8px; }
   .fc-row{ display:flex; align-items:flex-start; gap:10px; padding:11px 13px; border:1px solid var(--border);
     border-radius:var(--r-md); font-size:12.5px; line-height:1.5; background:var(--surface); }
@@ -4616,6 +4781,9 @@
         });
         return loadState(early && early.state).then(function(){
           notifyDueSoon();
+          // The dashboard reports what is due to review and which exams are close, so
+          // the sets have to be loaded whether or not Study has been opened.
+          hsLoadSide();
           // A link to a chat, a set or a quiz, and a plain refresh: land where the
           // address bar says once there is data to land on.
           applyPendingRoute();
@@ -4849,17 +5017,59 @@
     var graded = classes.map(function(c){ return classGradeStats(c.id).currentGrade; }).filter(function(g){ return g!=null; });
     var avg = graded.length ? (graded.reduce(function(s,g){ return s+g; },0)/graded.length) : null;
 
+    var cardsDue = studyDueTotal();
+
     var html = '<div class="tiles icon-tiles">'
       + iconTile('assignments', 'var(--accent-soft)', 'var(--accent)', totalAssignments, 'Total Assignments')
       + iconTile('calendar', 'var(--accent-soft)', 'var(--accent)', week, 'Due This Week')
-      + iconTile('check', 'var(--success-soft)', 'var(--success)', completedTotal, 'Completed')
+      + iconTile('cards', 'var(--success-soft)', 'var(--success)', cardsDue, 'Cards To Review', 'study')
       + iconTile('chart', '#EFE9FE', '#7C5BD8', avg!=null?avg.toFixed(0)+'%':'—', 'Current Average', 'grades')
       + '</div>';
 
+    html += studyNudgeHtml();
     html += '<div class="dash-row">' + focusHighlightHtml() + upcomingWeekCardHtml() + '</div>';
     html += classesPreviewCardHtml();
     html += '<div class="dash-row">' + recentFilesCardHtml() + recentNotesCardHtml() + '</div>';
     return html;
+  }
+
+  /**
+   * What studying needs from you today, on the page you actually open.
+   *
+   * Vesta scheduled reviews nobody was ever told about and held exam dates next to
+   * term-by-term progress without ever comparing them. This is the comparison, and
+   * it only appears when it has something to say.
+   */
+  function studyNudgeHtml(){
+    var due = studyDueTotal();
+    var radar = studyExamRadar(10);
+    if(!due && !radar.length) return '';
+    var top = radar[0];
+    var behind = top ? (top.total - top.learned) : 0;
+    return '<div class="card study-nudge">'
+      + '<div class="card-head"><h2>Studying</h2>'
+      + '<a class="see-all" href="#" data-action="switch-tab" data-tab="study">Open Study →</a></div>'
+      + '<div class="nudge-rows">'
+      + (top && behind
+          ? '<div class="nudge-row'+(top.examDays<=3?' is-urgent':'')+'">'
+            + '<span class="dot" style="--c:'+(classColor(top.classId)||'var(--none)')+'"></span>'
+            + '<div class="nudge-main"><b>'+escapeHtml(top.examTitle||'Exam')+' '+examWhen(top.examDays)+'</b>'
+            + '<span>'+behind+' of '+top.total+' terms not learned yet'
+            + (radar.length > 1 ? ' \u00b7 '+(radar.length-1)+' other exam'+(radar.length===2?'':'s')+' close' : '')
+            + '</span></div>'
+            + '<button type="button" class="btn primary" data-action="study-cram-class" '
+            + 'data-id="'+(top.classId||'')+'" data-title="'+escapeHtml(top.examTitle||'Exam')+'">Cram</button>'
+            + '</div>'
+          : '')
+      + (due
+          ? '<div class="nudge-row">'
+            + '<span class="dot" style="--c:var(--accent)"></span>'
+            + '<div class="nudge-main"><b>'+due+' card'+(due===1?'':'s')+' ready to review</b>'
+            + '<span>Scheduled from how the last sitting went.</span></div>'
+            + '<button type="button" class="btn" data-action="study-review-due">Review</button>'
+            + '</div>'
+          : '')
+      + '</div></div>';
   }
 
   /** @param {string=} tab a page the tile opens when clicked */
@@ -5691,12 +5901,22 @@
     ]).then(function(r){
       if(r[0]){ hsSettings = r[0]; hsUsage = r[0].usage; }
       hsDecks = r[1] || [];
+      // The server counts days in UTC, which reads as one day out for a whole evening
+      // in PST. Everything else on screen counts in local days, and a dashboard that
+      // says "in 4 days" beside "Due in 5 days" about the same exam is just wrong, so
+      // the date is the server's and the arithmetic is the browser's.
+      hsDecks.forEach(function(d){
+        d.examDays = d.examDate ? diffDaysFromToday(d.examDate) : null;
+      });
       hsQuizzes = r[2] || [];
       hsThreads = r[3] || [];
       hsSideLoaded = true;
       // Study reads the same sets, so it needs the repaint too; without it the section
-      // renders its empty state once and never corrects itself.
-      if(activeTab==='headstart' || activeTab==='study'){ renderView(); paintIcons(); }
+      // renders its empty state once and never corrects itself. The dashboard shows
+      // the due count and the exam radar, so it is in the same position.
+      if(activeTab==='headstart' || activeTab==='study' || activeTab==='dashboard'){
+        renderView(); paintIcons();
+      }
     });
   }
 
@@ -5881,8 +6101,31 @@
       + '<span class="type-badge">'+(TYPE_LABELS[it.type]||'Other')+'</span>'
       + '<span class="due-label '+urgency+'">'+urgencyLabel(it.dueDate)+'</span>'
       + (done ? '<span class="hs-done">'+iconSvg('check')+done+' saved</span>' : '')
+      + hsItemStudyBadge(it)
       + '<span class="hs-open">Open →</span>'
       + '</div>';
+  }
+
+  /**
+   * Study material made for this assignment, on the assignment.
+   *
+   * A set built from a midterm's readings was filed under Study and lost its
+   * connection to the midterm, so the thing you made and the reason you made it lived
+   * on different pages.
+   */
+  function hsItemStudyBadge(it){
+    var decks = (hsDecks || []).filter(function(d){ return d.itemId === it.id; });
+    var quizzes = (hsQuizzes || []).filter(function(q){ return q.itemId === it.id; });
+    if(!decks.length && !quizzes.length) return '';
+    var due = decks.reduce(function(t, d){ return t + (d.dueCount||0); }, 0);
+    var label = decks.length
+      ? (due ? due + ' due' : decks.length + ' set' + (decks.length===1?'':'s'))
+      : quizzes.length + ' quiz' + (quizzes.length===1?'':'zes');
+    return '<button type="button" class="hs-study-badge'+(due?' has-due':'')+'" '
+      + 'data-action="'+(decks.length ? 'hs-open-deck' : 'hs-open-quiz')+'" '
+      + 'data-id="'+(decks.length ? decks[0].id : quizzes[0].id)+'" '
+      + 'title="Study material made for this assignment">'
+      + iconSvg('cards')+escapeHtml(label)+'</button>';
   }
 
   function hsDueSectionsHtml(){
@@ -5942,6 +6185,97 @@
       + '</div></section>';
   }
 
+  /**
+   * Which tools are worth offering for a piece of work, given what it is and how far
+   * along it already is.
+   *
+   * Ten tools laid out as a menu asks you to decide what you need before you know,
+   * which is the part that is actually hard. This picks two or three, and it changes
+   * as the work moves: nothing saved yet and it offers to explain the thing; work
+   * already generated and it offers to review what you have written instead of
+   * drafting over the top of it.
+   */
+  function hsSuggestTools(it){
+    var type = it.type || 'other';
+    var started = savedWorkCount(it) > 0 || (it.focusSeconds || 0) >= 600;
+    var days = it.dueDate ? diffDaysFromToday(it.dueDate) : null;
+    var out = [];
+    if(type === 'exam' || type === 'quiz'){
+      out = started ? ['gaps', 'concepts', 'study_plan'] : ['study_plan', 'concepts', 'summarize'];
+    } else if(type === 'reading'){
+      out = ['summarize', 'concepts', 'gaps'];
+    } else if(type === 'discussion'){
+      out = started ? ['revise', 'refine'] : ['explain', 'outline', 'draft'];
+    } else if(type === 'project') {
+      out = started ? ['gaps', 'revise', 'study_plan'] : ['explain', 'outline', 'study_plan'];
+    } else {
+      out = started ? ['revise', 'gaps', 'refine'] : ['explain', 'outline', 'draft'];
+    }
+    // A day out, planning is not the useful answer any more.
+    if(days != null && days <= 1) out = out.filter(function(k){ return k !== 'study_plan'; });
+    if((it.rubricId || it.hasRubric) && out.indexOf('rubric') < 0) out.unshift('rubric');
+    return out.slice(0, 3);
+  }
+
+  function sentenceCase(s){
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  }
+
+  /** One line on where this piece of work stands, from what Vesta already knows. */
+  function hsStateLine(it){
+    var bits = [];
+    var saved = savedWorkCount(it);
+    if(saved) bits.push(saved + ' piece' + (saved===1?'':'s') + ' already made');
+    var mins = Math.round((it.focusSeconds || 0) / 60);
+    if(mins >= 5) bits.push(mins + ' min logged');
+    var decks = (hsDecks || []).filter(function(d){ return d.itemId === it.id; });
+    if(decks.length) bits.push(decks.length + ' set' + (decks.length===1?'':'s') + ' of terms');
+    if(!bits.length) bits.push('nothing started on it yet');
+    return bits.join(' \u00b7 ');
+  }
+
+  /**
+   * The one piece of work to pick up, and the two or three things to do to it.
+   *
+   * The list below is sorted by pressure already; this says out loud what the sort
+   * has decided, which is the difference between a page you scan and a page that
+   * answers the question you came with.
+   */
+  function hsPlanHtml(){
+    var open = hsOpenItems(hsClassId);
+    if(!open.length) return '';
+    var it = open[0];
+    var c = classById(it.classId);
+    var days = it.dueDate ? diffDaysFromToday(it.dueDate) : null;
+    var why = days == null ? 'No due date, and it is the oldest thing still open.'
+            : days < 0    ? Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' overdue.'
+            : days === 0  ? 'Due today.'
+            : days === 1  ? 'Due tomorrow.'
+            : 'Due in ' + days + ' days'
+              + (open.length > 1 ? ', and the most pressing of ' + open.length + ' open.' : '.');
+    var tools = hsSuggestTools(it);
+    return '<section class="hs-plan'+(days != null && days <= 1 ? ' is-urgent' : '')+'">'
+      + '<div class="hs-plan-head">'
+      + '<span class="hs-plan-eyebrow">Start here</span>'
+      + '<span class="dot" style="--c:'+(classColor(it.classId)||'var(--none)')+'"></span>'
+      + '<span class="hs-plan-class">'+escapeHtml(c ? (c.code||c.name||'') : 'No class')+'</span>'
+      + '</div>'
+      + '<h3 class="hs-plan-title" data-action="hs-open-item" data-id="'+it.id+'">'
+      + escapeHtml(it.title || 'Untitled')+'</h3>'
+      + '<div class="hs-plan-why">'+escapeHtml(why)+' '+escapeHtml(sentenceCase(hsStateLine(it)))+'.</div>'
+      + '<div class="hs-plan-tools">'
+      + tools.map(function(k){
+          if(!HS_TOOLS[k]) return '';
+          return '<button type="button" class="hs-plan-tool" data-action="hs-start-tool" '
+            + 'data-id="'+it.id+'" data-tool="'+k+'">'
+            + '<b>'+escapeHtml(HS_TOOLS[k].label)+'</b>'
+            + '<span>'+escapeHtml(HS_TOOLS[k].blurb)+'</span></button>';
+        }).join('')
+      + '<button type="button" class="hs-plan-tool is-plain" data-action="hs-open-item" data-id="'+it.id+'">'
+      + '<b>Just open the chat</b><span>Ask it something of your own.</span></button>'
+      + '</div></section>';
+  }
+
   function viewHeadstart(){
     if(!hsSideLoaded) hsLoadSide();
     // Working on something takes over the page. Browsing and working were both
@@ -5956,6 +6290,7 @@
     // class filter and what the day has cost so far.
     return '<div class="hs-bar">' + hsClassPillsHtml()
       + '<div class="hs-bar-right">' + hsSpendChipHtml() + '</div></div>'
+      + hsPlanHtml()
       + hsThreadsSectionHtml()
       + hsDueSectionsHtml();
   }
@@ -5965,17 +6300,88 @@
   // activities with different session shapes. A set is just terms; Flashcards, Learn
   // and Test are three ways to study the same set rather than three things you make.
 
-  var studyScreen = null;    // null is the list of sets; {kind:'set', id} is one of them
+  // null is the list of sets; {kind:'set', id} is one of them, {kind:'quiz', id} one
+  // quiz, and {kind:'queue', scope} a run built across sets rather than from one.
+  var studyScreen = null;
 
+  /**
+   * Sets in the order they should be studied.
+   *
+   * An exam in five days beats a card due today, because the card will still be there
+   * afterwards and the exam will not. Sets with a close exam come first, then whatever
+   * has the most due.
+   */
   function studySets(){
     return hsDecks.slice().sort(function(a, b){
+      var ea = (a.examDays != null && a.examDays <= 21) ? a.examDays : 999;
+      var eb = (b.examDays != null && b.examDays <= 21) ? b.examDays : 999;
+      if(ea !== eb) return ea - eb;
       return (b.dueCount||0) - (a.dueCount||0);
     });
+  }
+
+  function studyDueTotal(){
+    return (hsDecks || []).reduce(function(t, d){ return t + (d.dueCount||0); }, 0);
+  }
+
+  function studyStuckTotal(){
+    return (hsDecks || []).reduce(function(t, d){ return t + (d.stuckCount||0); }, 0);
+  }
+
+  /**
+   * Which exams are close, and how much of the material is not learned yet.
+   *
+   * Vesta knew both halves of this already and never put them together: exam dates
+   * live on assignments, and how known a term is lives on the card. One per class,
+   * soonest first.
+   */
+  function studyExamRadar(within){
+    within = within == null ? 14 : within;
+    var byClass = {};
+    (hsDecks || []).forEach(function(d){
+      if(d.examDays == null || d.examDays > within) return;
+      var key = (d.classId || 'none') + '|' + (d.examDate || '');
+      var row = byClass[key] || (byClass[key] = {
+        classId: d.classId, examDays: d.examDays, examDate: d.examDate,
+        examTitle: d.examTitle, total: 0, learned: 0, sets: 0
+      });
+      row.total += d.cardCount || 0;
+      row.learned += d.learnedCount || 0;
+      row.sets += 1;
+    });
+    return Object.keys(byClass).map(function(k){ return byClass[k]; })
+      .filter(function(r){ return r.total > 0; })
+      .sort(function(a, b){ return a.examDays - b.examDays; });
+  }
+
+  function studyRadarHtml(){
+    var rows = studyExamRadar();
+    if(!rows.length) return '';
+    return '<div class="study-radar">'
+      + rows.map(function(r){
+          var c = classById(r.classId);
+          var left = r.total - r.learned;
+          var tone = r.examDays <= 3 ? ' is-urgent' : (r.examDays <= 7 ? ' is-soonish' : '');
+          return '<div class="radar-row'+tone+'">'
+            + '<span class="dot" style="--c:'+(classColor(r.classId)||'var(--none)')+'"></span>'
+            + '<span class="radar-class">'+escapeHtml(c ? (c.code||c.name||'') : 'No class')+'</span>'
+            + '<span class="radar-what"><b>'+escapeHtml(r.examTitle||'Exam')+'</b> '+examWhen(r.examDays)+'</span>'
+            + '<span class="radar-gap">'
+            + (left ? left+' of '+r.total+' terms not learned' : 'all '+r.total+' terms learned')
+            + '</span>'
+            + (left
+                ? '<button type="button" class="btn primary" data-action="study-cram-class" '
+                  + 'data-id="'+(r.classId||'')+'" data-title="'+escapeHtml(r.examTitle||'Exam')+'">Cram</button>'
+                : '')
+            + '</div>';
+        }).join('')
+      + '</div>';
   }
 
   function viewStudy(){
     if(!hsSideLoaded) hsLoadSide();
     if(studyScreen && studyScreen.kind === 'set') return setScreenHtml();
+    if(studyScreen && studyScreen.kind === 'queue') return setScreenHtml();
     if(studyScreen && studyScreen.kind === 'quiz') return quizScreenHtml();
     if(studyPane === 'humanizer') return hzViewHtml();
     var sets = studySets();
@@ -5988,30 +6394,65 @@
            + '<button type="button" class="btn primary" data-action="study-new-set">New set</button>'
            + '</div></div>';
     }
-    var due = sets.reduce(function(t, d){ return t + (d.dueCount||0); }, 0);
-    return studyTabsHtml() + '<div class="hs-bar">'
+    var due = studyDueTotal();
+    var stuck = studyStuckTotal();
+    return studyTabsHtml()
+      + '<div class="hs-bar">'
       + '<div class="study-summary">'
-      + (due ? '<b>'+due+'</b> card'+(due===1?'':'s')+' ready to review'
+      + (due ? '<b>'+due+'</b> card'+(due===1?'':'s')+' ready across '
+             + sets.filter(function(d){ return d.dueCount; }).length+' set'
+             + (sets.filter(function(d){ return d.dueCount; }).length===1?'':'s')
              : 'Nothing due right now. Everything is scheduled ahead.')
       + '</div>'
       + '<div class="hs-bar-right">'
       + '<button type="button" class="btn" data-action="study-generate">Build from my material</button>'
       + '<button type="button" class="btn primary" data-action="study-new-set">New set</button>'
       + '</div></div>'
+      // One button that honours the schedule across every set, because remembering to
+      // open five sets was the student's job and nobody did it.
+      + '<div class="study-actions">'
+      + '<button type="button" class="study-cta'+(due?'':' is-quiet')+'" data-action="study-review-due"'
+        + (due?'':' disabled')+'>'
+        + iconSvg('cards')
+        + '<span class="sc-main"><b>'+(due ? 'Review '+due+' due card'+(due===1?'':'s') : 'Nothing due')+'</b>'
+        + '<span>'+(due ? 'Every set at once, oldest first.' : 'Come back when something comes up.')+'</span></span>'
+        + '</button>'
+      + (stuck
+          ? '<button type="button" class="study-cta secondary" data-action="study-trouble">'
+            + iconSvg('alert')
+            + '<span class="sc-main"><b>'+stuck+' trouble term'+(stuck===1?'':'s')+'</b>'
+            + '<span>Forgotten three times or more. Drill just those.</span></span></button>'
+          : '')
+      + '</div>'
+      + studyRadarHtml()
       + studyQuizzesHtml(quizzes)
       + (sets.length ? '<h2 class="files-section-h">Sets of terms</h2>' : '')
       + '<div class="set-grid">'
-      + sets.map(function(d){
-          var c = classById(d.classId);
-          return '<button type="button" class="set-card" data-action="study-open-set" data-id="'+d.id+'">'
-            + '<span class="dot" style="--c:'+(classColor(d.classId)||'var(--none)')+'"></span>'
-            + '<span class="set-card-class">'+escapeHtml(c ? (c.code||c.name||'') : 'No class')+'</span>'
-            + '<span class="set-card-name">'+escapeHtml(d.name||'Untitled set')+'</span>'
-            + '<span class="set-card-meta">'+d.cardCount+' term'+(d.cardCount===1?'':'s')
-            + (d.dueCount ? ' · <b>'+d.dueCount+' due</b>' : '')+'</span>'
-            + '</button>';
-        }).join('')
+      + sets.map(setCardHtml).join('')
       + '</div>';
+  }
+
+  function setCardHtml(d){
+    var c = classById(d.classId);
+    var total = d.cardCount || 0;
+    var learnedPct = total ? Math.round((d.learnedCount||0) / total * 100) : 0;
+    var exam = d.examDays != null && d.examDays <= 21;
+    return '<button type="button" class="set-card" data-action="study-open-set" data-id="'+d.id+'">'
+      + '<span class="dot" style="--c:'+(classColor(d.classId)||'var(--none)')+'"></span>'
+      + '<span class="set-card-class">'+escapeHtml(c ? (c.code||c.name||'') : 'No class')+'</span>'
+      + '<span class="set-card-name">'+escapeHtml(d.name||'Untitled set')+'</span>'
+      + '<span class="set-card-meta">'+total+' term'+(total===1?'':'s')
+      + (d.dueCount ? ' \u00b7 <b>'+d.dueCount+' due</b>' : '')
+      + (d.stuckCount ? ' \u00b7 '+d.stuckCount+' stuck' : '')+'</span>'
+      + (total
+          ? '<span class="set-card-bar"><i style="width:'+learnedPct+'%"></i></span>'
+            + '<span class="set-card-sub">'+learnedPct+'% learned</span>'
+          : '')
+      + (exam
+          ? '<span class="set-card-exam'+(d.examDays<=3?' is-urgent':'')+'">'
+            + escapeHtml(d.examTitle||'Exam')+' '+examWhen(d.examDays)+'</span>'
+          : '')
+      + '</button>';
   }
 
   /**
@@ -6567,6 +7008,7 @@
       return '<div class="th-screen"><div class="hs-thinking"><i></i>Opening the set…</div></div>';
     }
     var d = FC.deck;
+    if(d.virtual) return queueScreenHtml();
     var c = classById(d.classId);
     var today = todayIso();
     var due = (d.cards||[]).filter(function(x){ return !x.suspended && (!x.due || x.due <= today); }).length;
@@ -6581,16 +7023,28 @@
         + '<div class="set-mode-body">'+inner+'</div>'
         + '</div>';
     }
+    var meta = deckMeta(d.id);
+    var st = setStats(d);
     return '<div class="set-screen">'
       + setHeadHtml(d, c, due)
+      + examBannerHtml(meta, st, d)
       + '<div class="set-modes">'
       + '<button type="button" class="set-mode" data-action="fc-review">'
-        + iconSvg('cards')+'<b>Flashcards</b><span>Flip through them and grade yourself.</span></button>'
+        + iconSvg('cards')+'<b>Flashcards</b><span>'
+        + (due ? due+' ready now. Grade each one and it schedules itself.'
+               : 'Nothing due right now.')+'</span></button>'
       + '<button type="button" class="set-mode" data-action="study-learn">'
         + iconSvg('check')+'<b>Learn</b><span>'+learnSubtitle(d)+'</span></button>'
       + '<button type="button" class="set-mode" data-action="study-test">'
         + iconSvg('assignments')+'<b>Test</b><span>A scored run through the whole set.</span></button>'
+      + '<button type="button" class="set-mode" data-action="fc-cram">'
+        + iconSvg('clock')+'<b>Cram</b><span>'
+        + (meta && meta.examDays != null && meta.examDays <= 21
+            ? escapeHtml(meta.examTitle || 'The exam')+' is '+examWhen(meta.examDays)+'. Every term, least known first.'
+            : 'Every term, least known first, schedule ignored.')+'</span></button>'
       + '</div>'
+      + setStatsHtml(st)
+      + troubleTermsHtml(st)
       + '<div class="set-terms">'
       + '<div class="set-terms-head"><h3>Terms in this set</h3>'
       + '<span class="hs-bucket-count">'+(d.cards||[]).length+'</span>'
@@ -6599,6 +7053,133 @@
           ? '<div class="set-term-list">'+(d.cards||[]).map(setTermRowHtml).join('')+'</div>'
           : '<div class="empty">This set is empty. Add a term to get going.</div>')
       + '</div></div>';
+  }
+
+  /** The screen for a queue built across sets, rather than for one set. */
+  function queueScreenHtml(){
+    var d = FC.deck;
+    var scope = (studyScreen && studyScreen.scope) || 'due';
+    var sub = (STUDY_SCOPES[scope] || {}).sub || '';
+    var head = '<div class="th-screen-head">'
+      + '<button type="button" class="th-back" data-action="study-home">\u2039 Study</button>'
+      + '<div class="th-screen-title"><h2>'+escapeHtml(d.name||'Study')+'</h2>'
+      + (FC.queue.length ? '<span class="type-badge">'+FC.queue.length+' card'
+          + (FC.queue.length===1?'':'s')+'</span>' : '')
+      + '</div>'
+      + '<div class="th-screen-acts"><span class="fc-scope-sub">'+escapeHtml(sub)+'</span></div>'
+      + '</div>';
+    if(FC.mode === 'empty'){
+      return '<div class="set-screen">'+head
+        + '<div class="empty">'
+        + (scope === 'trouble'
+            ? 'Nothing is stuck. A term lands here once you have forgotten it three times.'
+            : 'Nothing due across your sets. Everything is scheduled ahead.')
+        + '</div></div>';
+    }
+    return '<div class="set-screen">'+head
+      + '<div class="set-mode-body">'+fcReviewHtml()+'</div></div>';
+  }
+
+  /** What the deck list knows about this set that its cards do not: the next exam. */
+  function deckMeta(id){
+    return (hsDecks || []).find(function(x){ return x.id === id; }) || null;
+  }
+
+  function examWhen(days){
+    if(days == null) return '';
+    if(days <= 0) return 'today';
+    if(days === 1) return 'tomorrow';
+    return 'in ' + days + ' days';
+  }
+
+  /**
+   * Learned, still learning, not started, stuck.
+   *
+   * Counted from the cards themselves rather than the list endpoint, so it stays
+   * right the moment a round of Learn finishes.
+   */
+  function setStats(d){
+    var cards = (d.cards||[]).filter(function(c){ return !c.suspended; });
+    var learned = [], going = [], fresh = [], stuck = [];
+    cards.forEach(function(c){
+      if((c.lapses||0) >= 3) stuck.push(c);
+      // A card forgotten four times has `repetitions` back at zero, since a miss
+      // resets the ladder. Counting it as "not started" was how a set you had been
+      // fighting with all week could show nothing in progress at all.
+      var touched = (c.learnLevel||0) > 0 || (c.repetitions||0) > 0
+                    || (c.lapses||0) > 0 || !!c.lastReviewed;
+      if((c.learnLevel||0) >= LEARN_GOAL) learned.push(c);
+      else if(touched) going.push(c);
+      else fresh.push(c);
+    });
+    return { total:cards.length, learned:learned, going:going, fresh:fresh, stuck:stuck };
+  }
+
+  function setStatsHtml(st){
+    if(!st.total) return '';
+    var segs = [['learned', st.learned.length, 'Learned'],
+                ['going',   st.going.length,   'Still learning'],
+                ['fresh',   st.fresh.length,   'Not started']];
+    return '<div class="set-stats">'
+      + '<div class="set-stats-bar">'
+      + segs.map(function(s){
+          var pct = st.total ? (s[1] / st.total * 100) : 0;
+          return pct ? '<i class="ss-'+s[0]+'" style="width:'+pct+'%"></i>' : '';
+        }).join('')
+      + '</div>'
+      + '<div class="set-stats-legend">'
+      + segs.map(function(s){
+          return '<span class="ss-key ss-'+s[0]+'"><b>'+s[1]+'</b>'+s[2]+'</span>';
+        }).join('')
+      + (st.stuck.length ? '<span class="ss-key ss-stuck"><b>'+st.stuck.length+'</b>Stuck</span>' : '')
+      + '</div></div>';
+  }
+
+  /**
+   * The terms that keep going. Three lapses is not a hard card, it is a card being
+   * studied the wrong way, and the only useful thing to do with it is name it.
+   */
+  function troubleTermsHtml(st){
+    if(!st.stuck.length) return '';
+    var worst = st.stuck.slice().sort(function(a, b){ return (b.lapses||0) - (a.lapses||0) });
+    return '<div class="set-trouble">'
+      + '<div class="set-terms-head"><h3>You keep forgetting these</h3>'
+      + '<span class="hs-bucket-count">'+worst.length+'</span>'
+      + '<button type="button" class="btn primary" style="margin-left:auto;" data-action="fc-drill-trouble">'
+      + 'Drill these '+worst.length+'</button></div>'
+      + '<div class="set-term-list">'
+      + worst.slice(0, 6).map(function(c){
+          return '<div class="set-term is-stuck">'
+            + '<div class="set-term-front">'+escapeHtml(c.front||'')+'</div>'
+            + '<div class="set-term-back">'+escapeHtml(c.back||'')+'</div>'
+            + '<span class="set-term-due">forgotten '+(c.lapses||0)+'\u00d7</span>'
+            + '<button type="button" class="btn ghost" data-action="fc-edit" data-id="'+c.id+'">Edit</button>'
+            + '<span></span>'
+            + '</div>';
+        }).join('')
+      + '</div>'
+      + (worst.length > 6 ? '<div class="fc-hint" style="margin-top:8px;">'
+          + (worst.length - 6)+' more like this.</div>' : '')
+      + '</div>';
+  }
+
+  /** The exam this set is really for, when there is one close enough to matter. */
+  function examBannerHtml(meta, st, d){
+    if(!meta || meta.examDays == null || meta.examDays > 21) return '';
+    var unlearned = st.total - st.learned.length;
+    var tone = meta.examDays <= 3 ? ' is-urgent' : (meta.examDays <= 7 ? ' is-soonish' : '');
+    return '<div class="exam-banner'+tone+'">'
+      + '<div class="exam-banner-main">'
+      + '<b>'+escapeHtml(meta.examTitle || 'Exam')+' '+examWhen(meta.examDays)+'.</b> '
+      + (unlearned
+          ? unlearned + ' of ' + st.total + ' terms in this set '
+            + (unlearned === 1 ? 'is' : 'are') + ' not learned yet.'
+          : 'Every term in this set is learned.')
+      + '</div>'
+      + (unlearned
+          ? '<button type="button" class="btn primary" data-action="fc-cram">Cram now</button>'
+          : '')
+      + '</div>';
   }
 
   function setHeadHtml(d, c, due){
@@ -6656,6 +7237,28 @@
     if(!done) return 'Multiple choice, then typed, until you know them.';
     if(done >= cards.length) return 'Every term learned. Start again to go round once more.';
     return done + ' of ' + cards.length + ' learned so far.';
+  }
+
+  /**
+   * Tell the schedule what another mode just found out.
+   *
+   * Learn, Test and Flashcards were three views of the same terms that knew nothing
+   * about each other: missing a term in a test left it scheduled months out, and
+   * learning one in Learn did not push it any further away. Every mode now reports
+   * what happened, in one request at the end of a round, and a miss brings the card
+   * back tomorrow whichever mode found it.
+   *
+   * Nothing on screen waits for the reply; the counts refresh when it lands.
+   */
+  function sendReviews(grades){
+    var reviews = Object.keys(grades || {}).map(function(id){
+      return { id:id, grade:grades[id] };
+    });
+    if(!reviews.length) return Promise.resolve();
+    return apiPost('/api/cards/review-batch', { reviews:reviews }).then(function(r){
+      (r && r.cards || []).forEach(fcAdoptCard);
+      hsLoadSide();
+    }).catch(function(){ /* a lost grade is not worth an error dialog mid-drill */ });
   }
 
   var LEARN_GOAL = 2;                 // level at which a term counts as learned
@@ -6723,7 +7326,8 @@
       at: 0,
       answered: null,             // {right, given, answer} while the result shows
       round: 1,
-      dirty: {}
+      dirty: {},
+      grades: {}                  // what to tell the flashcard schedule at the end
     };
     cards.forEach(function(c){ FC.learn.levels[c.id] = c.learnLevel || 0; });
     learnBuildRound();
@@ -6751,7 +7355,13 @@
   /** Save what this round changed. One request, and nothing waits for it. */
   function learnSaveProgress(){
     var L = FC.learn;
-    if(!L || !Object.keys(L.dirty).length) return;
+    if(!L) return;
+    if(Object.keys(L.grades).length){
+      var grades = L.grades;
+      L.grades = {};
+      sendReviews(grades);
+    }
+    if(!Object.keys(L.dirty).length) return;
     var levels = L.dirty;
     L.dirty = {};
     apiPost('/api/decks/' + FC.deck.id + '/learn', { levels: levels })
@@ -6778,7 +7388,13 @@
       L.queue.push(card);                 // it comes back before the round ends
     }
     L.dirty[card.id] = L.levels[card.id];
+    // Recognising a term from four choices is weaker evidence than typing it, so it
+    // earns the ordinary hit rather than the easy one.
+    L.grades[card.id] = right ? 4 : 1;
     L.answered = { right: right, given: given, answer: card.back };
+    // A round grows every time a term is missed, so a bad round can run long. Save
+    // part way rather than holding a drill's worth of progress in the tab.
+    if(Object.keys(L.dirty).length >= 5) learnSaveProgress();
     renderDeck();
   }
 
@@ -6794,6 +7410,17 @@
       learnBuildRound();
     }
     renderDeck();
+  }
+
+  /**
+   * Leaving a mode should not throw away what it found out.
+   *
+   * Learn only reported at the end of a round, and a round with several misses in it
+   * grows as you go, so walking away from a bad round lost every grade in it — which
+   * is exactly the round whose grades matter most.
+   */
+  function studyLeaveMode(){
+    if(FC && FC.learn) learnSaveProgress();
   }
 
   function learnHtml(){
@@ -6907,6 +7534,14 @@
     });
     T.marks = marks;
     T.submitted = true;
+    // A written answer marked `null` is still the student's to judge, so it is not
+    // reported until they do; `test-self` sends that one on its own.
+    var grades = {};
+    Object.keys(marks).forEach(function(id){
+      if(marks[id] === null) return;
+      grades[id] = marks[id] ? 4 : 1;
+    });
+    sendReviews(grades);
     renderDeck();
   }
 
@@ -13109,32 +13744,112 @@
     }).catch(reportError);
   }
 
-  function fcStartReview(){
-    var today = new Date().toISOString().slice(0,10);
-    var due = FC.deck.cards.filter(function(c){
-      return !c.suspended && (!c.due || c.due <= today);
-    });
-    if(!due.length) due = FC.deck.cards.filter(function(c){ return !c.suspended; });
-    FC.queue = due;
+  /**
+   * Start a sitting on this set.
+   *
+   * `all` ignores the schedule, which is what Cram is. Otherwise it is what is due,
+   * and when nothing is due it says so instead of quietly handing over the whole set
+   * — that fallback is what made the due dates look decorative, since you got every
+   * card either way.
+   */
+  function fcStartReview(opts){
+    opts = opts || {};
+    var today = todayIso();
+    var live = (FC.deck.cards || []).filter(function(c){ return !c.suspended; });
+    var queue;
+    if(opts.all){
+      // Least known first: the twenty minutes before an exam should go on the terms
+      // that are not there yet.
+      queue = live.slice().sort(function(a, b){
+        return (a.learnLevel||0) - (b.learnLevel||0)
+            || (b.lapses||0) - (a.lapses||0)
+            || (a.repetitions||0) - (b.repetitions||0);
+      });
+    } else if(opts.ids){
+      var want = {};
+      opts.ids.forEach(function(id){ want[id] = true; });
+      queue = live.filter(function(c){ return want[c.id]; });
+    } else {
+      queue = live.filter(function(c){ return !c.due || c.due <= today; });
+    }
+    if(!queue.length){
+      notify('Nothing due in this set',
+             'Everything here is scheduled ahead. Cram if you want to go through it anyway.');
+      return;
+    }
+    FC.queue = queue;
     FC.at = 0; FC.flipped = false; FC.done = 0; FC.pick = FC_DEFAULT_PICK;
-    FC.mode = due.length ? 'review' : 'list';
+    FC.session = fcNewSession(queue.length);
+    FC.cram = !!opts.all;
+    FC.mode = 'review';
     renderDeck();
+  }
+
+  // ---------------- one queue across every set ----------------
+  // Cards are due per set, so five sets meant remembering to open five things, and
+  // the schedule was only ever honoured by whoever remembered. A queue is built from
+  // a scope instead, and each card carries the set it came from.
+
+  var STUDY_SCOPES = {
+    due:     { label:'Everything due',  sub:'Cards from every set that are ready today.' },
+    cram:    { label:'Cram',            sub:'Every term, least known first, schedule ignored.' },
+    trouble: { label:'Trouble terms',   sub:'Only the ones you keep forgetting.' }
+  };
+
+  function openStudyQueue(scope, opts){
+    opts = opts || {};
+    closeModal();
+    studyScreen = { kind:'queue', scope:scope, label:opts.label || null };
+    FC = null;
+    if(activeTab !== 'study'){ activeTab = 'study'; render(); }
+    renderView();
+    var q = '?scope=' + encodeURIComponent(scope)
+      + (opts.classId ? '&classId=' + encodeURIComponent(opts.classId) : '')
+      + (opts.deckId ? '&deckId=' + encodeURIComponent(opts.deckId) : '');
+    apiGet('/api/study/queue' + q).then(function(r){
+      if(!studyScreen || studyScreen.kind !== 'queue') return;
+      var cards = (r && r.cards) || [];
+      FC = {
+        deck: { id:null, virtual:true, classId: opts.classId || null,
+                name: opts.label || (STUDY_SCOPES[scope] || {}).label || 'Study',
+                cards: cards },
+        mode: cards.length ? 'review' : 'empty',
+        queue: cards.slice(), at:0, flipped:false, done:0, pick:FC_DEFAULT_PICK,
+        session: fcNewSession(cards.length), cram: scope !== 'due'
+      };
+      renderView();
+      paintIcons();
+    }).catch(function(err){ studyScreen = null; renderView(); reportError(err); });
   }
 
   function fcReviewHtml(){
     var card = FC.queue[FC.at];
-    if(!card){
-      return '<div class="qz-score"><div class="qz-pct">'+FC.done+'</div>'
-        + '<div class="qz-sub">card'+(FC.done===1?'':'s')+' reviewed. Come back when the next ones are due.</div>'
-        + '<div style="margin-top:16px;"><button type="button" class="btn" data-action="fc-list">Back to the deck</button></div></div>';
-    }
+    if(!card) return fcSummaryHtml();
+    var S = FC.session || (FC.session = fcNewSession(FC.queue.length));
     var label = card.kind==='question' ? 'Question' : (card.kind==='concept' ? 'Concept' : 'Term');
+    var relearning = Object.keys(S.relearn).length;
+    var left = FC.queue.length - FC.at;
+    var uniq = S.total || FC.queue.length;
+    var pct = uniq ? Math.round(Math.min(uniq, FC.done) / uniq * 100) : 0;
+
     return '<div class="fc-stage'+(FC.flipped?' is-flipped':'')+'" id="fc-stage">'
-      + '<div class="qz-progress">'+(FC.at+1)+' of '+FC.queue.length+'</div>'
+      + '<div class="fc-track">'
+      + '<div class="fc-track-head">'
+      + '<span class="fc-track-left"><b>'+left+'</b> to go</span>'
+      + (relearning ? '<span class="fc-track-relearn">'+relearning+' coming back</span>' : '')
+      + '<span class="fc-track-done">'+FC.done+' of '+uniq+' cleared</span>'
+      + '</div>'
+      + '<div class="learn-bar"><i style="width:'+pct+'%"></i></div>'
+      + '</div>'
       + '<div class="fc-card" data-action="fc-flip" tabindex="0" role="button"'
       + ' aria-label="Show the answer">'
       + '<div class="fc-face fc-front">'
-      + '<div class="fc-side">'+escapeHtml(label)+'</div>'
+      + '<div class="fc-side">'+escapeHtml(label)
+      // In a queue built from several sets, the term alone does not say which course
+      // is being asked about, so the set's name rides along on the card.
+      + (card.deckName && FC.deck && FC.deck.virtual ? ' \u00b7 '+escapeHtml(card.deckName) : '')
+      + (S.relearn[card.id] ? '<span class="fc-again-tag">back again</span>' : '')
+      + '</div>'
       + '<div>'+escapeHtml(card.front||'')+'</div></div>'
       + '<div class="fc-face fc-back-face">'
       + '<div class="fc-side">Answer</div>'
@@ -13143,16 +13858,56 @@
       + '<div class="fc-grade">'
             + FC_GRADES.map(function(gr, i){
                 var picked = (typeof FC.pick === 'number' ? FC.pick : FC_DEFAULT_PICK) === i;
-                return '<button type="button" class="btn'
+                // What the press costs, said before it is pressed. Without this the
+                // difference between Good and Easy is invisible and so is the schedule.
+                var when = gr.g < 3 ? 'now' : fcIntervalChip(fcPredictDays(card, gr.g));
+                return '<button type="button" class="btn fc-g-'+gr.tone
                   + (gr.g === 1 ? ' ghost danger' : '')
                   + (picked ? ' fc-picked' : '')
                   + '" data-action="fc-grade" data-g="'+gr.g+'">'
-                  + escapeHtml(gr.label) + '<span class="fc-key">'+(i+1)+'</span></button>';
+                  + '<span class="fc-g-label">'+escapeHtml(gr.label)+'</span>'
+                  + '<span class="fc-g-when">'+when+'</span>'
+                  + '<span class="fc-key">'+(i+1)+'</span></button>';
               }).join('')
       + '</div>'
       + '<div class="fc-hint fc-hint-front">Click the card, or press space, to see the answer.</div>'
-      + '<div class="fc-hint fc-hint-back">Arrow keys choose, space or enter confirms, 1-4 pick directly.</div>'
+      + '<div class="fc-hint fc-hint-back">Arrows choose, space confirms, 1 to '+FC_GRADES.length+' pick directly. '
+      + 'A missed term comes back before you finish.</div>'
       + '</div>';
+  }
+
+  /**
+   * What the sitting came to.
+   *
+   * Three numbers and a date, because the question at the end of a session is whether
+   * it went well and when the work comes back, and neither was ever answered.
+   */
+  function fcSummaryHtml(){
+    var S = FC.session || fcNewSession(0);
+    var cleared = Object.keys(S.passed).length;
+    var soonest = null;
+    Object.keys(S.passed).forEach(function(id){
+      var c = (FC.queue || []).find(function(x){ return x.id === id; });
+      if(c && c.due && (!soonest || c.due < soonest)) soonest = c.due;
+    });
+    var when = soonest ? (soonest <= todayIso() ? 'later today' : relTimeAgo(soonest)) : null;
+    var tally = [['again', S.again, 'missed'], ['good', S.good, 'good'], ['easy', S.easy, 'easy']];
+    return '<div class="qz-score fc-summary">'
+      + '<div class="qz-pct">'+cleared+'</div>'
+      + '<div class="qz-sub">term'+(cleared===1?'':'s')+' cleared in '+S.answered+' flip'+(S.answered===1?'':'s')+'</div>'
+      + '<div class="fc-tally">'
+      + tally.map(function(t){
+          return '<span class="fc-tally-item '+t[0]+'"><b>'+t[1]+'</b>'+t[2]+'</span>';
+        }).join('')
+      + '</div>'
+      + (when ? '<div class="qz-sub">Next one of these is back '+escapeHtml(when)+'.</div>' : '')
+      + (S.again ? '<div class="qz-sub fc-summary-note">'+S.again+' miss'+(S.again===1?'':'es')
+          + ': due again tomorrow.</div>' : '')
+      + '<div style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">'
+      + '<button type="button" class="btn" data-action="fc-list">'
+      + (FC.deck && FC.deck.virtual ? 'Back to Study' : 'Back to the set')+'</button>'
+      + '<button type="button" class="btn primary" data-action="fc-again">Go round again</button>'
+      + '</div></div>';
   }
 
   /** Flip without re-rendering, so the card has something to animate between. */
@@ -13197,7 +13952,8 @@
 
   function renderDeck(){
     if(!FC) return;
-    if(activeTab === 'study' && studyScreen && studyScreen.kind === 'set'){
+    if(activeTab === 'study' && studyScreen
+       && (studyScreen.kind === 'set' || studyScreen.kind === 'queue')){
       renderView();
       paintIcons();
       // A typed Learn answer should be ready to type into: reaching for the mouse to
@@ -13232,15 +13988,75 @@
       + '</div></div>');
   }
 
-  // The four grade buttons, left to right, so the arrow keys and the number keys
+  // The three grade buttons, left to right, so the arrow keys and the number keys
   // agree with what is on screen.
+  //
+  // There used to be four, with "Hard" between a miss and a hit. It went because it
+  // is not a distinction anyone makes honestly at one in the morning, and because
+  // every extra button makes the row read as a survey rather than an answer. What a
+  // card actually asks is whether it came back at all, came back with effort, or came
+  // back instantly.
   var FC_GRADES = [
-    { g:1, label:'Missed it' },
-    { g:3, label:'Hard' },
-    { g:4, label:'Good' },
-    { g:5, label:'Easy' }
+    { g:1, label:'Missed it', tone:'again' },
+    { g:4, label:'Good',      tone:'good' },
+    { g:5, label:'Easy',      tone:'easy' }
   ];
-  var FC_DEFAULT_PICK = 2;   // Good: the honest default, not the flattering one
+  var FC_DEFAULT_PICK = 1;   // Good: the honest default, not the flattering one
+  // How far back a missed card goes in the same sitting. The point is that it returns
+  // before you leave: a grade that only changes a date you never see is not a grade.
+  var FC_RELEARN_GAP = 4;
+
+  /**
+   * What each grade would cost, in days, before you press it.
+   *
+   * A mirror of `sm2_next` in ai.py, kept here so the buttons can say "Good · 4d"
+   * without a round trip per card. If the scheduling changes there, change it here.
+   */
+  function fcPredictDays(card, grade){
+    var ease = card.ease || 2.5;
+    var reps = card.repetitions || 0;
+    var interval = card.interval || 0;
+    if(grade < 3) return 1;
+    var easy = grade >= 5;
+    reps += 1;
+    if(reps === 1) return easy ? 4 : 1;
+    if(reps === 2) return easy ? 10 : 6;
+    return Math.max(1, Math.round(interval * ease * (easy ? 1.3 : 1)));
+  }
+
+  /** "4d", "3mo", "1.4y" — short enough to sit on a button. */
+  function fcIntervalChip(days){
+    if(days <= 1) return '1d';
+    if(days < 30) return days + 'd';
+    if(days < 365) return Math.round(days / 30) + 'mo';
+    return (Math.round(days / 36.5) / 10) + 'y';
+  }
+
+  function fcNewSession(total){
+    return { again:0, good:0, easy:0, answered:0, passed:{}, relearn:{}, total:total || 0 };
+  }
+
+  /**
+   * Take the server's updated card without breaking the queue.
+   *
+   * A missed card is spliced back into the queue, so the same object can be in there
+   * twice. Replacing it in `deck.cards` with a fresh object, which is what this used
+   * to do, left the second sighting holding the stale copy and predicting the wrong
+   * intervals. Mutating in place keeps every reference honest.
+   */
+  function fcAdoptCard(updated){
+    if(!updated || !FC) return;
+    var lists = [FC.deck && FC.deck.cards, FC.queue];
+    lists.forEach(function(list){
+      (list || []).forEach(function(c){
+        if(c.id !== updated.id) return;
+        Object.keys(updated).forEach(function(k){
+          if(k === 'deckName' || k === 'classId') return;   // set by the queue, not the review
+          c[k] = updated[k];
+        });
+      });
+    });
+  }
 
   /** Keyboard for the review loop. Returns true when the key was ours. */
   /**
@@ -13315,7 +14131,7 @@
       fcGrade(FC_GRADES[typeof FC.pick === 'number' ? FC.pick : FC_DEFAULT_PICK].g);
       return true;
     }
-    if(key >= '1' && key <= '4'){
+    if(key >= '1' && key <= String(FC_GRADES.length)){
       e.preventDefault();
       fcGrade(FC_GRADES[Number(key) - 1].g);
       return true;
@@ -13327,20 +14143,49 @@
     return false;
   }
 
+  /**
+   * Grade the card in front of you, and act on it in this sitting.
+   *
+   * The grade was previously only a date: the card left the screen whichever button
+   * you pressed, and the one you had just blanked on was not seen again until
+   * tomorrow. So "Missed it" and "Easy" did the same visible thing, which is exactly
+   * why the buttons felt decorative. Now a miss goes back into the queue a few cards
+   * later and stays in the rotation until it comes back clean, and the tally at the
+   * top counts terms cleared rather than cards flipped.
+   */
   function fcGrade(g){
     var card = FC.queue[FC.at];
     if(!card) return;
+    var S = FC.session || (FC.session = fcNewSession(FC.queue.length));
+    var missed = g < 3;
+
+    if(missed){
+      S.again += 1;
+      S.relearn[card.id] = true;
+      var at = Math.min(FC.queue.length, FC.at + 1 + FC_RELEARN_GAP);
+      FC.queue.splice(at, 0, card);
+    } else {
+      if(g >= 5) S.easy += 1; else S.good += 1;
+      delete S.relearn[card.id];
+      S.passed[card.id] = true;
+    }
+    S.answered += 1;
+    FC.done = Object.keys(S.passed).length;
+    FC.at += 1;
+    FC.flipped = false;
+    FC.pick = FC_DEFAULT_PICK;
+    renderDeck();
+
+    // The schedule is the server's business and nothing on screen waits for it.
     apiPost('/api/cards/'+card.id+'/review', { grade: g }).then(function(updated){
-      for(var i=0;i<FC.deck.cards.length;i++){
-        if(FC.deck.cards[i].id === updated.id) FC.deck.cards[i] = updated;
-      }
-      FC.done++;
-      FC.at++;
-      FC.flipped = false;
-      FC.pick = FC_DEFAULT_PICK;
-      renderDeck();
-      if(FC.at >= FC.queue.length) hsLoadSide();
+      fcAdoptCard(updated);
+      if(FC && FC.at >= FC.queue.length){ fcPaintDone(); hsLoadSide(); }
     }).catch(reportError);
+  }
+
+  /** Repaint the summary once the last card's new due date has landed. */
+  function fcPaintDone(){
+    if(FC && FC.mode === 'review' && FC.at >= FC.queue.length) renderDeck();
   }
 
   // ---------------- Threads ----------------
@@ -13363,7 +14208,8 @@
     }).catch(function(err){ studyScreen = null; renderView(); reportError(err); });
   }
 
-  function openThread(tid){
+  /** @param {string=} tool a Headstart tool to run once the chat has loaded */
+  function openThread(tid, tool){
     // Close first, then build: closeModal clears every open workspace including TH, so
     // setting up the thread before it would wipe the thread we are opening.
     closeModal();            // a thread may have been reached from a modal; leave it behind
@@ -13379,6 +14225,7 @@
       TH.loading = false;
       TH.data = d;
       renderThread();
+      if(tool) threadSend(tool, false);
       if(d.classId){
         apiGet('/api/ai/context/'+d.classId).then(function(ctx){
           if(TH && TH.id === tid){ TH.ctx = ctx; }
@@ -13555,13 +14402,14 @@
    * Assignments used to open a one-shot run that was thrown away when you closed it.
    * They open a conversation now, so the work survives and can be carried on.
    */
-  function openItemThread(itemId){
+  /** @param {string=} tool a Headstart tool to run as soon as the chat is open */
+  function openItemThread(itemId, tool){
     var it = items.find(function(i){ return i.id===itemId; });
     if(!it) return;
     var existing = hsThreads.find(function(t){ return t.itemId === itemId; });
-    if(existing){ openThread(existing.id); return; }
+    if(existing){ openThread(existing.id, tool); return; }
     openDraftThread({ classId: it.classId, itemId: itemId,
-                      title: it.title || 'Untitled assignment' });
+                      title: it.title || 'Untitled assignment' }, tool);
   }
 
   /** A thread that exists on screen but not yet in the database.
@@ -13569,7 +14417,7 @@
    * Nothing is written until the first message, so looking at an assignment does not
    * leave an empty thread behind it. `threadSend` promotes it on the way past.
    */
-  function openDraftThread(seed){
+  function openDraftThread(seed, tool){
     closeModal();
     TH = { id: null, draftThread: seed, loading: false, busy: false, confirm: null,
            picking: false, ctx: null, srcOpen: false, draft: '',
@@ -13578,6 +14426,9 @@
     hsScreen = { kind: 'thread', id: null };
     if(activeTab !== 'headstart'){ activeTab = 'headstart'; render(); }
     renderThread();
+    // Arriving with a tool already chosen still goes through the usual confirmation,
+    // so nothing is spent on a single click from the plan card.
+    if(tool) threadSend(tool, false);
     if(seed.classId){
       apiGet('/api/ai/context/'+seed.classId)
         .then(function(ctx){ if(TH) TH.ctx = ctx; }).catch(function(){});
@@ -16443,6 +17294,7 @@
       return;
     }
     if(action==='hs-open-item'){ openItemThread(t.dataset.id); return; }
+    if(action==='hs-start-tool'){ openItemThread(t.dataset.id, t.dataset.tool); return; }
     if(action==='hs-back'){
       var backTo = hsBackItemId;
       closeModal();                 // this clears hsBackItemId too
@@ -16759,7 +17611,10 @@
     // ---- flashcards ----
     if(action==='hs-open-deck'){ hsBackItemId = null; openStudySet(t.dataset.id); return; }
     if(action==='study-open-set'){ openStudySet(t.dataset.id); return; }
-    if(action==='study-home'){ studyScreen = null; FC = null; renderView(); paintIcons(); return; }
+    if(action==='study-home'){
+      studyLeaveMode();
+      studyScreen = null; FC = null; renderView(); paintIcons(); return;
+    }
     if(action==='study-learn'){ learnStart(); return; }
     if(action==='study-test'){ testStart(); return; }
     if(action==='learn-next'){ learnNext(); return; }
@@ -16800,7 +17655,35 @@
       return;
     }
     if(action==='fc-review'){ fcStartReview(); return; }
-    if(action==='fc-list'){ FC.mode = 'list'; renderDeck(); return; }
+    if(action==='fc-cram'){ fcStartReview({ all:true }); return; }
+    if(action==='fc-drill-trouble'){
+      fcStartReview({ ids: setStats(FC.deck).stuck.map(function(c){ return c.id; }) });
+      return;
+    }
+    if(action==='fc-again'){
+      // "Go round again" means the same sitting over, including what was missed, and
+      // for a queue built across sets it means rebuilding that queue.
+      if(FC.deck && FC.deck.virtual){
+        openStudyQueue((studyScreen && studyScreen.scope) || 'due',
+                       { classId: FC.deck.classId, label: FC.deck.name });
+      } else {
+        fcStartReview({ all:true });
+      }
+      return;
+    }
+    if(action==='study-review-due'){ openStudyQueue('due'); return; }
+    if(action==='study-trouble'){ openStudyQueue('trouble'); return; }
+    if(action==='study-cram-class'){
+      openStudyQueue('cram', { classId: t.dataset.id || null,
+                               label: 'Cram: ' + (t.dataset.title || 'everything') });
+      return;
+    }
+    if(action==='fc-list'){
+      studyLeaveMode();
+      // A cross-set queue has no set to go back to; its way out is Study itself.
+      if(FC.deck && FC.deck.virtual){ studyScreen = null; FC = null; renderView(); paintIcons(); return; }
+      FC.mode = 'list'; renderDeck(); return;
+    }
     if(action==='fc-flip'){ fcSetFlipped(!FC.flipped); return; }
     if(action==='fc-grade'){ fcGrade(parseInt(t.dataset.g,10)); return; }
     if(action==='fc-add'){

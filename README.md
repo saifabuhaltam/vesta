@@ -15,12 +15,18 @@ is what makes the same code serve the deployment and a laptop.
 - A month and list calendar view, filterable by class, with .ics export
 - Per-class tabs: **Files** (real uploads, drag-and-drop, auto-categorized by filename — "Lecture 7.pdf" guesses Lecture slides, "Essay Rubric.docx" guesses Rubrics, "Midterm 2025.pdf" guesses Past exams — override any guess with the inline dropdown), **Assignments**, **Notes** (auto-links to an assignment when you mention its title), **Grades** (full weighted breakdown), **Syllabus** (a topic checklist)
 - **Rubric parsing** — any file categorized as a rubric gets a "Parse rubric" action that extracts its grading criteria via Claude, which can then be linked to a specific assignment. Once linked, the criteria show up on that assignment's detail view and feed into Headstart's context.
-- **Headstart** — a dedicated tab listing everything open, plus a "Headstart" button on any assignment. Depending on the assignment's type it offers a draft, an essay outline, quiz prep, a study outline, or a synthesis of the class's readings (using their extracted text, plus a linked rubric's criteria if one exists). Generated work stays attached to that assignment — accept it, edit it, ask for changes, or regenerate it from scratch. Calls the Claude API server-side; see the API key setup below.
+- **Headstart** — a dedicated tab listing everything open, plus a "Headstart" button on any assignment. It opens with a "Start here" card naming the most pressing piece of work, why it is pressing, how far along it already is, and the two or three tools worth using on it given that state. Depending on the assignment's type it offers a draft, an essay outline, quiz prep, a study outline, or a synthesis of the class's readings (using their extracted text, plus a linked rubric's criteria if one exists). What Vesta knows about your progress — time logged, work already generated, sets already made — goes into the prompt, so an outline asked for on day six is not the one from day one. Generated work stays attached to that assignment — accept it, edit it, ask for changes, or regenerate it from scratch. Calls the Claude API server-side; see the API key setup below.
 - **Lock In** — a Pomodoro-style focus timer tied to a specific assignment. Time spent in "work" phases logs back onto that assignment (visible on its detail view), so the loop of upload materials → Headstart drafts something → Lock In session to work on it → time logged is real, not just a diagram.
-- **Study** — sets of terms with three ways through them: Flashcards, Learn (four
-  choices, then typed from memory, until every term is learned) and Test (a scored
-  paper of mixed questions). All three run in the browser from your own terms, so they
-  cost nothing. Quizzes and practice tests built by Headstart are listed here too.
+- **Study** — sets of terms with four ways through them: Flashcards (spaced
+  repetition, where each grade says what it costs before you press it and a missed term
+  comes back before you finish), Learn (four choices, then typed from memory, until
+  every term is learned), Test (a scored paper of mixed questions) and Cram (every
+  term, least known first, schedule ignored). All four run in the browser from your own
+  terms, so they cost nothing, and all of them report back to the same schedule: miss a
+  term in a test and it is due again tomorrow.
+  One button reviews everything due across every set, another drills only the terms you
+  keep forgetting, and each set shows how much of it is learned next to the next exam
+  in its class. Quizzes and practice tests built by Headstart are listed here too.
 - **The Humanizer** — rewrites AI-sounding prose and marks each habit it removed on the
   original. It reads a paste, a note, a chat, a file you upload, or a file already in
   Vesta, and splits a long paper into sections on its own.
