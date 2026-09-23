@@ -175,3 +175,34 @@ def test_a_check_reads_the_text_it_is_missing(conn, class_id, downloads, reader,
     monkeypatch.setattr(canvas, "Client", FakeClient)
     sync.check_account(None)
     assert row(conn, mid)["extracted_text"] == "Lecture 3: attention and perception."
+
+
+# ---------------------------------------------------------------------------
+# what the source pickers are told about each file
+# ---------------------------------------------------------------------------
+
+def test_the_picker_learns_each_file_s_folder_size_and_why_it_cannot_be_read(conn, class_id):
+    """The picker said "no readable text" about a lecture video and a deck whose text was
+    still being read alike, and listed fifty names with nothing to group them by."""
+    import app as vesta_app
+    import ai
+    fid = str(uuid.uuid4())
+    conn.execute("INSERT INTO file_folders (id, class_id, parent_id, name, kind, sort_order, created_at)"
+                 " VALUES (?,?,?,?,?,?,?)", (fid, class_id, None, "Week 1", "custom", 0, "2026-09-01"))
+    conn.commit()
+    deck = link(conn, class_id, "Lecture 1.pdf")
+    conn.execute("UPDATE materials SET folder_id=? WHERE id=?", (fid, deck))
+    link(conn, class_id, "Recording.mp4", mimetype="video/mp4")
+    link(conn, class_id, "Photo.png", mimetype="image/png")
+    link(conn, class_id, "Readings.zip")
+    link(conn, class_id, "Notes.txt", kind="file", text="words")
+    conn.commit()
+    with vesta_app.app.test_request_context():
+        body = ai.ai_context(class_id).get_json()
+    by = {f["title"]: f for f in body["files"]}
+    assert (by["Lecture 1.pdf"]["folderName"], by["Lecture 1.pdf"]["reason"]) == ("Week 1", "reading")
+    assert by["Recording.mp4"]["reason"] == "video"
+    assert by["Photo.png"]["reason"] == "image"
+    assert by["Readings.zip"]["reason"] == "archive"
+    assert (by["Notes.txt"]["readable"], by["Notes.txt"]["reason"]) == (True, None)
+    assert by["Lecture 1.pdf"]["size"] == 20 * 1024 * 1024

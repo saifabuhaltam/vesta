@@ -394,3 +394,26 @@ def test_reading_missing_text_runs_on_postgres(monkeypatch):
     assert sync.read_missing_text(ALICE)["read"] == 1
     assert read == [ids[0]]                                  # the video is left alone
     assert sync.read_missing_text(ALICE)["read"] == 0        # and nothing is read twice
+
+
+def test_the_source_picker_context_runs_on_postgres():
+    """The picker's query now joins file folders. Run it the way the route does."""
+    import flask
+    import app as vesta_app
+    import ai
+    cid = make_class(ALICE, code="IAT 201")
+    conn = as_user(ALICE)
+    fid, mid = str(uuid.uuid4()), str(uuid.uuid4())
+    conn.execute("INSERT INTO file_folders (id, class_id, parent_id, name, kind, sort_order, created_at)"
+                 " VALUES (?,?,?,?,?,?,?)", (fid, cid, None, "Week 1", "custom", 0, "2026-09-01"))
+    conn.execute("INSERT INTO materials (id, semester_id, class_id, title, kind, url, filename, size,"
+                 " mimetype, folder_id, import_key, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                 (mid, vdb.active_semester_id(conn), cid, "Deck.pdf", "link", "https://x/d", "Deck.pdf",
+                  9000000, "application/pdf", fid, "canvas:file:1", "2026-09-01"))
+    conn.commit()
+    conn.close()
+    with vesta_app.app.test_request_context():
+        flask.g.user_id = ALICE
+        body = ai.ai_context(cid).get_json()
+    f = body["files"][0]
+    assert (f["folderName"], f["reason"], f["size"]) == ("Week 1", "reading", 9000000)

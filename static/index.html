@@ -636,7 +636,38 @@
   .hs-srcswap:hover{ color:var(--accent-ink); text-decoration:underline; }
   .hs-srclist li{ list-style:none; display:flex; gap:6px; align-items:baseline; }
   .hs-srclist li::before{ content:"·"; color:var(--text-faint); }
-  .hs-pickwrap{ max-height:230px; overflow:auto; margin-top:8px; }
+  .hs-pickwrap{ max-height:460px; overflow:auto; margin-top:8px; }
+
+  /* the file list every source picker uses (srcFilesHtml) */
+  .srcl{ display:flex; flex-direction:column; gap:8px; }
+  .srcl-top{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .srcl-filter{ flex:1; min-width:180px; padding:8px 14px; border-radius:var(--r-pill);
+    border:1px solid var(--border); background:var(--surface); color:var(--text); font:inherit; font-size:13px; }
+  .srcl-filter:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .srcl-count{ font-size:12px; color:var(--text-faint); white-space:nowrap; }
+  .srcl-list{ max-height:min(46vh, 380px); overflow-y:auto; border:1px solid var(--border);
+    border-radius:var(--r-md); padding:2px 6px 6px; background:var(--surface); }
+  .srcl-notes{ max-height:min(30vh, 240px); padding-top:6px; }
+  .srcl-group + .srcl-group{ border-top:1px solid var(--border); margin-top:4px; }
+  .srcl-ghead{ position:sticky; top:0; z-index:1; background:var(--surface); display:flex;
+    justify-content:space-between; gap:10px; padding:8px 6px 4px; font-size:11.5px; font-weight:700;
+    color:var(--text-muted); }
+  .srcl-ghead span:last-child{ color:var(--text-faint); font-weight:600; }
+  .srcl-row{ display:flex; align-items:center; gap:10px; padding:6px; border-radius:var(--r-sm); cursor:pointer; }
+  .srcl-row:hover{ background:var(--surface-2); }
+  .srcl-row input[type="checkbox"]{ width:15px; height:15px; margin:0; accent-color:var(--accent); flex:none; }
+  .srcl-ic{ width:28px; height:28px; border-radius:8px; color:#fff; font-size:9px; font-weight:800;
+    letter-spacing:.02em; display:flex; align-items:center; justify-content:center; flex:none; }
+  .srcl-ic-note{ background:var(--accent-soft); color:var(--accent); font-size:11px; }
+  .srcl-main{ display:flex; flex-direction:column; min-width:0; }
+  .srcl-name{ font-size:13px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .srcl-meta{ font-size:11.5px; color:var(--text-faint); }
+  .srcl-row.off{ cursor:default; }
+  .srcl-row.off .srcl-name{ color:var(--text-muted); font-weight:500; }
+  .srcl-row.off .srcl-ic{ opacity:.45; }
+  .srcl-row.off:hover{ background:transparent; }
+  .srcl-nomatch{ padding:12px 6px; font-size:12.5px; color:var(--text-faint); }
+  .srcl-hidden{ display:none !important; }
   .hs-pick{ display:flex; align-items:center; gap:8px; padding:5px 2px; font-size:12px; cursor:pointer; }
   .hs-pick input[type="checkbox"]{ width:14px; height:14px; accent-color:var(--accent); flex:none; }
   .hs-pick span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -14000,9 +14031,8 @@
     var out = '';
     if(ctx.files.length){
       out += '<div class="hs-pick-group">Files</div>'
-        + ctx.files.map(function(f){
-            return row('file', f.id, f.title, f.readable ? '' : 'not readable', !f.readable);
-          }).join('');
+        + srcFilesHtml('hs', ctx.files, function(id){ return sel.materialIds.indexOf(id) >= 0; },
+                       'hs-toggle-src', 'file');
     }
     if(ctx.folders.length){
       // A folder stands for the notes inside it, so an empty one is not worth offering.
@@ -15343,28 +15373,163 @@
       + '</div>';
   }
 
+  // ---------------- choosing sources: one file list for every picker ----------------
+  // Saif, 2026-09-23, on the chat's source picker: "extremely unorganized and
+  // impossible to see the proper list of items". Its rows had no styles at all, so the
+  // browser ran fifty file names together like a paragraph, and the one-shot tools'
+  // picker was a single flat list. Both now use this: grouped by the class's folders
+  // the way its Files tab is, a search box, a type badge, the size, and, for a file
+  // with nothing to read, which kind of nothing (a video, an image, or a Canvas deck
+  // whose text is still being read), with its box disabled rather than offered.
+  var SRC_REASON = { video:'Video, no text to read', image:'Image, no text to read',
+                     archive:'Zip file, no text to read', reading:'Text still being read from Canvas',
+                     link:'A web link, no text to read', none:'No text found in it' };
+  var srcFilter = {};          // picker id -> what was typed in its search
+
+  // A file in a folder is grouped under its folder. One in none is grouped by what kind
+  // of file it is, because a Canvas course with its Files tab switched on (IAT 201)
+  // brings every file in unfiled, and the filename guesses call most of them "other".
+  var SRC_KINDS = [
+    ['PDFs', ['pdf']],
+    ['Documents', ['doc','docx','rtf','odt','pages','txt','md']],
+    ['Slides', ['ppt','pptx','key','odp']],
+    ['Spreadsheets', ['xls','xlsx','csv','numbers','ods']],
+    ['Videos', ['mp4','mov','m4v','avi','mkv','webm','wmv']],
+    ['Images', ['png','jpg','jpeg','gif','webp','svg','heic','bmp']]
+  ];
+  function srcGroupOf(f){
+    if(f.folderName) return { key:'f:'+f.folderName, label:f.folderName, rank:0 };
+    var ext = String(f.filename || f.title || '').split('.').pop().toLowerCase();
+    for(var i=0;i<SRC_KINDS.length;i++){
+      if(SRC_KINDS[i][1].indexOf(ext) >= 0) return { key:'k:'+i, label:SRC_KINDS[i][0], rank:1+i };
+    }
+    return { key:'k:other', label:'Other files', rank:1+SRC_KINDS.length };
+  }
+
+  function srcRowHtml(f, on, action, kind, q){
+    var name = f.title || f.filename || 'File';
+    var meta = [];
+    if(f.size != null) meta.push(humanSize(f.size));
+    if(f.copies > 1) meta.push(f.copies+' identical copies');
+    if(!f.readable) meta.push(SRC_REASON[f.reason] || 'No text to read');
+    var hidden = q && name.toLowerCase().indexOf(q) < 0;
+    return '<label class="srcl-row'+(f.readable ? '' : ' off')+(hidden ? ' srcl-hidden' : '')+'"'
+      + ' data-name="'+escapeHtml(name.toLowerCase())+'" title="'+escapeHtml(name)+'">'
+      + '<input type="checkbox" data-action="'+action+'" data-kind="'+kind+'" data-id="'+escapeHtml(f.id)+'"'
+      + (on ? ' checked' : '') + (!f.readable && !on ? ' disabled' : '') + '>'
+      + '<span class="srcl-ic" style="background:'+fileTypeColor(f.filename||name)+';">'
+      + escapeHtml(fileTypeInitials(f.filename||name))+'</span>'
+      + '<span class="srcl-main"><span class="srcl-name">'+escapeHtml(name)+'</span>'
+      + (meta.length ? '<span class="srcl-meta">'+escapeHtml(meta.join(' · '))+'</span>' : '')
+      + '</span></label>';
+  }
+
+  function srcFilesHtml(pickerId, files, isOn, action, kind){
+    files = files || [];
+    if(!files.length) return '<div class="hs-none">No files in this class yet.</div>';
+    // The same file twice (IAT 201 has several: one copy in each of two Canvas folders)
+    // is one row. Two identical boxes cannot be told apart, and ticking both would feed
+    // a tool the same text twice and charge for it.
+    var byKey = {}, unique = [];
+    files.forEach(function(f){
+      var k = (f.title||'').toLowerCase() + '|' + (f.size == null ? '' : f.size);
+      if(byKey[k]){ byKey[k].copies = (byKey[k].copies || 1) + 1; return; }
+      byKey[k] = Object.assign({}, f);
+      unique.push(byKey[k]);
+    });
+    files = unique;
+    var q = (srcFilter[pickerId] || '').trim().toLowerCase();
+    var groups = {}, order = [];
+    files.forEach(function(f){
+      var g = srcGroupOf(f);
+      if(!groups[g.key]){ groups[g.key] = { info:g, files:[] }; order.push(g.key); }
+      groups[g.key].files.push(f);
+    });
+    // Folders first, in the order a person counts them (Week 2 before Week 10), then
+    // the kinds of loose file in a fixed order.
+    order.sort(function(a, b){
+      var x = groups[a].info, y = groups[b].info;
+      if(x.rank !== y.rank) return x.rank - y.rank;
+      return x.label.localeCompare(y.label, undefined, { numeric:true, sensitivity:'base' });
+    });
+    var readable = files.filter(function(f){ return f.readable; }).length;
+    var chosen = files.filter(function(f){ return isOn(f.id); }).length;
+    var anyShown = false;
+    var body = order.map(function(key){
+      var g = groups[key].info.label;
+      var list = groups[key].files.slice().sort(function(a, b){
+        if(a.readable !== b.readable) return a.readable ? -1 : 1;
+        return (a.title||'').localeCompare(b.title||'', undefined, { numeric:true, sensitivity:'base' });
+      });
+      var shown = list.filter(function(f){ return !q || (f.title||'').toLowerCase().indexOf(q) >= 0; }).length;
+      if(shown) anyShown = true;
+      return '<div class="srcl-group'+(shown ? '' : ' srcl-hidden')+'">'
+        + '<div class="srcl-ghead"><span>'+escapeHtml(g)+'</span><span>'+list.length+'</span></div>'
+        + list.map(function(f){ return srcRowHtml(f, isOn(f.id), action, kind, q); }).join('')
+        + '</div>';
+    }).join('');
+    return '<div class="srcl" data-srcl="'+pickerId+'">'
+      + '<div class="srcl-top">'
+      + '<input type="search" class="srcl-filter" data-srcl-filter="'+pickerId+'" placeholder="Find a file"'
+      + ' value="'+escapeHtml(srcFilter[pickerId]||'')+'" aria-label="Find a file">'
+      + '<span class="srcl-count">'+readable+' of '+files.length+' can be read'
+      + (chosen ? ' · '+chosen+' chosen' : '')+'</span></div>'
+      + '<div class="srcl-list">'+body
+      + '<div class="srcl-nomatch'+(anyShown ? ' srcl-hidden' : '')+'">No file matches that.</div>'
+      + '</div></div>';
+  }
+
+  /** Notes in the same shape as files, so the picker reads as one list. */
+  function srcNotesHtml(notes, isOn, action, kind){
+    if(!(notes||[]).length) return '<div class="hs-none">No notes in this class yet.</div>';
+    return '<div class="srcl-list srcl-notes">' + notes.map(function(n){
+      var empty = !n.chars;
+      var on = isOn(n.id);
+      return '<label class="srcl-row'+(empty ? ' off' : '')+'" title="'+escapeHtml(n.title||'')+'">'
+        + '<input type="checkbox" data-action="'+action+'" data-kind="'+kind+'" data-id="'+escapeHtml(n.id)+'"'
+        + (on ? ' checked' : '') + (empty && !on ? ' disabled' : '') + '>'
+        + '<span class="srcl-ic srcl-ic-note">N</span>'
+        + '<span class="srcl-main"><span class="srcl-name">'+escapeHtml(n.title||'Untitled note')+'</span>'
+        + (empty ? '<span class="srcl-meta">Empty</span>' : '')+'</span></label>';
+    }).join('') + '</div>';
+  }
+
+  document.addEventListener('input', function(e){
+    var el = e.target;
+    if(!el || !el.matches || !el.matches('[data-srcl-filter]')) return;
+    srcFilter[el.getAttribute('data-srcl-filter')] = el.value;
+    var q = el.value.trim().toLowerCase();
+    var box = el.closest('.srcl');
+    if(!box) return;
+    var any = false;
+    box.querySelectorAll('.srcl-group').forEach(function(g){
+      var n = 0;
+      g.querySelectorAll('.srcl-row').forEach(function(r){
+        var hit = !q || (r.getAttribute('data-name')||'').indexOf(q) >= 0;
+        r.classList.toggle('srcl-hidden', !hit);
+        if(hit) n++;
+      });
+      g.classList.toggle('srcl-hidden', !n);
+      if(n) any = true;
+    });
+    var none = box.querySelector('.srcl-nomatch');
+    if(none) none.classList.toggle('srcl-hidden', any);
+  });
+
   /** Same picker as the one-shot workspace, writing to the thread instead of a run. */
   function threadPickerHtml(){
     var ctx = TH.ctx;
     if(!ctx) return '<div class="hs-thinking"><i></i>Loading what this class has…</div>';
     var sel = TH.data.selection || { materialIds:[], noteIds:[] };
-    function row(kind, id, label, sub, on){
-      return '<label class="hs-srcrow"><input type="checkbox" data-action="th-src-toggle"'
-        + ' data-kind="'+kind+'" data-id="'+id+'"'+(on?' checked':'')+'>'
-        + '<span><b>'+escapeHtml(label)+'</b>'
-        + (sub ? '<span class="hs-saved-sub"> '+escapeHtml(sub)+'</span>' : '')+'</span></label>';
-    }
-    var files = (ctx.files||[]).map(function(f){
-      return row('material', f.id, f.title, f.readable ? '' : 'no readable text',
-                 (sel.materialIds||[]).indexOf(f.id) >= 0);
-    }).join('');
-    var notes = (ctx.notes||[]).map(function(nt){
-      return row('note', nt.id, nt.title, '', (sel.noteIds||[]).indexOf(nt.id) >= 0);
-    }).join('');
+    var files = srcFilesHtml('th', ctx.files, function(id){
+      return (sel.materialIds||[]).indexOf(id) >= 0;
+    }, 'th-src-toggle', 'material');
+    var notes = srcNotesHtml(ctx.notes, function(id){
+      return (sel.noteIds||[]).indexOf(id) >= 0;
+    }, 'th-src-toggle', 'note');
     return '<div class="th-picker">'
-      + '<div class="hs-group-label">Files</div>'+(files || '<div class="hs-none">No files in this class yet.</div>')
-      + '<div class="hs-group-label" style="margin-top:12px;">Notes</div>'
-      + (notes || '<div class="hs-none">No notes in this class yet.</div>')
+      + '<div class="hs-group-label">Files</div>'+files
+      + '<div class="hs-group-label" style="margin-top:14px;">Notes</div>'+notes
       + '<div class="hs-actions" style="margin-top:14px;">'
       + '<button type="button" class="btn primary" data-action="th-pick-done">Done</button></div>'
       + '</div>';

@@ -771,15 +771,49 @@ def ai_settings():
     return jsonify(out)
 
 
+_VIDEO_EXTS = {"mp4", "mov", "m4v", "avi", "mkv", "webm", "wmv", "flv"}
+_IMAGE_EXTS = {"png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "heic", "tif", "tiff"}
+_ARCHIVE_EXTS = {"zip", "rar", "7z", "tar", "gz", "tgz"}
+
+
+def unreadable_reason(m):
+    """Why a file has no text a tool could read, in one word the picker can explain.
+
+    The picker used to say "no readable text" about everything from a lecture video to
+    a 20 MB deck whose text simply had not been read yet, which told him nothing about
+    which ones were worth waiting for.
+    """
+    name = (m["filename"] or m["title"] or "").lower()
+    ext = name.rsplit(".", 1)[-1] if "." in name else ""
+    mime = (m["mimetype"] or "").lower()
+    if mime.startswith("video/") or ext in _VIDEO_EXTS:
+        return "video"
+    if mime.startswith("image/") or ext in _IMAGE_EXTS:
+        return "image"
+    if ext in _ARCHIVE_EXTS:
+        return "archive"
+    key = m["import_key"] if "import_key" in m.keys() else None
+    if m["kind"] != "file" and (key or "").startswith("canvas:file:"):
+        return "reading"          # a Canvas file whose text is read in the background
+    if m["kind"] != "file":
+        return "link"
+    return "none"                 # a scanned PDF, or a format with no reader
+
+
 @bp.route("/api/ai/context/<cid>")
 def ai_context(cid):
     """Everything in a class that could be fed to a tool, so the user can pick."""
     conn = get_db()
+    # With the folder each file sits in, its size and type, so the picker can group a
+    # class's files the way its Files tab does rather than listing fifty names at once.
     mats = conn.execute(
-        "SELECT id, title, filename, category, "
-        "  CASE WHEN extracted_text IS NULL OR extracted_text='' THEN 0 ELSE 1 END AS readable, "
-        "  LENGTH(COALESCE(extracted_text,'')) AS chars "
-        "FROM materials WHERE class_id=? ORDER BY created_at DESC", (cid,)).fetchall()
+        "SELECT m.id AS id, m.title AS title, m.filename AS filename, m.category AS category, "
+        "  m.kind AS kind, m.mimetype AS mimetype, m.size AS size, m.import_key AS import_key, "
+        "  m.folder_id AS folder_id, f.name AS folder_name, "
+        "  CASE WHEN m.extracted_text IS NULL OR m.extracted_text='' THEN 0 ELSE 1 END AS readable, "
+        "  LENGTH(COALESCE(m.extracted_text,'')) AS chars "
+        "FROM materials m LEFT JOIN file_folders f ON f.id = m.folder_id "
+        "WHERE m.class_id=? ORDER BY m.created_at DESC", (cid,)).fetchall()
     notes = conn.execute(
         "SELECT id, title, folder_id, LENGTH(COALESCE(text,'')) AS chars FROM notes "
         "WHERE class_id=? AND (deleted_at IS NULL OR deleted_at='') ORDER BY updated_at DESC",
@@ -797,8 +831,10 @@ def ai_context(cid):
     conn.close()
     return jsonify({
         "files": [{"id": m["id"], "title": m["title"] or m["filename"] or "File",
-                   "category": m["category"], "readable": bool(m["readable"]),
-                   "chars": m["chars"]} for m in mats],
+                   "filename": m["filename"], "category": m["category"],
+                   "readable": bool(m["readable"]), "chars": m["chars"], "size": m["size"],
+                   "folderId": m["folder_id"], "folderName": m["folder_name"],
+                   "reason": None if m["readable"] else unreadable_reason(m)} for m in mats],
         "notes": [{"id": n["id"], "title": n["title"] or "Untitled note",
                    "folderId": n["folder_id"], "chars": n["chars"]} for n in notes],
         "folders": [{"id": f["id"], "name": f["name"], "parentId": f["parent_id"],
