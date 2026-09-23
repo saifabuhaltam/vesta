@@ -617,6 +617,23 @@ browser against REM 388: Accept all added 31 assignments and 35 files, Undo remo
 them all and offered all 66 changes again, and the 26 downloads in flight left nothing
 behind on disk.
 
-**Offered, not built:** filling an existing assignment's *empty* description from
-Canvas, offered in the review like a missing due date. A new assignment from Canvas
-already arrives with its description, as plain text.
+## Descriptions, 2026-09-22
+
+A new assignment from Canvas arrives with Canvas's description. Asked for by Saif: an
+assignment he already has with an **empty** description is now offered Canvas's, in
+its own group, "Descriptions Canvas can fill in", with Skip / Add description and the
+start of the text on the row. One he wrote himself is never offered a replacement,
+because instructors reword descriptions all term and every rewording would look like
+a change. Undo takes a filled description back to empty.
+
+Descriptions are plain text shown with their line breaks, so `canvas.plain_text` now
+keeps the shape: paragraphs stay paragraphs, list items become "- " lines, and inline
+tags (links, the coloured spans Canvas's editor uses) vanish without a gap. The first
+version reused `ai.strip_html`, which squashes all whitespace and turned a brief of
+several paragraphs into one line. Discussion 08 reads "- Please, discuss two pros and
+two cons of a whale hunt by a First Nation."
+
+Found while testing it: a failed assertion in `tests/pg` left its connection open, and
+the cleanup's `ALTER TABLE` then waited on that lock forever, so the run hung instead
+of failing. `tests/pg/test_canvas_pg.py` now closes every connection before cleaning
+up. The other files in `tests/pg` have the same shape and the same exposure.

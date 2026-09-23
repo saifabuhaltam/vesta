@@ -35,6 +35,14 @@ def schema():
 @pytest.fixture(autouse=True)
 def clean():
     yield
+    # Close whatever a failed test left open first. An open transaction holds locks,
+    # and the ALTER TABLE below would otherwise wait on them forever: the whole run
+    # hangs instead of reporting the one failure.
+    while _open:
+        try:
+            _open.pop().close()
+        except Exception:
+            pass
     conn = psycopg.connect(DATABASE_URL, autocommit=True)
     with conn.cursor() as cur:
         for t in ("materials", "items", "grade_categories", "file_folders", "classes",
@@ -45,8 +53,13 @@ def clean():
     conn.close()
 
 
+_open = []
+
+
 def as_user(uid):
-    return vdb.get_db(user_id=uid)
+    conn = vdb.get_db(user_id=uid)
+    _open.append(conn)
+    return conn
 
 
 def make_class(uid, code="REM 388"):
@@ -166,10 +179,12 @@ def test_accepting_a_change_and_keeping_another_on_postgres():
     cid = make_class(ALICE)
     conn = as_user(ALICE)
     iid = str(uuid.uuid4())
+    # With a description of his own, so Canvas's is not offered: this test is about a
+    # moved date and a kept grade, and nothing else.
     conn.execute("INSERT INTO items (id, semester_id, class_id, title, type, due_date, due_time,"
-                 " status, score, import_key, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                 " status, score, import_key, notes, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                  (iid, vdb.active_semester_id(conn), cid, "Quiz 01", "quiz", "2026-09-15",
-                  "11:20", "done", 80.0, "canvas:100", "2026-09-01"))
+                  "11:20", "done", 80.0, "canvas:100", "My reminder", "2026-09-01"))
     conn.commit()
     conn.close()
     connect(ALICE, cid, items=[planned()])
@@ -279,4 +294,21 @@ def test_undo_runs_on_postgres_and_checks_every_dependent_table():
     left = conn.execute("SELECT import_key FROM items WHERE class_id=?", (cid,)).fetchall()
     assert [r["import_key"] for r in left] == ["canvas:101"]
     assert sync.build_review(conn, sync.load_state(conn))["count"] >= 2
+    conn.close()
+
+
+def test_an_empty_description_fills_in_on_postgres():
+    cid = make_class(ALICE)
+    conn = as_user(ALICE)
+    iid = str(uuid.uuid4())
+    conn.execute("INSERT INTO items (id, semester_id, class_id, title, type, due_date, due_time,"
+                 " status, score, import_key, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                 (iid, vdb.active_semester_id(conn), cid, "Quiz 01", "quiz", "2026-09-16",
+                  "11:20", "todo", 90.0, "canvas:100", "2026-09-01"))
+    conn.commit()
+    conn.close()
+    connect(ALICE, cid, items=[planned()])
+    report, _ = accept_everything(ALICE)
+    conn = as_user(ALICE)
+    assert conn.execute("SELECT notes FROM items WHERE id=?", (iid,)).fetchone()["notes"] == "Read ch 1"
     conn.close()

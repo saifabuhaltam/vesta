@@ -308,3 +308,30 @@ def test_every_planned_type_survives_the_round_trip():
     for _, typ in canvas.TYPE_WORDS:
         out = sync.compare_items([], plan([planned(type=typ)]))
         assert out[0]["type"] in syllabus.ITEM_TYPES
+
+
+# ---------------------------------------------------------------------------
+# descriptions
+# ---------------------------------------------------------------------------
+
+def test_an_empty_description_is_offered_canvas_s():
+    existing = [row(import_key="canvas:100", due_date="2026-10-01", due_time="23:59",
+                    weight=10.0, notes="")]
+    out = sync.compare_items(existing, plan([planned(notes="Two pros and two cons.")]))
+    change = next(c for c in out[0]["changes"] if c["field"] == "notes")
+    assert (change["after"], change["fill"]) == ("Two pros and two cons.", True)
+
+
+def test_a_description_he_wrote_is_never_offered_a_replacement():
+    """Instructors reword all term; every rewording would otherwise be a change."""
+    existing = [row(import_key="canvas:100", due_date="2026-10-01", due_time="23:59",
+                    weight=10.0, notes="My own reminder: start early")]
+    out = sync.compare_items(existing, plan([planned(notes="Two pros and two cons.")]))
+    assert out[0]["change"] == "same"
+
+
+def test_no_description_on_canvas_offers_nothing():
+    existing = [row(import_key="canvas:100", due_date="2026-10-01", due_time="23:59",
+                    weight=10.0, notes="")]
+    out = sync.compare_items(existing, plan([planned(notes="")]))
+    assert out[0]["change"] == "same"

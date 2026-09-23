@@ -108,20 +108,38 @@ def normalise_host(value):
     return host.rstrip("/")
 
 
+# Tags that end a paragraph (a blank line after) or a line. Everything else is inline
+# and simply disappears.
+_PARA_END = re.compile(r"</(p|div|h[1-6]|table|blockquote|pre|ul|ol)\s*>", re.I)
+# Not </li>: each <li> already starts its own line, so ending one adds nothing.
+_LINE_END = re.compile(r"</tr\s*>", re.I)
+
+
 def plain_text(html):
-    """The HTML body of a Canvas assignment as something `items.notes` can hold.
+    """The HTML body of a Canvas assignment as the plain text `items.notes` holds.
 
-    `ai.strip_html` does exactly this and is imported rather than repeated, but lazily:
-    importing `ai` pulls in the Anthropic client and the whole generation layer, and a
-    module whose job is reading JSON should not cost that at import time.
-
-    The one thing added on top is closing up the space a stripped tag leaves in front
-    of punctuation. Canvas descriptions are written in its rich text editor and are
-    full of inline tags, so "Covers <b>weeks 1 to 5</b>." arrives as "... 5 ." without
-    this.
+    Vesta shows an assignment's description as plain text with its line breaks kept,
+    so the shape matters as much as the words: paragraphs stay paragraphs and a list
+    stays a list, one "- " item to a line. The first version reused `ai.strip_html`,
+    which collapses every run of whitespace to a single space and so turned a
+    three-paragraph brief into one line. Inline tags (bold, links, the coloured spans
+    Canvas's editor wraps "two pros" and "two cons" in) vanish without leaving a gap.
     """
-    from ai import strip_html
-    return _pg_safe(re.sub(r"\s+([.,;:!?)\]])", r"\1", strip_html(html)))
+    import html as htmllib
+
+    s = html or ""
+    s = re.sub(r"<(script|style)[^>]*>.*?</\1\s*>", " ", s, flags=re.S | re.I)
+    s = re.sub(r"<br\s*/?>", "\n", s, flags=re.I)
+    s = re.sub(r"<li\b[^>]*>", "\n- ", s, flags=re.I)
+    s = re.sub(r"</t[dh]\s*>", " ", s, flags=re.I)
+    s = _PARA_END.sub("\n\n", s)
+    s = _LINE_END.sub("\n", s)
+    s = re.sub(r"<[^>]+>", "", s)
+    s = htmllib.unescape(s).replace("\xa0", " ")
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in s.split("\n")]
+    text = "\n".join(lines)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return _pg_safe(text)
 
 
 def _pg_safe(text):

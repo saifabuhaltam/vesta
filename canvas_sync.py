@@ -139,6 +139,14 @@ def compare_items(existing, plan, seen=()):
             fill = before is None or before == ""
             changes.append({"field": field, "before": before, "after": after, "fill": fill})
 
+        # A description is offered only into an empty one. Where he already has text,
+        # his stands and nothing is offered: instructors reword descriptions all term,
+        # and every rewording would otherwise look like a change to review.
+        offered = (item.get("notes") or "").strip()
+        mine = _col(match, "notes") or ""
+        if offered and not canvas.plain_text(mine).strip():
+            changes.append({"field": "notes", "before": mine, "after": offered, "fill": True})
+
         item["changes"] = changes
         item["change"] = "changed" if changes else "same"
         # A gap is filled without asking; a disagreement waits to be ticked. An item
@@ -526,7 +534,7 @@ def folder_by_name(conn, class_id, name):
 
 # Which draft field maps to which column when a single ticked change is applied.
 CHANGE_COLUMNS = {"dueDate": "due_date", "dueTime": "due_time", "type": "type",
-                  "weight": "weight", "score": "score"}
+                  "weight": "weight", "score": "score", "notes": "notes"}
 
 
 def _ticked(change):
@@ -732,6 +740,7 @@ GROUPS = (
     ("grade", "Grades"),
     ("newItem", "New assignments"),
     ("dateAdded", "Due dates Canvas can fill in"),
+    ("description", "Descriptions Canvas can fill in"),
     ("newFile", "New files"),
     ("updatedFile", "Files the professor replaced"),
     ("conflict", "Files with the same name as one you have"),
@@ -1104,6 +1113,10 @@ def _units_for_class(draft, existing_cats, course_entry, course_id, class_id, cl
                 {"date": before[0], "time": before[1], "text": _fmt_due(*before) if had_date else None},
                 {"date": after[0], "time": after[1], "text": _fmt_due(*after)},
                 _item=item, _changes=due_changes)
+        if "notes" in by_field:
+            c = by_field["notes"]
+            add("description", key, title, key + "|notes", c["before"], c["after"],
+                _item=item, _changes=[c])
         if "score" in by_field:
             c = by_field["score"]
             add("grade", key, title, key + "|score", c["before"], c["after"],
@@ -1194,6 +1207,7 @@ def _headlines(units, limit=3):
             differs, "" if differs == 1 else "s", "s" if differs == 1 else ""))
     counted = (("newItem", "new assignment", "new assignments"),
                ("dateAdded", "due date to fill in", "due dates to fill in"),
+               ("description", "description to fill in", "descriptions to fill in"),
                ("newFile", "new file", "new files"),
                ("updatedFile", "replaced file", "replaced files"),
                ("conflict", "file to compare", "files to compare"),
@@ -1398,7 +1412,7 @@ def _draft_from_units(units, snapshot):
             if item.get("categoryCanvasId") in plan_cats:
                 cats[item["categoryCanvasId"]] = dict(plan_cats[item["categoryCanvasId"]])
             items[u["key"]] = item
-        elif kind in ("moved", "dateAdded", "grade", "other") and u.get("_item"):
+        elif kind in ("moved", "dateAdded", "description", "grade", "other") and u.get("_item"):
             base = items.setdefault(u["key"], dict(u["_item"], include=True, changes=[]))
             for c in u.get("_changes") or []:
                 base["changes"].append(dict(c, include=True))

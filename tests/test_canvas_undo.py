@@ -372,3 +372,32 @@ def test_a_profile_canvas_will_not_give_falls_back_rather_than_failing(conn, cla
     monkeypatch.setattr(canvas, "Client", NoProfile)
     assert sync.check_account(None)["checked"] == 1
     assert sync.load_snapshot(conn, COURSE)["timeZone"] == ""
+
+
+# ---------------------------------------------------------------------------
+# filling a description he left empty
+# ---------------------------------------------------------------------------
+
+def test_an_empty_description_is_its_own_group_and_fills_in(conn, class_id):
+    iid = add_item(conn, class_id, title="Discussion 08", import_key="canvas:100",
+                   due_date="2026-09-16", due_time="11:20", weight=5.0)
+    connect(conn, class_id, items=[planned(title="Discussion 08", weight=5.0, score=None,
+                                           notes="- Discuss two pros and two cons.")])
+    rev = review(conn)
+    assert [g["kind"] for g in rev["groups"]] == ["description"]
+    assert rev["headlines"] == ["1 description to fill in"]
+    uid, _ = apply_all(conn)
+    assert item_row(conn, iid)["notes"] == "- Discuss two pros and two cons."
+    assert review(conn)["count"] == 0
+    undo(conn, uid)
+    assert (item_row(conn, iid)["notes"] or "") == ""
+    assert review(conn)["count"] == 1
+
+
+def test_skipping_a_description_is_remembered(conn, class_id):
+    add_item(conn, class_id, title="Discussion 08", import_key="canvas:100",
+             due_date="2026-09-16", due_time="11:20", weight=5.0)
+    connect(conn, class_id, items=[planned(title="Discussion 08", weight=5.0, score=None,
+                                           notes="Discuss two pros and two cons.")])
+    apply_all(conn, reject_kinds=("description",))
+    assert review(conn)["count"] == 0

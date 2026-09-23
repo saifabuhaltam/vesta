@@ -12025,6 +12025,7 @@
     grade:       ['Keep mine', 'Use Canvas'],
     newItem:     ['Skip', 'Add'],
     dateAdded:   ['Skip', 'Add date'],
+    description: ['Skip', 'Add description'],
     newFile:     ['Skip', 'Add'],
     updatedFile: ['Keep this version', 'Update'],
     conflict:    ['Keep mine', 'Add Canvas’s copy too'],
@@ -12032,7 +12033,8 @@
   };
   var CV_ALL = {
     moved:['Keep all mine','Use Canvas for all'], grade:['Keep all mine','Use Canvas for all'],
-    newItem:['Skip all','Add all'], dateAdded:['Skip all','Add all'], newFile:['Skip all','Add all'],
+    newItem:['Skip all','Add all'], dateAdded:['Skip all','Add all'], description:['Skip all','Add all'],
+    newFile:['Skip all','Add all'],
     updatedFile:['Keep all','Update all'], conflict:['Keep all mine','Add all'],
     other:['Keep all mine','Use Canvas for all']
   };
@@ -12041,6 +12043,7 @@
     grade: 'Scores posted on Canvas. Where you typed your own, it stays unless you choose Canvas.',
     newItem: 'Assignments on Canvas that are not in Vesta yet.',
     dateAdded: 'Assignments you already have that have no due date in Vesta.',
+    description: 'Assignments you already have with no description in Vesta. Canvas’s is copied in as plain text. One you wrote yourself is never replaced.',
     newFile: 'Small files are saved to Vesta straight away. Bigger ones, and video, stay on Canvas until you open them.',
     updatedFile: 'Files your professor has replaced on Canvas since Vesta saved them.',
     conflict: 'A file with the same name is already in this class, and Canvas’s copy is different. Yours is never replaced.',
@@ -12285,6 +12288,10 @@
     var b = u.before, a = u.after;
     if(u.kind === 'moved') return '<s>'+escapeHtml(b.text)+'</s> → <b>'+escapeHtml(a.text)+'</b>';
     if(u.kind === 'dateAdded') return 'Due <b>'+escapeHtml(a.text)+'</b>';
+    if(u.kind === 'description'){
+      var flat = String(a||'').replace(/\s+/g, ' ').trim();
+      return escapeHtml(flat.length > 180 ? flat.slice(0, 180).replace(/\s+\S*$/, '')+'…' : flat);
+    }
     if(u.kind === 'grade'){
       return b == null ? 'Canvas has <b>'+cvPct(a)+'</b>. Nothing in Vesta yet.'
                        : 'Yours <s>'+cvPct(b)+'</s> · Canvas <b>'+cvPct(a)+'</b>';

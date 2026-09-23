@@ -625,3 +625,30 @@ def test_a_nul_byte_never_reaches_postgres():
          "points_possible": 1}]}])
     item = plan["items"][0]
     assert "\x00" not in item["title"] and "\x00" not in item["notes"]
+
+
+# ---------------------------------------------------------------------------
+# descriptions keep their shape
+# ---------------------------------------------------------------------------
+
+def test_a_description_keeps_its_paragraphs_and_lists():
+    """Vesta shows a description as plain text with its line breaks, so a brief of
+    three paragraphs must not arrive as one line."""
+    html = ("<p>Covers <b>weeks 1 to 5</b>.</p><p>Bring&nbsp;notes.<br>Closed book.</p>"
+            "<ul><li>One</li><li>Two</li></ul><p>End.</p>")
+    assert canvas.plain_text(html) == \
+        "Covers weeks 1 to 5.\n\nBring notes.\nClosed book.\n\n- One\n- Two\n\nEnd."
+
+
+def test_discussion_08_reads_cleanly():
+    """Canvas's editor wraps "two pros" and "two cons" in links and coloured spans."""
+    html = ('<ol><li>Please, discuss <a href="https://x"><span style="color:#1a8">two pros</span></a>'
+            ' and <span style="color:red"><u>two cons</u></span> of a whale hunt by a First'
+            ' Nation.</li></ol>')
+    assert canvas.plain_text(html) == \
+        "- Please, discuss two pros and two cons of a whale hunt by a First Nation."
+
+
+def test_an_empty_or_missing_description_is_empty():
+    for html in (None, "", "<p></p>", "<p><br></p>", "<div>&nbsp;</div>"):
+        assert canvas.plain_text(html) == ""
