@@ -846,6 +846,17 @@
   .ss-key.ss-stuck::before{ background:var(--danger); }
   .ss-key.ss-stuck b{ color:var(--danger); }
 
+  /* A term's own state, in the same colours as the set's bar. */
+  .term-state{ display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:var(--r-pill);
+    font-size:11px; font-weight:700; white-space:nowrap; justify-self:start; letter-spacing:0; text-transform:none; }
+  .term-state::before{ content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .term-state.ts-learned{ background:var(--success-soft); color:var(--success); }
+  .term-state.ts-going{ background:var(--accent-soft); color:var(--accent-ink); }
+  .term-state.ts-fresh{ background:var(--surface-2); color:var(--text-muted); }
+  .term-state.ts-stuck{ background:var(--danger-soft); color:var(--danger); }
+  /* on the card, a tag in the top corner rather than a line in the centred column */
+  .fc-front .term-state{ position:absolute; top:14px; right:16px; }
+
   .set-trouble{ margin-top:22px; padding:16px 18px; border-radius:var(--r-card);
     border:1px solid var(--danger-soft); background:var(--danger-soft); }
   .set-trouble .set-terms-head h3{ color:var(--danger); }
@@ -2122,7 +2133,7 @@
   .set-terms-head h3{ font-size:14px; font-weight:700; }
   .set-term-list{ display:flex; flex-direction:column; gap:4px; }
   /* Term and definition in two columns, the way a set reads on paper. */
-  .set-term{ display:grid; grid-template-columns:minmax(140px, 1fr) 2fr auto auto auto;
+  .set-term{ display:grid; grid-template-columns:minmax(140px, 1fr) 2fr auto auto auto auto;
     align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border);
     border-radius:var(--r-md); padding:10px 14px; }
   .set-term-front{ font-size:13.5px; font-weight:650; color:var(--text); }
@@ -5156,6 +5167,16 @@
 
   function renderView(){
     var view = document.getElementById('view');
+    // A Headstart chat is rebuilt by every redraw, and a rebuilt panel starts scrolled to
+    // the top: Saif found the chat "resets to the top of the chat anytime a new message
+    // pops up", because something always redraws a moment after a reply arrives. So its
+    // place is carried across. At the bottom (or near it) it stays at the bottom and
+    // follows what arrives; scrolled up to read, it stays where it was.
+    var oldChat = document.getElementById('th-scroll');
+    var chatKeep = oldChat ? {
+      top: oldChat.scrollTop,
+      atBottom: oldChat.scrollHeight - oldChat.scrollTop - oldChat.clientHeight < 120
+    } : null;
     if(activeTab==='class') view.innerHTML = viewClassPage();
     else if(activeTab==='dashboard') view.innerHTML = viewDashboard();
     else if(activeTab==='classes') view.innerHTML = viewClasses();
@@ -5168,6 +5189,10 @@
     else if(activeTab==='focus') view.innerHTML = viewFocusPage();
     else view.innerHTML = viewAssignments();
     if(activeTab==='notes') loadNoteSuggestions();
+    var newChat = document.getElementById('th-scroll');
+    if(newChat){
+      newChat.scrollTop = (!chatKeep || chatKeep.atBottom) ? newChat.scrollHeight : chatKeep.top;
+    }
     // Opening a screen often redraws the view without going through render(), so the
     // address bar is kept honest here too. syncUrl does nothing when it already agrees.
     syncUrl();
@@ -7275,16 +7300,36 @@
     var learned = [], going = [], fresh = [], stuck = [];
     cards.forEach(function(c){
       if((c.lapses||0) >= 3) stuck.push(c);
-      // A card forgotten four times has `repetitions` back at zero, since a miss
-      // resets the ladder. Counting it as "not started" was how a set you had been
-      // fighting with all week could show nothing in progress at all.
-      var touched = (c.learnLevel||0) > 0 || (c.repetitions||0) > 0
-                    || (c.lapses||0) > 0 || !!c.lastReviewed;
-      if((c.learnLevel||0) >= LEARN_GOAL) learned.push(c);
-      else if(touched) going.push(c);
-      else fresh.push(c);
+      var p = termProgress(c);
+      if(p === 'learned') learned.push(c);
+      else if(p === 'fresh') fresh.push(c);
+      else going.push(c);
     });
     return { total:cards.length, learned:learned, going:going, fresh:fresh, stuck:stuck };
+  }
+
+  /**
+   * Where one term stands: learned, still learning or not started. The set's bar
+   * counts with this, and every term shows it too, on its row and on the card.
+   *
+   * A card forgotten four times has `repetitions` back at zero, since a miss resets
+   * the ladder. Counting it as "not started" was how a set you had been fighting with
+   * all week could show nothing in progress at all.
+   */
+  function termProgress(c){
+    if((c.learnLevel||0) >= LEARN_GOAL) return 'learned';
+    var touched = (c.learnLevel||0) > 0 || (c.repetitions||0) > 0
+                  || (c.lapses||0) > 0 || !!c.lastReviewed;
+    return touched ? 'going' : 'fresh';
+  }
+
+  /** The label a term carries. Stuck (forgotten three times) says more than
+   *  "still learning" about a term that is not learned yet, so it wins there. */
+  function termStateHtml(c){
+    var p = termProgress(c);
+    if(p !== 'learned' && (c.lapses||0) >= 3) p = 'stuck';
+    var label = { learned:'Learned', going:'Still learning', fresh:'Not started', stuck:'Stuck' }[p];
+    return '<span class="term-state ts-'+p+'">'+label+'</span>';
   }
 
   function setStatsHtml(st){
@@ -7324,6 +7369,7 @@
           return '<div class="set-term is-stuck">'
             + '<div class="set-term-front">'+escapeHtml(c.front||'')+'</div>'
             + '<div class="set-term-back">'+escapeHtml(c.back||'')+'</div>'
+            + termStateHtml(c)
             + '<span class="set-term-due">forgotten '+(c.lapses||0)+'\u00d7</span>'
             + '<button type="button" class="btn ghost" data-action="fc-edit" data-id="'+c.id+'">Edit</button>'
             + '<span></span>'
@@ -7378,6 +7424,7 @@
     return '<div class="set-term">'
       + '<div class="set-term-front">'+escapeHtml(card.front||'')+'</div>'
       + '<div class="set-term-back">'+escapeHtml(card.back||'')+'</div>'
+      + termStateHtml(card)
       + '<span class="set-term-due">'+escapeHtml(when)+'</span>'
       + '<button type="button" class="btn ghost" data-action="fc-edit" data-id="'+card.id+'">Edit</button>'
       + '<button type="button" class="btn ghost row-x" data-action="fc-delete" title="Delete this card" data-id="'+card.id+'">✕</button>'
@@ -14852,6 +14899,7 @@
       // is being asked about, so the set's name rides along on the card.
       + (card.deckName && FC.deck && FC.deck.virtual ? ' \u00b7 '+escapeHtml(card.deckName) : '')
       + (S.relearn[card.id] ? '<span class="fc-again-tag">back again</span>' : '')
+      + termStateHtml(card)
       + '</div>'
       + '<div>'+escapeHtml(card.front||'')+'</div></div>'
       + '<div class="fc-face fc-back-face">'
@@ -15313,8 +15361,11 @@
     if(hsScreen && hsScreen.kind === 'thread'){
       renderView();
       paintIcons();
+      // renderView keeps the chat's place. Only sending moves it: your own message
+      // should always come into view, even from halfway up the conversation.
       var sc0 = document.getElementById('th-scroll');
-      if(sc0 && TH.data && (TH.data.messages||[]).length) sc0.scrollTop = sc0.scrollHeight;
+      if(sc0 && TH.scrollToEnd) sc0.scrollTop = sc0.scrollHeight;
+      TH.scrollToEnd = false;
       var ta0 = document.getElementById('th-draft');
       if(ta0 && !TH.busy){ ta0.focus(); ta0.setSelectionRange(ta0.value.length, ta0.value.length); }
       return;
@@ -15758,6 +15809,7 @@
                   user: retry ? null : { role:'user', tool: toolKey || null,
                                          content: toolKey ? ((HS_TOOLS[toolKey]||{}).label || '') : text } };
     if(!retry) TH.draft = '';
+    TH.scrollToEnd = true;
     renderThread();
     var payload = retry
       ? { retryOf: retry, confirmed: true, stream: true, fast: fast }
