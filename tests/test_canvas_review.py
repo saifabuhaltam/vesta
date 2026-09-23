@@ -596,7 +596,8 @@ def test_a_failed_fetch_leaves_the_link_as_it_was(conn, class_id, monkeypatch):
     assert (row["kind"], row["stored_name"]) == ("link", None)
 
 
-def test_a_replaced_file_swaps_in_the_new_copy_and_removes_the_old(conn, class_id, monkeypatch):
+def test_a_replaced_file_swaps_in_the_new_copy_and_keeps_the_old_for_undo(conn, class_id, monkeypatch):
+    """The old copy stays on disk: the undo history owns it until the entry ages out."""
     import app as vesta_app
 
     connect(conn, class_id)
@@ -619,7 +620,7 @@ def test_a_replaced_file_swaps_in_the_new_copy_and_removes_the_old(conn, class_i
     monkeypatch.setattr(canvas.Client, "download", v2)
     stored = vesta_app.fetch_canvas_material(mid, replace=True)
     assert stored != old
-    assert not os.path.exists(os.path.join(vesta_app.UPLOAD_DIR, old))
+    assert os.path.exists(os.path.join(vesta_app.UPLOAD_DIR, old))
     with open(os.path.join(vesta_app.UPLOAD_DIR, stored), "rb") as fh:
         assert fh.read() == b"v2"
 

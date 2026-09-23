@@ -2118,8 +2118,13 @@ def fetch_canvas_material(mid, user_id=None, replace=False):
     queued. After that it is an ordinary file, and `download_material` serves it.
 
     `replace` is for a file the professor replaced on Canvas and he chose to update: the
-    new bytes land under a new name first, the row is switched over, and only then is
-    the old copy removed, so a failed download never leaves him with nothing.
+    new bytes land under a new name first and the row is switched over. The old copy is
+    not deleted here. The Canvas undo history owns it for as long as that update can be
+    undone, and removes it when the entry ages out (`canvas_sync._forget_undo`).
+
+    The switch-over only happens if the row still points where it did when the
+    download began. An undo, or a delete, can land while a big file is still coming
+    down, and the finished download must not overwrite it: it is thrown away instead.
 
     `user_id` is required on a worker thread, for the reason `make_office_preview` gives.
     """
@@ -2146,21 +2151,22 @@ def fetch_canvas_material(mid, user_id=None, replace=False):
             size = client.download(m["url"], partial)
             os.replace(partial, path)
             text = extract_text(path, original)
-            old = [m["stored_name"], m["preview_name"] if "preview_name" in m.keys() else None]
-            conn.execute(
+            was = m["stored_name"]
+            # `stored_name IS NULL` spelled out rather than `IS ?`, which Postgres rejects.
+            cur = conn.execute(
                 "UPDATE materials SET kind='file', stored_name=?, size=?, extracted_text=?,"
-                " preview_name=NULL, preview_status=NULL WHERE id=?",
-                (stored, size, text, mid))
+                " preview_name=NULL, preview_status=NULL WHERE id=?"
+                + (" AND stored_name=?" if was else " AND stored_name IS NULL"),
+                (stored, size, text, mid) + ((was,) if was else ()))
             conn.commit()
-        finally:
-            conn.close()
-    if replace:
-        for name in old:
-            if name and name != stored:
+            if not cur.rowcount:
                 try:
-                    os.remove(os.path.join(UPLOAD_DIR, name))
+                    os.remove(path)
                 except OSError:
                     pass
+                return None
+        finally:
+            conn.close()
     if office_ext(original) and soffice_path():
         threading.Thread(target=make_office_preview, args=(mid, path, original, user_id),
                          daemon=True).start()

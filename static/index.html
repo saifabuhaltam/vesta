@@ -2719,7 +2719,12 @@
   .cv-opt:hover{ color:var(--text); }
   .cv-opt.on{ background:var(--surface); color:var(--text); box-shadow:var(--shadow-card); }
   .cv-opt.accept.on{ background:var(--success); color:#fff; }
-  .cv-flash{ margin-bottom:16px; }
+  .cv-flash{ margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .cv-flash > span{ flex:1; min-width:220px; }
+  .cv-history{ margin-top:16px; }
+  .cv-history h2{ font-size:15px; margin-bottom:4px; }
+  .cv-hist-row{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:10px 0; border-top:1px solid var(--border); }
   #cv-root .btn[disabled], #cv-settings .btn[disabled]{ opacity:.5; cursor:default; }
   .cv-hidden > div + div{ margin-top:6px; }
   .cv-empty h2{ font-size:15px; margin-bottom:4px; }
@@ -12006,6 +12011,7 @@
   var cvDecisions = {};       // change id -> 'accept' | 'reject', held until Apply
   var cvBusy = false;
   var cvFlash = null;         // what the last Apply did, shown at the top of the review
+  var cvFlashUndo = null;     // the undo id for that Apply, so the message can offer it
   var cvPollTimer = null;
   var cvLastLoad = 0;
   var cvBooted = false;
@@ -12238,6 +12244,7 @@
     cvReview = null;
     cvDecisions = {};
     cvFlash = null;
+    cvFlashUndo = null;
     var root = document.getElementById('cv-root');
     if(root) root.innerHTML = '';
   }
@@ -12358,6 +12365,44 @@
     }).join('') + '</div>';
   }
 
+  /**
+   * What can be undone, newest first. Each apply is one line with its own Undo, in the
+   * open rather than behind a menu, because the time he wants it is the time he least
+   * wants to go looking for it.
+   */
+  function cvHistoryHtml(){
+    var list = (cvReview && cvReview.history) || [];
+    if(!list.length) return '';
+    return '<div class="si-section cv-history"><h2>Recently applied</h2>'
+      + '<div class="hint cv-hint">Undo takes back what an apply added or changed, and offers it again. '
+      + 'Anything you’ve worked on since is left as it is.</div>'
+      + list.slice(0, 10).map(function(h){
+          return '<div class="cv-hist-row"><div><div class="cv-title">'+escapeHtml(h.summary||'Applied')+'</div>'
+            + '<div class="cv-detail">'+escapeHtml(cvAgo(h.at)
+            + ((h.classes||[]).length ? ' · '+h.classes.join(', ') : ''))+'</div></div>'
+            + '<button type="button" class="btn" data-action="cv-undo" data-id="'+escapeHtml(h.id)+'">Undo</button>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+
+  function cvUndo(id){
+    openDialog({ kind:'confirm', title:'Undo this?',
+                 message:'What it added is removed and what it changed goes back, and all of it is offered '
+                   + 'to you again. Anything you’ve worked on since stays exactly as it is.',
+                 confirmLabel:'Undo', cancelLabel:'Keep it' }).then(function(ok){
+      if(ok !== true) return;
+      return apiPost('/api/canvas/undo', { id:id }).then(function(r){
+        cvFlash = r.message || 'Undone.';
+        cvFlashUndo = null;
+        if(cv) cv.review = r.review;
+        renderCanvasBanner();
+        cvRefreshClassPage();
+        return loadState().then(function(){ return cvLoadReview(); });
+      });
+    }).catch(reportError);
+  }
+
   function renderCanvasReview(){
     if(!cvOpen) return;
     var root = document.getElementById('cv-root');
@@ -12386,7 +12431,12 @@
       + 'then apply. Anything you keep as it is won’t be offered again unless Canvas changes it. '
       + escapeHtml(checked)+'</div>';
 
-    var flash = cvFlash ? '<div class="si-keep cv-flash">'+escapeHtml(cvFlash)+'</div>' : '';
+    var flash = cvFlash
+      ? '<div class="si-keep cv-flash"><span>'+escapeHtml(cvFlash)+'</span>'
+        + (cvFlashUndo ? '<button type="button" class="btn" data-action="cv-undo" data-id="'
+            + escapeHtml(cvFlashUndo)+'">Undo</button>' : '')
+        + '</div>'
+      : '';
     var body;
     if(!r){
       body = '<div class="si-section"><div class="hint">Loading what Canvas found…</div></div>';
@@ -12426,7 +12476,7 @@
       + '</div></div>';
 
     root.innerHTML = '<div class="si-panel"><div class="si-inner">'+head+flash+body+cvHiddenHtml()
-      + '</div></div>'+foot;
+      + cvHistoryHtml() + '</div></div>'+foot;
     paintIcons(root);
     var panel = root.querySelector('.si-panel');
     if(panel) panel.scrollTop = scroll;
@@ -12436,12 +12486,14 @@
     cvDecisions[id] = cvDecisions[id] === choice ? undefined : choice;
     if(!cvDecisions[id]) delete cvDecisions[id];
     cvFlash = null;
+    cvFlashUndo = null;
     renderCanvasReview();
   }
 
   function cvDecideAll(kind, choice){
     cvUnits(kind).forEach(function(u){ cvDecisions[u.id] = choice; });
     cvFlash = null;
+    cvFlashUndo = null;
     renderCanvasReview();
   }
 
@@ -12458,6 +12510,7 @@
       cvBusy = false;
       cvDecisions = {};
       cvFlash = cvApplyMessage(r);
+      cvFlashUndo = r.undoId || null;
       if(cv) cv.review = r.review;
       renderCanvasBanner();
       cvRefreshClassPage();
@@ -18016,6 +18069,7 @@
       return;
     }
     if(action==='cv-unhide'){ cvUnhide(t.dataset.class); return; }
+    if(action==='cv-undo'){ cvUndo(t.dataset.id); return; }
     if(action==='cv-settings'){ closeCanvasReview(); openSettingsModal('calendar'); return; }
     if(action==='cv-connect'){ cvDoConnect(); return; }
     if(action==='cv-replace'){ cvConnect.replacing = true; cvConnect.error = null; cvRepaintSettings(); return; }

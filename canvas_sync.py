@@ -540,7 +540,7 @@ def _ticked(change):
     return bool(change.get("fill"))
 
 
-def apply_draft(conn, class_id, draft, guess_category=None):
+def apply_draft(conn, class_id, draft, guess_category=None, journal=None):
     """Write the ticked parts of a reviewed draft into one class.
 
     Assumes it is already inside a transaction; the caller commits, so a half-applied
@@ -554,7 +554,11 @@ def apply_draft(conn, class_id, draft, guess_category=None):
       tell an assignment he deleted from one he has never seen.
 
     Nothing is deleted here, and nothing not ticked is touched.
+
+    `journal`, when given, collects one entry per write with what it replaced, which
+    is everything `undo_apply` needs to reverse this exactly. See `undo_apply`.
     """
+    log = journal.append if journal is not None else (lambda entry: None)
     import uuid
     from datetime import datetime
 
@@ -580,8 +584,14 @@ def apply_draft(conn, class_id, draft, guess_category=None):
             # reviewed and accepted. Creating a missing one is structural and follows
             # the items that need it; rewriting an existing one is a decision.
             if cat.get("applyWeight"):
+                old = conn.execute("SELECT weight, drop_lowest FROM grade_categories WHERE id=?",
+                                   (gid,)).fetchone()
+                after = {"weight": cat.get("weight"), "drop_lowest": int(cat.get("dropLowest") or 0)}
                 conn.execute("UPDATE grade_categories SET weight=?, drop_lowest=? WHERE id=?",
-                             (cat.get("weight"), int(cat.get("dropLowest") or 0), gid))
+                             (after["weight"], after["drop_lowest"], gid))
+                log({"op": "cat~", "id": gid, "class": class_id,
+                     "before": {"weight": _col(old, "weight"), "drop_lowest": _col(old, "drop_lowest")},
+                     "after": after})
         else:
             gid = str(uuid.uuid4())
             conn.execute(
@@ -590,6 +600,7 @@ def apply_draft(conn, class_id, draft, guess_category=None):
                 (gid, class_id, name, cat.get("weight"), int(cat.get("dropLowest") or 0),
                  order, now))
             counts["categories"] += 1
+            log({"op": "cat+", "id": gid, "class": class_id, "name": name})
         cat_ids[cat.get("canvasId")] = gid
 
     for item in draft.get("items") or []:
@@ -603,11 +614,15 @@ def apply_draft(conn, class_id, draft, guess_category=None):
             # else he has touched are never rewritten by a sync of an assignment that
             # already exists.
             sets, values = [], []
+            current = conn.execute("SELECT * FROM items WHERE id=? AND class_id=?",
+                                   (item["existingId"], class_id)).fetchone()
+            fields = {}
             for change in item.get("changes") or []:
                 column = CHANGE_COLUMNS.get(change.get("field"))
                 if column and _ticked(change):
                     sets.append(column + "=?")
                     values.append(change.get("after"))
+                    fields[column] = [_col(current, column), change.get("after")]
             # No category_id here. Accepting a moved deadline must not also move the
             # assignment into Canvas's grade category: that is a second change he was
             # never shown. Only a new assignment arrives in a category.
@@ -618,17 +633,26 @@ def apply_draft(conn, class_id, draft, guess_category=None):
             conn.execute("UPDATE items SET " + ", ".join(sets) + " WHERE id=? AND class_id=?",
                          tuple(values) + (item["existingId"], class_id))
             counts["updated"] += 1
+            fields["import_key"] = [_col(current, "import_key"), key]
+            log({"op": "item~", "id": item["existingId"], "class": class_id,
+                 "title": _col(current, "title"), "fields": fields})
         else:
+            iid = str(uuid.uuid4())
+            wrote = {"title": item.get("title") or "Untitled",
+                     "type": item.get("type") or "assignment",
+                     "due_date": item.get("dueDate"), "due_time": item.get("dueTime"),
+                     "status": "todo", "weight": None if cat else item.get("weight"),
+                     "score": item.get("score"), "notes": item.get("notes") or "",
+                     "category_id": cat}
             conn.execute(
                 "INSERT INTO items (id, semester_id, class_id, title, type, due_date,"
                 " due_time, status, weight, score, notes, created_at, category_id,"
                 " import_key, location) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (str(uuid.uuid4()), db.semester_for(conn, class_id), class_id,
-                 item.get("title") or "Untitled", item.get("type") or "assignment",
-                 item.get("dueDate"), item.get("dueTime"), "todo",
-                 None if cat else item.get("weight"), item.get("score"),
-                 item.get("notes") or "", now, cat, key, ""))
+                (iid, db.semester_for(conn, class_id), class_id,
+                 wrote["title"], wrote["type"], wrote["due_date"], wrote["due_time"],
+                 "todo", wrote["weight"], wrote["score"], wrote["notes"], now, cat, key, ""))
             counts["items"] += 1
+            log({"op": "item+", "id": iid, "class": class_id, "wrote": wrote})
         if key:
             keys.append(key)
 
@@ -638,10 +662,12 @@ def apply_draft(conn, class_id, draft, guess_category=None):
             continue
         name = entry.get("folderName")
         if name and name not in folders:
-            before = folders.get(name)
+            had = conn.execute("SELECT id FROM file_folders WHERE class_id=? AND parent_id IS NULL"
+                               " AND lower(name)=lower(?)", (class_id, name.strip()[:120])).fetchone()
             folders[name] = folder_by_name(conn, class_id, name)
-            if folders[name] and before is None:
+            if folders[name] and not had:
                 counts["folders"] += 1
+                log({"op": "folder+", "id": folders[name], "class": class_id})
         mid = str(uuid.uuid4())
         filename = entry.get("filename") or entry.get("title") or "file"
         category = guess_category(filename) if guess_category else None
@@ -656,6 +682,8 @@ def apply_draft(conn, class_id, draft, guess_category=None):
              entry.get("title") or filename, "link", entry.get("url"), filename, None,
              entry.get("mimetype"), entry.get("size"), None, entry.get("importKey"), now))
         counts["files"] += 1
+        log({"op": "mat+", "id": mid, "class": class_id,
+             "wrote": {"folder_id": folders.get(name), "title": entry.get("title") or filename}})
         if entry.get("importKey"):
             keys.append(entry["importKey"])
         if should_prefetch(entry):
@@ -783,17 +811,34 @@ def _known_file_ids(conn, class_id):
     return out
 
 
-def check_course(conn, client, course_id, class_id, full=False):
+def account_zone(client):
+    """The time zone his Canvas account shows deadlines in, as (tzinfo, name).
+
+    Asked once per check. A profile Canvas will not give, or a zone name this server's
+    database does not know, falls back to Vesta's own zone rather than failing the
+    check: an hour's disagreement is a nuisance, and no check at all is worse.
+    """
+    import ics
+    try:
+        name = (client.profile() or {}).get("time_zone") or ""
+    except Exception:
+        name = ""
+    tz = ics.zone(name) if name else None
+    return (tz, name) if tz is not None else (None, "")
+
+
+def check_course(conn, client, course_id, class_id, full=False, tz=None, tz_name=""):
     """Read one course off Canvas and store what was found. Writes no class rows."""
     course = client.course(course_id)
     groups = client.assignment_groups(course_id)
-    plan = canvas.plan_course(course, groups)
+    plan = canvas.plan_course(course, groups, tz)
     known = None if full else _known_file_ids(conn, class_id)
     files = client.course_files(course_id, known=known)
     snapshot = {
         "courseId": course_id,
         "fetchedAt": _now(),
         "full": bool(full),
+        "timeZone": tz_name,
         "course": {k: course.get(k) for k in
                    ("id", "name", "course_code", "apply_assignment_group_weights")},
         "plan": plan,
@@ -874,6 +919,7 @@ def check_account(user_id, full=False, course_id=None, reason=""):
                 client = canvas.Client(state.get("host"), state.get("token"))
             except canvas.CanvasError as e:
                 client, account_error = None, e.message
+            tz, tz_name = account_zone(client) if client is not None else (None, "")
             for cid, entry in list((state.get("courses") or {}).items()):
                 if client is None:
                     break
@@ -883,7 +929,8 @@ def check_account(user_id, full=False, course_id=None, reason=""):
                 if not class_is_live(conn, class_id):
                     continue
                 try:
-                    check_course(conn, client, cid, class_id, full=full)
+                    check_course(conn, client, cid, class_id, full=full, tz=tz,
+                                 tz_name=tz_name)
                     results[cid] = None
                     report["checked"] += 1
                 except canvas.CanvasError as e:
@@ -1267,6 +1314,8 @@ def apply_selection(conn, state, accept, reject, guess_category=None):
     Returns a report plus the files to fetch, which the caller downloads after the
     transaction has committed.
     """
+    import copy
+
     review = build_review(conn, state)
     units = {}
     for c in review["classes"]:
@@ -1275,6 +1324,9 @@ def apply_selection(conn, state, accept, reject, guess_category=None):
                 units[u["id"]] = u
     accept, reject = list(accept or []), list(reject or [])
     stale = [i for i in accept + reject if i not in units]
+    # What the stored state looked like before, so an undo can put it back.
+    before = copy.deepcopy(state.get("courses") or {})
+    journal = []
 
     for uid in reject:
         if uid in units:
@@ -1293,7 +1345,7 @@ def apply_selection(conn, state, accept, reject, guess_category=None):
         course_id = class_units[0]["courseId"]
         snap = load_snapshot(conn, course_id) or {}
         draft = _draft_from_units(class_units, snap)
-        counts, fetch, keys = apply_draft(conn, class_id, draft, guess_category)
+        counts, fetch, keys = apply_draft(conn, class_id, draft, guess_category, journal)
         for k, v in counts.items():
             totals[k] = totals.get(k, 0) + v
         to_fetch.extend(fetch)
@@ -1302,10 +1354,14 @@ def apply_selection(conn, state, accept, reject, guess_category=None):
             if u["kind"] != "updatedFile":
                 continue
             f = u["_file"]
-            row = conn.execute("SELECT id, stored_name FROM materials WHERE id=? AND class_id=?",
+            row = conn.execute("SELECT * FROM materials WHERE id=? AND class_id=?",
                                (f["existingId"], class_id)).fetchone()
             if not row:
                 continue
+            journal.append({"op": "mat~", "id": f["existingId"], "class": class_id,
+                            "title": _col(row, "title"),
+                            "before": {k: _col(row, k) for k in
+                                       ("kind", "stored_name", "preview_name", "size", "url")}})
             conn.execute("UPDATE materials SET size=?, url=COALESCE(?, url) WHERE id=?",
                          (f.get("size"), f.get("url"), f["existingId"]))
             totals["replaced"] += 1
@@ -1315,8 +1371,14 @@ def apply_selection(conn, state, accept, reject, guess_category=None):
                 to_fetch.append({"materialId": f["existingId"], "url": f.get("url"),
                                  "filename": f.get("filename"), "size": f.get("size"),
                                  "replace": True})
-    return {"applied": totals, "stale": stale, "rejected": len(reject) - len(
-        [i for i in reject if i in stale])}, to_fetch
+    report = {"applied": totals, "stale": stale,
+              "rejected": len(reject) - len([i for i in reject if i in stale])}
+    undo = _undo_entry(before, state.get("courses") or {}, journal, report,
+                       sorted({u["classLabel"] for u in units.values()
+                               if u["id"] in set(accept) | set(reject)}))
+    if undo:
+        report["_undo"] = undo
+    return report, to_fetch
 
 
 def _draft_from_units(units, snapshot):
@@ -1571,7 +1633,9 @@ def review():
     conn = db.get_db()
     try:
         state = load_state(conn)
-        return jsonify(public_review(build_review(conn, state, request.args.get("classId"))))
+        out = public_review(build_review(conn, state, request.args.get("classId")))
+        out["history"] = history(conn)
+        return jsonify(out)
     finally:
         conn.close()
 
@@ -1595,6 +1659,10 @@ def apply():
             conn.rollback()
             raise
         save_state(conn, state)
+        undo = report.pop("_undo", None)
+        if undo:
+            record_undo(conn, undo)
+            report["undoId"] = undo["id"]
         report["review"] = review_summary(build_review(conn, state))
     finally:
         conn.close()
@@ -1661,3 +1729,355 @@ def set_auto():
         return jsonify(public_state(state))
     finally:
         conn.close()
+
+
+# ===========================================================================
+# undo
+#
+# Saif asked for this on 2026-09-22: a way back after Accept all, in case he changes
+# his mind. Every apply records exactly what it wrote and what each write replaced;
+# undoing one reverses those writes and puts the review's memory (what was synced,
+# skipped or kept) back the way it was, so what was undone is offered again.
+#
+# The rule that makes it safe to press: **undo never destroys his work.** Anything he
+# has touched since the apply is left exactly as it is and named in the report: an
+# assignment he edited, finished, or hung anything off (subtasks, notes, a Headstart
+# draft, a chat, a quiz, flashcards, a rubric, an attached file); a file he moved,
+# renamed, linked, or used as a source; a field he changed again afterwards. Only what
+# is still precisely as the apply left it is taken back.
+# ===========================================================================
+
+UNDO_KEY = "canvas_undo"
+
+# How many applies can be undone. Ten covers "I changed my mind" by a wide margin, and
+# bounds the old file copies kept for a replaced file (see `_forget_undo`).
+UNDO_KEEP = 10
+
+# Everything that can hang off an assignment or a file, as (table, column). Deleting a
+# row with any of these attached would take his work with it, through a cascade or by
+# quietly unlinking it, so undo leaves such a row alone. `tests/test_canvas_undo.py`
+# compares these lists with the live schema, so a new table cannot be missed here.
+ITEM_DEPENDENTS = (
+    ("subtasks", "item_id", "it has subtasks"),
+    ("notes", "linked_item_id", "a note is linked to it"),
+    ("note_links", "item_id", "a note is linked to it"),
+    ("headstarts", "item_id", "it has Headstart work"),
+    ("rubrics", "item_id", "a rubric is linked to it"),
+    ("flashcard_decks", "item_id", "a flashcard set is linked to it"),
+    ("quizzes", "item_id", "a quiz is linked to it"),
+    ("threads", "item_id", "a chat is linked to it"),
+    ("item_files", "item_id", "files are attached to it"),
+)
+MATERIAL_DEPENDENTS = (
+    ("note_links", "file_id", "a note links to it"),
+    ("rubrics", "material_id", "it was parsed as a rubric"),
+    ("headstart_sources", "material_id", "Headstart used it"),
+    ("flashcard_decks", "source_material_id", "flashcards were made from it"),
+    ("thread_sources", "material_id", "a chat uses it"),
+    ("item_files", "material_id", "it is attached to an assignment"),
+)
+
+# What an apply wrote into a new assignment, and so what must still be there for the
+# assignment to count as untouched.
+ITEM_WROTE = ("title", "type", "due_date", "due_time", "status", "weight", "score",
+              "notes", "category_id")
+
+
+def _undo_entry(before, after, journal, report, class_labels):
+    """The record an undo needs: the writes, and how the stored state changed."""
+    import uuid
+
+    seen_added, rejected_prev = {}, {}
+    for cid, entry in (after or {}).items():
+        old = before.get(cid) or {}
+        added = sorted(set(entry.get("seen") or []) - set(old.get("seen") or []))
+        if added:
+            seen_added[cid] = added
+        was, now = old.get("rejected") or {}, entry.get("rejected") or {}
+        changed = {rk: was.get(rk) for rk in now if was.get(rk) != now[rk]}
+        if changed:
+            rejected_prev[cid] = changed
+    if not journal and not seen_added and not rejected_prev:
+        return None
+    return {"id": str(uuid.uuid4()), "at": _now(), "classes": class_labels,
+            "summary": _undo_summary(report), "journal": journal,
+            "seenAdded": seen_added, "rejectedPrev": rejected_prev}
+
+
+def _undo_summary(report):
+    a = report.get("applied") or {}
+
+    def n(count, one, many=None):
+        return "%d %s" % (count, one if count == 1 else (many or one + "s"))
+    parts = []
+    if a.get("items"):
+        parts.append("added " + n(a["items"], "assignment"))
+    if a.get("updated"):
+        parts.append("updated " + n(a["updated"], "assignment"))
+    if a.get("files"):
+        parts.append("added " + n(a["files"], "file"))
+    if a.get("replaced"):
+        parts.append("updated " + n(a["replaced"], "file"))
+    if report.get("rejected"):
+        parts.append("kept yours for " + n(report["rejected"], "change"))
+    text = ", ".join(parts) or "saved your choices"
+    return text[0].upper() + text[1:]
+
+
+def load_undo(conn):
+    import json
+    raw = db_get_setting(conn, UNDO_KEY)
+    try:
+        entries = json.loads(raw) if raw else []
+    except ValueError:
+        entries = []
+    return entries if isinstance(entries, list) else []
+
+
+def save_undo(conn, entries):
+    import json
+    db_set_setting(conn, UNDO_KEY, json.dumps(entries))
+
+
+def record_undo(conn, entry):
+    """Keep this apply undoable, newest first, and let the oldest go past UNDO_KEEP."""
+    entries = [entry] + load_undo(conn)
+    kept, dropped = entries[:UNDO_KEEP], entries[UNDO_KEEP:]
+    save_undo(conn, kept)
+    for old in dropped:
+        _forget_undo(conn, old)
+
+
+def _forget_undo(conn, entry):
+    """An entry leaving the history for good: remove the old copies of replaced files.
+
+    A file the professor replaced keeps its previous copy on disk for exactly as long
+    as the apply that replaced it can be undone, and no longer. A copy some row still
+    points at, because the undo already happened or the fetch never did, stays.
+    """
+    import os
+    import db
+
+    for op in entry.get("journal") or []:
+        if op.get("op") != "mat~":
+            continue
+        for name in ((op.get("before") or {}).get("stored_name"),
+                     (op.get("before") or {}).get("preview_name")):
+            if not name:
+                continue
+            used = conn.execute("SELECT 1 FROM materials WHERE stored_name=? OR preview_name=?",
+                                (name, name)).fetchone()
+            if not used:
+                try:
+                    os.remove(os.path.join(db.UPLOAD_DIR, name))
+                except OSError:
+                    pass
+
+
+def history(conn):
+    """What can be undone, newest first, as the review shows it."""
+    return [{"id": e["id"], "at": e["at"], "summary": e.get("summary") or "",
+             "classes": e.get("classes") or []} for e in load_undo(conn)]
+
+
+def _eq(a, b):
+    """Two stored values the same, the way the page would say so."""
+    if (a is None or a == "") and (b is None or b == ""):
+        return True
+    x, y = canvas._number(a), canvas._number(b)
+    if x is not None and y is not None:
+        return round(x, 4) == round(y, 4)
+    return str(a if a is not None else "") == str(b if b is not None else "")
+
+
+def _attached(conn, dependents, row_id):
+    for table, column, why in dependents:
+        if conn.execute("SELECT 1 FROM %s WHERE %s=? LIMIT 1" % (table, column),
+                        (row_id,)).fetchone():
+            return why
+    return None
+
+
+def undo_apply(conn, state, entry, extract_text=None):
+    """Reverse one apply, keeping anything he has touched since. Does not commit.
+
+    Returns (report, files_to_remove). Files are removed only after the caller has
+    committed, so a failure part way through cannot leave rows pointing at nothing.
+    """
+    import os
+    import db
+
+    done = {"items": 0, "restored": 0, "files": 0, "categories": 0, "folders": 0}
+    kept, remove = [], []
+
+    for op in reversed(entry.get("journal") or []):
+        kind, rid = op.get("op"), op.get("id")
+
+        if kind == "mat+":
+            row = conn.execute("SELECT * FROM materials WHERE id=?", (rid,)).fetchone()
+            if not row:
+                continue                                  # he already deleted it
+            wrote = op.get("wrote") or {}
+            title = _col(row, "title") or _col(row, "filename") or "A file"
+            if _col(row, "class_id") != op.get("class") or \
+                    not _eq(_col(row, "folder_id"), wrote.get("folder_id")) or \
+                    not _eq(_col(row, "title"), wrote.get("title")):
+                kept.append({"title": title, "why": "you moved or renamed it"})
+                continue
+            why = _attached(conn, MATERIAL_DEPENDENTS, rid)
+            if why:
+                kept.append({"title": title, "why": why})
+                continue
+            conn.execute("DELETE FROM materials WHERE id=?", (rid,))
+            remove += [n for n in (_col(row, "stored_name"), _col(row, "preview_name")) if n]
+            done["files"] += 1
+
+        elif kind == "mat~":
+            row = conn.execute("SELECT * FROM materials WHERE id=?", (rid,)).fetchone()
+            if not row:
+                continue
+            old = op.get("before") or {}
+            name = old.get("stored_name")
+            if name and not os.path.exists(os.path.join(db.UPLOAD_DIR, name)):
+                kept.append({"title": op.get("title") or "A file",
+                             "why": "its earlier version is no longer stored"})
+                continue
+            text = None
+            if name and extract_text:
+                try:
+                    text = extract_text(os.path.join(db.UPLOAD_DIR, name),
+                                        _col(row, "filename") or name)
+                except Exception:
+                    text = None
+            conn.execute("UPDATE materials SET kind=?, stored_name=?, preview_name=?, size=?,"
+                         " url=?, extracted_text=?, preview_status=NULL WHERE id=?",
+                         (old.get("kind") or "file", name, old.get("preview_name"),
+                          old.get("size"), old.get("url"), text, rid))
+            remove += [n for n in (_col(row, "stored_name"), _col(row, "preview_name"))
+                       if n and n not in (name, old.get("preview_name"))]
+            done["files"] += 1
+
+        elif kind == "folder+":
+            busy = conn.execute("SELECT 1 FROM materials WHERE folder_id=? LIMIT 1", (rid,)).fetchone() \
+                or conn.execute("SELECT 1 FROM file_folders WHERE parent_id=? LIMIT 1", (rid,)).fetchone()
+            if not busy:
+                conn.execute("DELETE FROM file_folders WHERE id=?", (rid,))
+                done["folders"] += 1
+
+        elif kind == "item~":
+            row = conn.execute("SELECT * FROM items WHERE id=?", (rid,)).fetchone()
+            if not row:
+                continue
+            sets, values, moved_on = [], [], False
+            for column, (was, wrote) in (op.get("fields") or {}).items():
+                if _eq(_col(row, column), wrote):
+                    sets.append(column + "=?")
+                    values.append(was)
+                elif column != "import_key":
+                    moved_on = True
+            if sets:
+                conn.execute("UPDATE items SET " + ", ".join(sets) + " WHERE id=?",
+                             tuple(values) + (rid,))
+                done["restored"] += 1
+            if moved_on:
+                kept.append({"title": _col(row, "title") or op.get("title") or "An assignment",
+                             "why": "you changed it again since"})
+
+        elif kind == "item+":
+            row = conn.execute("SELECT * FROM items WHERE id=?", (rid,)).fetchone()
+            if not row:
+                continue
+            wrote = op.get("wrote") or {}
+            title = _col(row, "title") or "An assignment"
+            if any(not _eq(_col(row, c), wrote.get(c)) for c in ITEM_WROTE) or \
+                    (canvas._number(_col(row, "focus_seconds")) or 0) > 0:
+                kept.append({"title": title, "why": "you've worked on it since"})
+                continue
+            why = _attached(conn, ITEM_DEPENDENTS, rid)
+            if why:
+                kept.append({"title": title, "why": why})
+                continue
+            conn.execute("DELETE FROM items WHERE id=?", (rid,))
+            done["items"] += 1
+
+        elif kind == "cat~":
+            row = conn.execute("SELECT * FROM grade_categories WHERE id=?", (rid,)).fetchone()
+            after, old = op.get("after") or {}, op.get("before") or {}
+            if row and _eq(_col(row, "weight"), after.get("weight")) and \
+                    _eq(_col(row, "drop_lowest"), after.get("drop_lowest")):
+                conn.execute("UPDATE grade_categories SET weight=?, drop_lowest=? WHERE id=?",
+                             (old.get("weight"), old.get("drop_lowest") or 0, rid))
+
+        elif kind == "cat+":
+            if not conn.execute("SELECT 1 FROM items WHERE category_id=? LIMIT 1", (rid,)).fetchone():
+                conn.execute("DELETE FROM grade_categories WHERE id=?", (rid,))
+                done["categories"] += 1
+
+    # The review's memory, back to how it was: what was synced is no longer "seen", so
+    # anything taken back is offered again rather than treated as deleted, and a
+    # "keep mine" made in this apply is forgotten.
+    for cid, keys in (entry.get("seenAdded") or {}).items():
+        forget(state, cid, keys)
+    for cid, previous in (entry.get("rejectedPrev") or {}).items():
+        rejected = state.setdefault("courses", {}).setdefault(cid, {}).setdefault("rejected", {})
+        for rk, value in previous.items():
+            if value is None:
+                rejected.pop(rk, None)
+            else:
+                rejected[rk] = value
+
+    return {"undone": done, "kept": kept}, remove
+
+
+def undo_message(report):
+    d = report.get("undone") or {}
+
+    def n(count, one, many=None):
+        return "%d %s" % (count, one if count == 1 else (many or one + "s"))
+    parts = []
+    if d.get("items"):
+        parts.append("removed " + n(d["items"], "assignment"))
+    if d.get("restored"):
+        parts.append("put back " + n(d["restored"], "assignment") + " as they were")
+    if d.get("files"):
+        parts.append("took back " + n(d["files"], "file"))
+    msg = ("Undone: " + ", ".join(parts) + ".") if parts else "Undone."
+    kept = report.get("kept") or []
+    if kept:
+        names = "; ".join("%s (%s)" % (k["title"], k["why"]) for k in kept[:4])
+        more = " and %d more" % (len(kept) - 4) if len(kept) > 4 else ""
+        msg += " Left as they are, because they have your work in them: " + names + more + "."
+    return msg
+
+
+@bp.route("/api/canvas/undo", methods=["POST"])
+def undo_route():
+    import os
+    import db
+    body = request.get_json(force=True) or {}
+    extract = current_app.config.get("EXTRACT_TEXT")
+    conn = db.get_db()
+    try:
+        entries = load_undo(conn)
+        entry = next((e for e in entries if e.get("id") == body.get("id")), None)
+        if not entry:
+            return jsonify({"error": "That change can no longer be undone."}), 404
+        state = load_state(conn)
+        try:
+            report, remove = undo_apply(conn, state, entry, extract)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        save_state(conn, state)
+        save_undo(conn, [e for e in entries if e.get("id") != entry["id"]])
+        report["message"] = undo_message(report)
+        report["review"] = review_summary(build_review(conn, state))
+    finally:
+        conn.close()
+    for name in remove:
+        try:
+            os.remove(os.path.join(db.UPLOAD_DIR, name))
+        except OSError:
+            pass
+    return jsonify(report)

@@ -132,12 +132,22 @@ def _pg_safe(text):
     return (text or "").replace("\x00", "")
 
 
-def due_local(due_at):
-    """A Canvas UTC timestamp -> (date, time) in Saif's timezone, as Vesta stores them.
+def due_local(due_at, tz=None):
+    """A Canvas UTC timestamp -> (date, time) as Canvas shows it, as Vesta stores them.
 
     Returns ('2026-09-29', '23:59') for an assignment due at the end of that Tuesday,
     which Canvas reports as '2026-09-30T06:59:59Z'. Converting first is the whole point
     of this function: the naive split puts every evening deadline on the following day.
+
+    `tz` is the time zone of the student's Canvas account, and it matters more than it
+    looks. Canvas shows Saif his deadlines in America/Los_Angeles. The time zone
+    database says America/Vancouver leaves daylight saving for good on 2026-11-01, so
+    converting in Vancouver's zone put every deadline from November to March an hour
+    after the one Canvas showed him: Discussion 08, due 23:59 on Nov 15 in Canvas,
+    arrived as 00:59 on Nov 16, and 45 REM 388 deadlines showed as "moved". Converting
+    in the account's own zone reproduces Canvas's screen exactly, and where the two
+    clocks disagree it is the earlier of the two, which is the safe one to be told.
+    Without it, `ics.zone()` is the fallback.
 
     Seconds are dropped, because `items.due_time` is 'HH:MM'. A Canvas deadline of
     23:59:59 is stored as 23:59 rather than rounded up into the next day.
@@ -149,7 +159,7 @@ def due_local(due_at):
         dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
         return None, None
-    tz = zone()
+    tz = tz or zone()
     if tz is not None and dt.tzinfo is not None:
         dt = dt.astimezone(tz)
     return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M")
@@ -313,7 +323,7 @@ def import_key(assignment_id):
     return "canvas:" + str(assignment_id)
 
 
-def plan_course(course, groups):
+def plan_course(course, groups, tz=None):
     """Everything Canvas knows about one course, in the shape the sync engine applies.
 
     Deliberately the same two keys the syllabus importer's draft uses, `categories` and
@@ -339,7 +349,7 @@ def plan_course(course, groups):
         cat = by_canvas_id.get(g.get("id"))
         for a in (g.get("assignments") or []):
             points = _number(a.get("points_possible"))
-            due_date, due_time = due_local(a.get("due_at"))
+            due_date, due_time = due_local(a.get("due_at"), tz)
             items.append({
                 "canvasId": a.get("id"),
                 "importKey": import_key(a.get("id")),
@@ -557,6 +567,10 @@ class Client:
             out.extend(body)
             url, pages = next_link(r.headers.get("link") or r.headers.get("Link")), pages + 1
         return out
+
+    def profile(self):
+        """His Canvas profile, for `time_zone`: the zone Canvas shows his deadlines in."""
+        return self._get(self.base + "/users/self/profile").json()
 
     def whoami(self):
         """Check a token before anything is stored under it, and get his name."""

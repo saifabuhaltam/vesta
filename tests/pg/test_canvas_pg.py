@@ -244,3 +244,39 @@ def test_a_check_outside_a_request_writes_as_the_right_account(monkeypatch):
     assert [i["title"] for i in snap["plan"]["items"]] == ["Quiz 01"]
     assert sync.load_state(conn)["lastCheck"]
     conn.close()
+
+
+def test_undo_runs_on_postgres_and_checks_every_dependent_table():
+    """Undo asks each of the tables that can hang off an assignment or a file whether
+    anything does. A table missing on Postgres would abort the whole transaction."""
+    cid = make_class(ALICE)
+    connect(ALICE, cid, items=[planned(categoryCanvasId=1),
+                               planned(canvasId=101, importKey="canvas:101", title="Quiz 02")],
+            categories=[{"canvasId": 1, "name": "Quizzes", "weight": 10.0, "dropLowest": 0}],
+            files=[cfile()])
+    conn = as_user(ALICE)
+    state = sync.load_state(conn)
+    rev = sync.build_review(conn, state)
+    ids = [u["id"] for c in rev["classes"] for g in c["groups"] for u in g["changes"]]
+    report, _ = sync.apply_selection(conn, state, ids, [])
+    conn.commit()
+    sync.save_state(conn, state)
+    entry = report.pop("_undo")
+    sync.record_undo(conn, entry)
+    conn.commit()
+    # one assignment gets a subtask, so undo has to leave it
+    kept_id = conn.execute("SELECT id FROM items WHERE import_key='canvas:101'").fetchone()["id"]
+    conn.execute("INSERT INTO subtasks (id, item_id, title, done) VALUES (?,?,?,0)",
+                 (str(uuid.uuid4()), kept_id, "Outline"))
+    conn.commit()
+
+    state = sync.load_state(conn)
+    result, _ = sync.undo_apply(conn, state, sync.load_undo(conn)[0])
+    conn.commit()
+    sync.save_state(conn, state)
+    assert result["undone"]["items"] == 1 and result["undone"]["files"] == 1
+    assert result["kept"] == [{"title": "Quiz 02", "why": "it has subtasks"}]
+    left = conn.execute("SELECT import_key FROM items WHERE class_id=?", (cid,)).fetchall()
+    assert [r["import_key"] for r in left] == ["canvas:101"]
+    assert sync.build_review(conn, sync.load_state(conn))["count"] >= 2
+    conn.close()

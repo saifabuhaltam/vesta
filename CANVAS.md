@@ -569,3 +569,54 @@ only. Fixed, and `canvas_sync.py` is now in the `IS ?` scan in
 - **Parked, not built:** Canvas rubrics into the rubric-criteria path; announcements
   and Canvas calendar events; moving an assignment he already had into Canvas's grade
   category (deliberately never done as a side effect of another change).
+
+## Deadlines in the Canvas account's time zone, 2026-09-22
+
+Saif's first real review on vesta.study showed 45 REM 388 deadlines "moved" by exactly
+one hour, all on or after November 1: Discussion 08, due 23:59 on Nov 15 in Canvas,
+arrived as 00:59 on Nov 16. Canvas stores `2026-11-16T07:59:59Z`. His Canvas account is
+set to America/Los_Angeles, which is UTC-8 in November, so Canvas shows 23:59. Vesta
+converted in America/Vancouver, and the time zone database (2026c) has Vancouver on
+permanent UTC-7 from 2026-11-01, so it read 00:59. October dates agree either way.
+
+Fixed by converting in the zone of the Canvas account, read once per check from
+`/users/self/profile` (`account_zone`), falling back to Vesta's zone if Canvas will not
+say. Vesta now shows every deadline exactly as Canvas does, and friends at other schools
+get their own account's zone. The snapshot records which zone it used (`timeZone`).
+Where the two clocks disagree, Canvas's is the earlier, so Vesta is never later than
+the real cut-off.
+
+The rows he was shown clear on the next check. Any Canvas assignment already accepted
+with a November-to-March deadline was saved an hour late, and the next review offers
+it as moved back an hour.
+
+## Undo, 2026-09-22
+
+Asked for by Saif, "in case I change my mind after accepting all". Every apply keeps a
+record of what it wrote and what each write replaced (`apply_draft(journal=...)`), plus
+how the review's memory changed; the last ten are kept in `app_settings` under
+`canvas_undo` and listed as "Recently applied" at the bottom of the review, each with
+its own Undo, and the "Done" message after Apply carries one too.
+
+Undo takes back what the apply did and puts the review's memory back, so everything
+taken back is offered again rather than hidden as deleted, and a Keep mine made in that
+apply is forgotten. **It never destroys his work:** an assignment he edited, finished,
+worked on, or hung anything off, a file he moved, renamed, linked or used, and a field
+he changed again afterwards are all left exactly as they are and named in the result.
+`ITEM_DEPENDENTS` and `MATERIAL_DEPENDENTS` list the fifteen tables that can hang off
+an assignment or a file, and `tests/test_canvas_undo.py` compares them with the live
+schema so a new table cannot be missed.
+
+A file the professor replaced keeps its previous copy on disk while that update can be
+undone; `_forget_undo` removes it when the entry ages past ten. A download still in
+flight when Undo is pressed finishes, sees the row has moved on, and throws itself away
+instead of overwriting the undo (`fetch_canvas_material`'s conditional update).
+
+Verified on real Postgres (every dependent table queried under RLS) and in a real
+browser against REM 388: Accept all added 31 assignments and 35 files, Undo removed
+them all and offered all 66 changes again, and the 26 downloads in flight left nothing
+behind on disk.
+
+**Offered, not built:** filling an existing assignment's *empty* description from
+Canvas, offered in the review like a missing due date. A new assignment from Canvas
+already arrives with its description, as plain text.
