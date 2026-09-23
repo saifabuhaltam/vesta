@@ -1526,32 +1526,36 @@
   .nt-wrap.with-ctx{ grid-template-columns:300px minmax(0,1fr); }
   /* the class this list belongs to, at the top of the list itself */
   /* ---- assignment card: the detail sheet from the mockup ---- */
-  .ac-modal{ max-width:660px; }
-  .ac-head{ position:relative; padding:22px 26px 0; }
-  .ac-close{ position:absolute; top:16px; right:18px; width:32px; height:32px; border-radius:50%;
+  /* A size smaller than it was, and never taller than the window: the header, tabs
+     and footer stay put and only the middle scrolls, so Save changes is always on
+     screen. It used to run off the bottom of a laptop. */
+  .ac-modal{ max-width:600px; display:flex; flex-direction:column; max-height:calc(100vh - 80px); }
+  .ac-head{ position:relative; padding:18px 22px 0; flex:none; }
+  .ac-close{ position:absolute; top:14px; right:16px; width:30px; height:30px; border-radius:50%;
     border:none; background:var(--surface-2); color:var(--text-muted); font-size:15px; cursor:pointer;
     display:flex; align-items:center; justify-content:center; }
   .ac-close:hover{ background:var(--surface-3); color:var(--text); }
-  .ac-class{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600;
-    color:var(--text-muted); margin-bottom:10px; }
-  .ac-title{ font-size:30px; font-weight:800; letter-spacing:-0.02em; line-height:1.15; margin-bottom:10px; }
-  .ac-when{ display:flex; align-items:stretch; gap:0; margin:20px 0 4px; }
+  .ac-class{ display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600;
+    color:var(--text-muted); margin-bottom:6px; }
+  .ac-title{ font-size:24px; font-weight:800; letter-spacing:-0.02em; line-height:1.15; margin-bottom:8px;
+    padding-right:36px; }
+  .ac-when{ display:flex; align-items:stretch; gap:0; margin:14px 0 2px; }
   .ac-when-cell{ display:flex; align-items:center; gap:12px; flex:1; padding:2px 0; }
   .ac-when-cell + .ac-when-cell{ border-left:1px solid var(--border); padding-left:26px; }
-  .ac-when-ic{ width:34px; height:34px; border-radius:var(--r-md); background:var(--surface-2);
+  .ac-when-ic{ width:30px; height:30px; border-radius:var(--r-md); background:var(--surface-2);
     color:var(--text-muted); display:flex; align-items:center; justify-content:center; flex:none; }
-  .ac-when-ic svg{ width:17px; height:17px; }
+  .ac-when-ic svg{ width:15px; height:15px; }
   .ac-when-label{ font-size:11.5px; color:var(--text-faint); }
-  .ac-when-value{ font-size:14px; font-weight:700; color:var(--text); }
-  .ac-tabs{ display:flex; gap:26px; border-bottom:1px solid var(--border); padding:0 26px; margin-top:18px; }
+  .ac-when-value{ font-size:13.5px; font-weight:700; color:var(--text); }
+  .ac-tabs{ display:flex; gap:22px; border-bottom:1px solid var(--border); padding:0 22px; margin-top:12px; flex:none; }
   .ac-tab{ display:flex; align-items:center; gap:7px; border:none; background:transparent;
-    font-family:inherit; font-size:13.5px; font-weight:600; color:var(--text-muted);
-    padding:12px 0; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+    font-family:inherit; font-size:13px; font-weight:600; color:var(--text-muted);
+    padding:10px 0; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
   .ac-tab:hover{ color:var(--text); }
   .ac-tab.active{ color:var(--accent); border-bottom-color:var(--accent); }
   .ac-tab svg{ width:15px; height:15px; }
-  .ac-panel{ padding:20px 26px 4px; }
-  .ac-card{ border:1px solid var(--border); border-radius:var(--r-card); padding:16px; margin-bottom:14px; }
+  .ac-panel{ padding:16px 22px 4px; flex:1 1 auto; min-height:0; max-height:none; overflow-y:auto; }
+  .ac-card{ border:1px solid var(--border); border-radius:var(--r-card); padding:14px; margin-bottom:12px; }
   .ac-card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
   .ac-card-head h3{ font-size:15px; font-weight:700; }
   .ac-empty-box{ background:var(--surface-2); border-radius:var(--r-md); padding:14px;
@@ -1567,8 +1571,17 @@
   .ac-file + .ac-file{ border-top:1px solid var(--border); }
   .ac-file-name{ font-size:13px; font-weight:600; }
   .ac-file-meta{ font-size:11.5px; color:var(--text-faint); margin-top:1px; }
-  .ac-foot{ display:flex; align-items:center; justify-content:space-between;
-    padding:16px 26px 22px; border-top:1px solid var(--border); margin-top:8px; }
+  .ac-foot{ display:flex; align-items:center; justify-content:space-between; flex:none;
+    padding:12px 22px 16px; border-top:1px solid var(--border); }
+
+  /* a description, drawn from its markers (descHtml) */
+  .desc{ font-size:13px; line-height:1.6; color:var(--text); overflow-wrap:anywhere; }
+  .desc p{ margin:0 0 10px; }
+  .desc p:last-child, .desc ol:last-child, .desc ul:last-child{ margin-bottom:0; }
+  .desc ol, .desc ul{ margin:2px 0 10px; padding-left:22px; }
+  .desc li{ margin:0 0 4px; }
+  .desc li.desc-nested{ margin-left:18px; }
+  .desc a{ color:var(--accent); text-decoration:underline; text-underline-offset:2px; }
   .ac-del{ display:inline-flex; align-items:center; gap:7px; border:none; background:transparent;
     color:var(--danger); font-family:inherit; font-size:13.5px; font-weight:700; cursor:pointer;
     padding:8px 6px; border-radius:var(--r-sm); }
@@ -3283,6 +3296,63 @@
     });
     if(inList) html += '</ul>';
     return html;
+  }
+  /**
+   * An assignment description, drawn with its formatting.
+   *
+   * Descriptions are stored as text with light markers, which is what a Canvas
+   * description is converted into (canvas.plain_text): **bold** (Canvas's headings),
+   * *italic*, "1." and "- " list lines, [text](link), and a blank line between
+   * paragraphs. Not mdLite, which Headstart uses: it turns numbered lines into bullets,
+   * and "Answer these 6 questions" followed by six bullets loses the point, and it has
+   * no links. Lines inside a paragraph stay separate lines, the way Canvas's editor
+   * lays out a heading above its text. Text he typed himself, with no markers at all,
+   * comes out as the plain paragraphs it always was.
+   */
+  function descInline(s){
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+                  '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    s = s.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*\w])\*(?![\s*])([^*]+?)\*(?![*\w])/g, '$1<em>$2</em>');
+    s = s.replace(/(^|[\s(])(https?:\/\/[^\s<]+)/g,
+                  '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+    return s;
+  }
+  function descHtml(text){
+    var blocks = String(text||'').replace(/\r/g, '').split(/\n[ \t]*\n+/);
+    return '<div class="desc">' + blocks.map(function(block){
+      var out = '', para = [], list = null;
+      function flushPara(){ if(para.length){ out += '<p>'+para.join('<br>')+'</p>'; para = []; } }
+      function flushList(){ if(list){ out += '</'+list+'>'; list = null; } }
+      block.split('\n').forEach(function(raw){
+        var ol = raw.match(/^(\s*)(\d+)[.)]\s+(.*)$/);
+        var ul = raw.match(/^(\s*)[-•]\s+(.*)$/) || raw.match(/^(\s*)\*\s+(.*)$/);
+        if(ol || ul){
+          flushPara();
+          var kind = ol ? 'ol' : 'ul';
+          if(list !== kind){
+            flushList();
+            out += kind === 'ol' ? '<ol start="'+Number(ol[2])+'">' : '<ul>';
+            list = kind;
+          }
+          var nested = ((ol || ul)[1] || '').length > 0;
+          out += '<li'+(nested ? ' class="desc-nested"' : '')+'>'
+            + descInline(escapeHtml(ol ? ol[3] : ul[2]))+'</li>';
+        } else if(raw.trim()){
+          flushList();
+          para.push(descInline(escapeHtml(raw.trim())));
+        }
+      });
+      flushPara(); flushList();
+      return out;
+    }).join('') + '</div>';
+  }
+  /** The same description as bare words, for one-line previews in lists. */
+  function descPlain(text){
+    return String(text||'')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$1')
+      .replace(/\*{1,3}([^*\n]+?)\*{1,3}/g, '$1');
   }
   // The Inbox holds notes and files that have not been filed under a class yet, for
   // when something needs writing down or saving before there is time to sort it.
@@ -5179,7 +5249,8 @@
     var col = cls ? cls.color : 'var(--none)';
     var due = diffDaysFromToday(it.dueDate);
     var dueLabel = due<0 ? (Math.abs(due)+' days overdue') : due===0 ? 'Due today' : due===1 ? 'Due tomorrow' : 'Due in '+due+' days';
-    var desc = it.notes ? escapeHtml(it.notes.slice(0,140))+(it.notes.length>140?'…':'') : (it.weight!=null ? 'Worth '+it.weight+'% of your grade in this class.' : 'Take a look and get ahead of it.');
+    var flat = descPlain(it.notes).replace(/\s+/g, ' ').trim();
+    var desc = flat ? escapeHtml(flat.slice(0,140))+(flat.length>140?'…':'') : (it.weight!=null ? 'Worth '+it.weight+'% of your grade in this class.' : 'Take a look and get ahead of it.');
     return '<div class="card">'
       + '<div class="card-head"><h2>What to work on <span style="color:var(--text-faint);font-weight:400;">→</span></h2></div>'
       + '<div class="focus-highlight">'
@@ -5736,7 +5807,7 @@
   }
 
   function asgSubtitle(it){
-    var n = (it.notes||'').split('\n')[0].trim();
+    var n = descPlain(it.notes).split('\n')[0].trim();
     return n ? escapeHtml(n.slice(0,60)) + (n.length>60?'…':'') : '';
   }
 
@@ -12028,6 +12099,7 @@
     newItem:     ['Skip', 'Add'],
     dateAdded:   ['Skip', 'Add date'],
     description: ['Skip', 'Add description'],
+    layout:      ['Keep as is', 'Use Canvas’s layout'],
     newFile:     ['Skip', 'Add'],
     updatedFile: ['Keep this version', 'Update'],
     conflict:    ['Keep mine', 'Add Canvas’s copy too'],
@@ -12037,6 +12109,7 @@
     twin:['All different','All the same'], categories:['Keep mine for all','Use Canvas’s for all'],
     moved:['Keep all mine','Use Canvas for all'], grade:['Keep all mine','Use Canvas for all'],
     newItem:['Skip all','Add all'], dateAdded:['Skip all','Add all'], description:['Skip all','Add all'],
+    layout:['Keep all as they are','Lay out all like Canvas'],
     newFile:['Skip all','Add all'],
     updatedFile:['Keep all','Update all'], conflict:['Keep all mine','Add all'],
     other:['Keep all mine','Use Canvas for all']
@@ -12052,7 +12125,9 @@
     grade: 'Scores posted on Canvas. Where you typed your own, it stays unless you choose Canvas.',
     newItem: 'Assignments on Canvas that are not in Vesta yet.',
     dateAdded: 'Assignments you already have with no due date, or no due time, in Vesta.',
-    description: 'Assignments you already have with no description in Vesta. Canvas’s is copied in as plain text. One you wrote yourself is never replaced.',
+    description: 'Assignments you already have with no description in Vesta. Canvas’s is copied in with its formatting. One you wrote yourself is never replaced.',
+    layout: 'Descriptions saved before Vesta kept Canvas’s formatting, so they arrived as one long paragraph. '
+      + 'These are the same words, laid out the way Canvas has them: bold headings, numbered questions, lists and links.',
     newFile: 'Small files are saved to Vesta straight away. Bigger ones, and video, stay on Canvas until you open them.',
     updatedFile: 'Files your professor has replaced on Canvas since Vesta saved them.',
     conflict: 'A file with the same name is already in this class, and Canvas’s copy is different. Yours is never replaced.',
@@ -12315,8 +12390,8 @@
       return 'Adds up to <b>'+cvPct(a.total)+'</b>. Yours: '+list(a.mine||[])
         + '. Canvas’s: '+list(a.canvas||[])+'.';
     }
-    if(u.kind === 'description'){
-      var flat = String(a||'').replace(/\s+/g, ' ').trim();
+    if(u.kind === 'description' || u.kind === 'layout'){
+      var flat = descPlain(a).replace(/\s+/g, ' ').trim();
       return escapeHtml(flat.length > 180 ? flat.slice(0, 180).replace(/\s+\S*$/, '')+'…' : flat);
     }
     if(u.kind === 'grade'){
@@ -13404,10 +13479,12 @@
 
   function itemCardDetailsHtml(it, cls){
     var desc = itemCardEditingDesc
-      ? '<textarea id="ac-desc" rows="4" style="width:100%;" placeholder="What does this assignment ask for?">'
+      ? '<textarea id="ac-desc" rows="8" style="width:100%;" placeholder="What does this assignment ask for?">'
         + escapeHtml(it.notes||'') + '</textarea>'
+        + '<div class="hint" style="margin-top:6px;">**bold**, *italic*, lines starting “- ” or “1.” for lists, '
+        + 'and a blank line between paragraphs.</div>'
       : (it.notes
-          ? '<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;">'+escapeHtml(it.notes)+'</div>'
+          ? descHtml(it.notes)
           : '<div class="ac-empty-box">No description added yet.</div>');
 
     var files = itemFiles(it, cls);

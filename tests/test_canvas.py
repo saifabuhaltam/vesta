@@ -288,7 +288,7 @@ def test_a_plan_reads_the_title_type_due_date_and_score():
     assert item["title"] == "Midterm 1"
     assert item["type"] == "exam"
     assert (item["dueDate"], item["dueTime"]) == ("2026-10-13", "23:59")
-    assert item["notes"] == "Covers weeks 1 to 5."
+    assert item["notes"] == "Covers **weeks 1 to 5**."
     assert item["score"] == 85.0
     assert item["url"].endswith("/assignments/100")
 
@@ -637,16 +637,47 @@ def test_a_description_keeps_its_paragraphs_and_lists():
     html = ("<p>Covers <b>weeks 1 to 5</b>.</p><p>Bring&nbsp;notes.<br>Closed book.</p>"
             "<ul><li>One</li><li>Two</li></ul><p>End.</p>")
     assert canvas.plain_text(html) == \
-        "Covers weeks 1 to 5.\n\nBring notes.\nClosed book.\n\n- One\n- Two\n\nEnd."
+        "Covers **weeks 1 to 5**.\n\nBring notes.\nClosed book.\n\n- One\n- Two\n\nEnd."
 
 
 def test_discussion_08_reads_cleanly():
-    """Canvas's editor wraps "two pros" and "two cons" in links and coloured spans."""
-    html = ('<ol><li>Please, discuss <a href="https://x"><span style="color:#1a8">two pros</span></a>'
-            ' and <span style="color:red"><u>two cons</u></span> of a whale hunt by a First'
-            ' Nation.</li></ol>')
+    """His real Discussion 08: a numbered list, with "two pros" and "two cons" bold,
+    underlined and coloured. Bold survives; colour and underline have nowhere to go."""
+    html = ('<ol style="list-style-type: decimal;"><li><span style="font-size: 12pt;">Please, discuss '
+            '<strong><span style="color: #169179;"><u>two pros</u></span></strong> and <strong>'
+            '<span style="color: #e03e2d;"><u>two cons</u></span></strong> of a whale hunt by a '
+            'First Nation.</span></li></ol>')
     assert canvas.plain_text(html) == \
-        "- Please, discuss two pros and two cons of a whale hunt by a First Nation."
+        "1. Please, discuss **two pros** and **two cons** of a whale hunt by a First Nation."
+
+
+def test_design_reflection_keeps_its_headings_questions_and_links():
+    """His real Design Reflection, abridged: bold headings over their text, numbered
+    questions typed into the paragraph, an empty <strong> Canvas's editor left behind."""
+    html = ('<p><strong>Outcomes</strong><br>The intent of this assignment.</p>'
+            '<p><strong>Key words </strong><br>Design practice</p>'
+            '<p>Submit using Canvas.<br><strong></strong></p>'
+            '<p><strong>Questions for reflection:</strong><br>1. What inspires you?<br>2. What problem?</p>'
+            '<ul><li>See <a href="https://canvas.sfu.ca/x">the rubric</a></li></ul>')
+    assert canvas.plain_text(html) == (
+        "**Outcomes**\nThe intent of this assignment.\n\n**Key words**\nDesign practice\n\n"
+        "Submit using Canvas.\n\n**Questions for reflection:**\n1. What inspires you?\n"
+        "2. What problem?\n\n- See [the rubric](https://canvas.sfu.ca/x)")
+
+
+def test_bold_across_a_line_break_does_not_break_the_conversion():
+    """This crashed on 2 of his 52 descriptions and lost their formatting."""
+    assert canvas.plain_text("<p><strong>First line<br>second line</strong> after</p>") == \
+        "**First line**\n**second line** after"
+
+
+def test_a_squashed_copy_and_the_laid_out_one_have_the_same_words():
+    squashed = "Outcomes The intent of this assignment. Key words Design practice 1. What inspires you?"
+    laid_out = ("**Outcomes**\nThe intent of this assignment.\n\n**Key words**\nDesign practice\n\n"
+                "1. What inspires you?")
+    assert canvas.plain_words(squashed) == canvas.plain_words(laid_out)
+    assert canvas.plain_words("See the rubric") == canvas.plain_words("See [the rubric](https://x.y/z)")
+    assert canvas.plain_words("My own notes") != canvas.plain_words("Outcomes")
 
 
 def test_an_empty_or_missing_description_is_empty():

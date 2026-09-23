@@ -153,6 +153,13 @@ def compare_items(existing, plan, seen=()):
         mine = _col(match, "notes") or ""
         if offered and not canvas.plain_text(mine).strip():
             changes.append({"field": "notes", "before": mine, "after": offered, "fill": True})
+        elif offered and mine.strip() != offered and \
+                canvas.plain_words(mine) == canvas.plain_words(offered):
+            # The same words in a different layout: a description saved before Vesta
+            # kept Canvas's formatting, which arrived as one wall of text. Word for word
+            # the same is what makes it safe to call Canvas's copy rather than his.
+            changes.append({"field": "notes", "before": mine, "after": offered, "fill": True,
+                            "relayout": True})
 
         item["changes"] = changes
         item["change"] = "changed" if changes else "same"
@@ -750,6 +757,7 @@ GROUPS = (
     ("newItem", "New assignments"),
     ("dateAdded", "Due dates and times Canvas can fill in"),
     ("description", "Descriptions Canvas can fill in"),
+    ("layout", "Descriptions to lay out like Canvas"),
     ("newFile", "New files"),
     ("updatedFile", "Files the professor replaced"),
     ("conflict", "Files with the same name as one you have"),
@@ -1140,8 +1148,8 @@ def _units_for_class(draft, existing_cats, course_entry, course_id, class_id, cl
                 _item=item, _changes=due_changes)
         if "notes" in by_field:
             c = by_field["notes"]
-            add("description", key, title, key + "|notes", c["before"], c["after"],
-                _item=item, _changes=[c])
+            add("layout" if c.get("relayout") else "description", key, title, key + "|notes",
+                c["before"], c["after"], _item=item, _changes=[c])
         if "score" in by_field:
             c = by_field["score"]
             add("grade", key, title, key + "|score", c["before"], c["after"],
@@ -1239,6 +1247,7 @@ def _headlines(units, limit=3):
     counted = (("newItem", "new assignment", "new assignments"),
                ("dateAdded", "due date to fill in", "due dates to fill in"),
                ("description", "description to fill in", "descriptions to fill in"),
+               ("layout", "description to lay out", "descriptions to lay out"),
                ("newFile", "new file", "new files"),
                ("updatedFile", "replaced file", "replaced files"),
                ("conflict", "file to compare", "files to compare"),
@@ -1484,7 +1493,7 @@ def _draft_from_units(units, snapshot):
             if item.get("categoryCanvasId") in plan_cats:
                 cats[item["categoryCanvasId"]] = dict(plan_cats[item["categoryCanvasId"]])
             items[u["key"]] = item
-        elif kind in ("moved", "dateAdded", "description", "grade", "other") and u.get("_item"):
+        elif kind in ("moved", "dateAdded", "description", "layout", "grade", "other") and u.get("_item"):
             base = items.setdefault(u["key"], dict(u["_item"], include=True, changes=[]))
             for c in u.get("_changes") or []:
                 base["changes"].append(dict(c, include=True))

@@ -401,3 +401,33 @@ def test_skipping_a_description_is_remembered(conn, class_id):
                                            notes="Discuss two pros and two cons.")])
     apply_all(conn, reject_kinds=("description",))
     assert review(conn)["count"] == 0
+
+
+def test_a_description_saved_squashed_is_offered_canvas_s_layout(conn, class_id):
+    """Design Reflection as he found it: accepted before the formatting was kept."""
+    iid = add_item(conn, class_id, title="Design Reflection", import_key="canvas:100",
+                   due_date="2026-09-16", due_time="11:20", weight=5.0)
+    conn.execute("UPDATE items SET notes=? WHERE id=?",
+                 ("Outcomes The intent of this assignment. 1. What inspires you? 2. What problem?", iid))
+    conn.commit()
+    laid_out = "**Outcomes**\nThe intent of this assignment.\n\n1. What inspires you?\n2. What problem?"
+    connect(conn, class_id, items=[planned(title="Design Reflection", weight=5.0, score=None,
+                                           notes=laid_out)])
+    rev = review(conn)
+    assert [g["kind"] for g in rev["groups"]] == ["layout"]
+    assert rev["headlines"] == ["1 description to lay out"]
+    uid, _ = apply_all(conn)
+    assert item_row(conn, iid)["notes"] == laid_out
+    undo(conn, uid)
+    assert item_row(conn, iid)["notes"].startswith("Outcomes The intent")
+
+
+def test_a_description_he_changed_is_never_offered_a_new_layout(conn, class_id):
+    iid = add_item(conn, class_id, title="Design Reflection", import_key="canvas:100",
+                   due_date="2026-09-16", due_time="11:20", weight=5.0)
+    conn.execute("UPDATE items SET notes=? WHERE id=?",
+                 ("Outcomes The intent of this assignment. Start early, ask Prof about Q3.", iid))
+    conn.commit()
+    connect(conn, class_id, items=[planned(title="Design Reflection", weight=5.0, score=None,
+                                           notes="**Outcomes**\nThe intent of this assignment.")])
+    assert review(conn)["count"] == 0

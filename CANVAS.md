@@ -679,3 +679,32 @@ row in one of his categories is never offered a weight of its own.
 Reproduced his SD 381 in a browser against the real course (Canvas's assignments in
 first, then his six done syllabus rows): four possible duplicates, merged in one Accept
 all; his rows kept their done status and grades; the overlap (108%) came up next.
+
+## Descriptions keep Canvas's formatting, and the assignment card fits, 2026-09-22
+
+Saif, looking at Design Reflection: "I don't like the fact that it's all clumped up in
+one big paragraph." That copy was saved this morning, before descriptions kept their
+line breaks. Two changes.
+
+**Formatting kept, not only line breaks.** `canvas.plain_text` walks the HTML with a
+real parser and writes light markers: **bold** (Canvas's headings are bold lines),
+*italic*, numbered and "- " list lines (nested ones indented), [text](link), an embedded
+video as a link, and a blank line between paragraphs. Colour and underline have nowhere
+to go and are dropped. Checked against all 52 descriptions in his five courses: no
+leftover HTML, no unbalanced markers, no lost words. The first parser version crashed
+on 2 of them (bold spanning a line break) and fell back to bare text; fixed and tested.
+The Details tab draws the markers with `descHtml`, not Headstart's `mdLite`, because
+mdLite turns numbered questions into bullets and has no links. List previews use
+`descPlain`, so markers never show in a row. Text he types himself, with no markers,
+draws as it always did.
+
+**Descriptions already saved squashed** are offered again in the review as
+"Descriptions to lay out like Canvas", only when his saved text has exactly Canvas's
+words (`plain_words`), so it is plainly the old copy and not something he wrote.
+Undoable.
+
+**The card** was running off the bottom of a laptop. It is a size smaller (600px wide,
+24px title, tighter header, tabs and footer) and never taller than the window: the
+header, tabs and footer stay put and only the middle scrolls. At his window size
+(1220 by 710) it now sits between 40px and 670px with Save changes on screen. Phones
+already get a bottom sheet with its own height cap and are unaffected.

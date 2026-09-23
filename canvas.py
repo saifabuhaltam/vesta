@@ -108,38 +108,185 @@ def normalise_host(value):
     return host.rstrip("/")
 
 
-# Tags that end a paragraph (a blank line after) or a line. Everything else is inline
-# and simply disappears.
-_PARA_END = re.compile(r"</(p|div|h[1-6]|table|blockquote|pre|ul|ol)\s*>", re.I)
-# Not </li>: each <li> already starts its own line, so ending one adds nothing.
-_LINE_END = re.compile(r"</tr\s*>", re.I)
-
-
 def plain_text(html):
-    """The HTML body of a Canvas assignment as the plain text `items.notes` holds.
+    """A Canvas description as the text Vesta keeps, with Canvas's formatting marked.
 
-    Vesta shows an assignment's description as plain text with its line breaks kept,
-    so the shape matters as much as the words: paragraphs stay paragraphs and a list
-    stays a list, one "- " item to a line. The first version reused `ai.strip_html`,
-    which collapses every run of whitespace to a single space and so turned a
-    three-paragraph brief into one line. Inline tags (bold, links, the coloured spans
-    Canvas's editor wraps "two pros" and "two cons" in) vanish without leaving a gap.
+    Vesta stores a description as text and draws it with the same light markup its
+    Headstart output uses, so the formatting travels as markers: **bold** (Canvas's
+    headings are bold lines), *italic*, "1." and "- " list lines, [text](link), and a
+    blank line between paragraphs. Saif asked for this after seeing Design Reflection
+    arrive as one wall of text; the first two versions either squashed every paragraph
+    into one line or kept the lines but lost the bold headings. Colour and underline
+    have nowhere to go and are dropped; images are dropped; an embedded video becomes
+    a link to it.
+
+    Walked with a real HTML parser rather than patterns, because lists need counting,
+    bold needs its emptiness checked (Canvas's editor leaves `<strong></strong>`
+    behind) and nesting has to be followed.
     """
-    import html as htmllib
+    parser = _DescriptionParser()
+    try:
+        parser.feed(html or "")
+        parser.close()
+    except Exception:
+        # Malformed beyond the parser's patience: fall back to text alone rather than
+        # lose the description.
+        return _pg_safe(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html or "")).strip())
+    return _pg_safe(parser.text())
 
-    s = html or ""
-    s = re.sub(r"<(script|style)[^>]*>.*?</\1\s*>", " ", s, flags=re.S | re.I)
-    s = re.sub(r"<br\s*/?>", "\n", s, flags=re.I)
-    s = re.sub(r"<li\b[^>]*>", "\n- ", s, flags=re.I)
-    s = re.sub(r"</t[dh]\s*>", " ", s, flags=re.I)
-    s = _PARA_END.sub("\n\n", s)
-    s = _LINE_END.sub("\n", s)
-    s = re.sub(r"<[^>]+>", "", s)
-    s = htmllib.unescape(s).replace("\xa0", " ")
-    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in s.split("\n")]
-    text = "\n".join(lines)
-    text = re.sub(r"\n{3,}", "\n\n", text).strip()
-    return _pg_safe(text)
+
+def plain_words(text):
+    """The words of a description, ignoring layout, markers and numbering.
+
+    What decides that a description saved squashed and Canvas's laid-out version are
+    the same text, so only the layout would change. A link's address is not part of
+    the words: the old conversion kept only its label."""
+    text = re.sub(r"\]\((https?://[^\s)]+)\)", "]", text or "")
+    text = re.sub(r"https?://\S+", " ", text)
+    return [w.lower() for w in re.findall(r"[A-Za-z]+", text)]
+
+
+class _DescriptionParser(__import__("html.parser").parser.HTMLParser):
+    BLOCK = {"p", "div", "blockquote", "pre", "table", "hr", "details", "caption", "section"}
+    HEADING = {"h1", "h2", "h3", "h4", "h5", "h6"}
+    SKIP = {"script", "style", "img"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.out = []            # finished text pieces
+        self.lists = []          # stack of ["ol", count] / ["ul", 0]
+        self.marks = []          # stack of (tag, index into out where it opened, marker)
+        self.links = []          # stack of (href, index into out)
+        self.skip = 0
+
+    # -- helpers ---------------------------------------------------------------------
+    def _break(self, n):
+        """End the current line (n=1) or paragraph (n=2).
+
+        Only ever appends. Bold markers and links remember positions in `out`, and
+        rebuilding the list here once moved them out from under a `<strong>` that
+        contained a `<br>`, which crashed on 2 of his 52 descriptions. Extra blank
+        lines are collapsed at the end, in `text`.
+        """
+        self.out.append("\n" * n)
+
+    def _open_mark(self, tag, marker):
+        self.marks.append((tag, len(self.out), marker))
+        self.out.append(marker)
+
+    def _close_mark(self, tag):
+        for i in range(len(self.marks) - 1, -1, -1):
+            if self.marks[i][0] == tag:
+                _, at, marker = self.marks.pop(i)
+                inner = "".join(self.out[at + 1:])
+                if not inner.strip():
+                    # `<strong></strong>`: drop the opening marker, keep any spacing
+                    self.out[at] = ""
+                    return
+                # Markers hug the words: "**Key words **" is not bold in any renderer.
+                lead = inner[:len(inner) - len(inner.lstrip())]
+                trail = inner[len(inner.rstrip()):]
+                body = inner.strip()
+                if "\n" in body:
+                    # Bold across a line break: bold each line, since the renderer
+                    # reads markers one line at a time.
+                    body = "\n".join(marker + l.strip() + marker if l.strip() else l
+                                     for l in body.split("\n"))
+                    self.out[at] = lead
+                    self.out[at + 1:] = [body, trail]
+                    return
+                self.out[at] = lead + marker
+                self.out[at + 1:] = [body, marker + trail]
+                return
+
+    # -- the parser's callbacks ------------------------------------------------------
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag in self.SKIP:
+            if tag != "img":
+                self.skip += 1
+            return
+        if self.skip:
+            return
+        if tag == "br":
+            self._break(1)
+        elif tag in self.BLOCK or tag in self.HEADING:
+            self._break(2)
+            if tag == "hr":
+                return
+            if tag in self.HEADING:
+                self._open_mark(tag, "**")
+        elif tag in ("ol", "ul"):
+            self._break(1 if self.lists else 2)
+            self.lists.append([tag, 0])
+        elif tag == "li":
+            self._break(1)
+            depth = max(len(self.lists) - 1, 0)
+            kind = self.lists[-1] if self.lists else ["ul", 0]
+            if kind[0] == "ol":
+                kind[1] += 1
+                self.out.append("  " * depth + "%d. " % kind[1])
+            else:
+                self.out.append("  " * depth + "- ")
+        elif tag in ("strong", "b"):
+            self._open_mark(tag, "**")
+        elif tag in ("em", "i"):
+            self._open_mark(tag, "*")
+        elif tag == "a":
+            href = (a.get("href") or "").strip()
+            self.links.append((href if href.startswith(("http://", "https://")) else "",
+                               len(self.out)))
+        elif tag == "iframe":
+            src = (a.get("src") or "").strip()
+            if src.startswith(("http://", "https://")):
+                self._break(2)
+                self.out.append("[Embedded video](%s)" % src)
+                self._break(2)
+        elif tag == "tr":
+            self._break(1)
+        elif tag in ("td", "th"):
+            self.out.append("  ")
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIP:
+            if tag != "img":
+                self.skip = max(0, self.skip - 1)
+            return
+        if self.skip:
+            return
+        if tag in self.HEADING:
+            self._close_mark(tag)
+            self._break(2)
+        elif tag in self.BLOCK:
+            self._break(2)
+        elif tag in ("ol", "ul"):
+            if self.lists:
+                self.lists.pop()
+            self._break(1 if self.lists else 2)
+        elif tag in ("strong", "b", "em", "i"):
+            self._close_mark(tag)
+        elif tag == "a" and self.links:
+            href, at = self.links.pop()
+            label = re.sub(r"\s+", " ", "".join(self.out[at:])).strip()
+            if href and label and label != href:
+                self.out[at:] = ["[" + label + "](" + href + ")"]
+            elif href and not label:
+                self.out.append(href)
+
+    def handle_data(self, data):
+        if self.skip:
+            return
+        self.out.append(re.sub(r"[ \t\r\n\xa0]+", " ", data))
+
+    def text(self):
+        lines = []
+        for line in "".join(self.out).split("\n"):
+            lead = line[:len(line) - len(line.lstrip(" "))]
+            body = re.sub(r"[ \t]+", " ", line.strip())
+            # A nested list item keeps its indent; everything else is trimmed.
+            lines.append(lead + body if re.match(r"^(\d+\.|-) ", body) and lead else body)
+        text = "\n".join(lines)
+        return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def _pg_safe(text):
