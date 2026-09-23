@@ -14421,7 +14421,8 @@
     closeModal();
     TH = { id: null, draftThread: seed, loading: false, busy: false, confirm: null,
            picking: false, ctx: null, srcOpen: false, draft: '',
-           data: { id: null, title: seed.title, classId: seed.classId, itemId: seed.itemId,
+           data: { id: null, title: seed.title || 'New chat', classId: seed.classId,
+                   itemId: seed.itemId,
                    messages: [], pinned: [], sources: [], selection: null } };
     hsScreen = { kind: 'thread', id: null };
     if(activeTab !== 'headstart'){ activeTab = 'headstart'; render(); }
@@ -14537,13 +14538,20 @@
   }
   var pendingClassPick = null;
 
-  function startNamedThread(cid){
-    askForText('New chat', { label:'What is it about?', placeholder:'Discussions',
-                               confirmLabel:'Create' }).then(function(name){
-      if(name === null) return;
-      return apiPost('/api/threads', { classId: cid, title: (name||'').trim() || 'New chat' })
-        .then(function(th){ return hsLoadSide().then(function(){ openThread(th.id); }); });
-    }).catch(reportError);
+  /** A chat's name, taken from the first thing said in it.
+   *
+   * Starting a chat used to ask "what is it about?", which meant needing a reason
+   * before asking a passing question. It names itself instead, the way every chat app
+   * does, and Rename is there when the guess is wrong. Worked out here rather than by
+   * the model: naming a sentence you typed yourself should not cost anything.
+   */
+  function threadTitleFrom(toolKey, text){
+    if(toolKey && HS_TOOLS[toolKey]) return HS_TOOLS[toolKey].label;
+    var s = (text||'').replace(/\s+/g, ' ').trim();
+    if(!s) return 'New chat';
+    if(s.length <= 48) return s;
+    var cut = s.slice(0, 48), sp = cut.lastIndexOf(' ');
+    return (sp > 20 ? cut.slice(0, sp) : cut) + '\u2026';
   }
 
   /** Every thread in a class, for when the strip only had room for three. */
@@ -14582,12 +14590,14 @@
       if(ta0) TH.draft = ta0.value;
       if(!toolKey && !(TH.draft||'').trim()) return;
       TH.busy = true; renderThread();
-      apiPost('/api/threads', { classId: seed.classId, itemId: seed.itemId, title: seed.title })
+      apiPost('/api/threads', { classId: seed.classId, itemId: seed.itemId,
+                                title: seed.title || threadTitleFrom(toolKey, TH.draft) })
         .then(function(th){
           if(!TH) return;
           TH.id = th.id;
           TH.draftThread = null;
           TH.data.id = th.id;
+          TH.data.title = th.title;
           hsScreen = { kind: 'thread', id: th.id };
           TH.busy = false;
           threadSend(toolKey, confirmed);
@@ -17326,7 +17336,7 @@
     // which class they are for. With one class there is nothing to ask.
     if(action==='hs-pick-thread-class'){
       pickClassThen(hsClassId, 'Which class is this about?', function(cid){
-        startNamedThread(cid);
+        openDraftThread({ classId: cid, title: null });
       });
       return;
     }
@@ -17345,13 +17355,7 @@
       return;
     }
     if(action==='hs-new-thread'){
-      var ncid = t.dataset.class;
-      askForText('New chat', { label:'What is it about?', placeholder:'Discussions',
-                                 confirmLabel:'Create' }).then(function(name){
-        if(name === null) return;
-        return apiPost('/api/threads', { classId:ncid, title:(name||'').trim() || 'New chat' })
-          .then(function(th){ return hsLoadSide().then(function(){ openThread(th.id); }); });
-      }).catch(reportError);
+      openDraftThread({ classId: t.dataset.class, title: null });
       return;
     }
     if(action==='hs-all-threads'){ openThreadList(t.dataset.class); return; }

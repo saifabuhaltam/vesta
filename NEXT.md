@@ -274,6 +274,28 @@ the two stuck terms; and the Headstart plan card picking the discussion due in t
 
 ## Built on 2026-09-21
 
+### A chat no longer needs a reason before it starts
+
+Clicking **+** asked *"What is it about?"* and would not open until it was answered,
+which is a reason to have before asking a passing question. It opens straight into the
+composer now, and names itself from the first thing said in it: the whole message when
+it is short, cut at a word boundary with an ellipsis past 48 characters, or the tool's
+own label when a chat is started from one of the ten openers. Rename is still there
+when the guess reads badly.
+
+Nothing new was needed to make it safe: a chat opened this way is the same draft an
+assignment already opened, so it exists on screen without a database row until the
+first message, and an abandoned one leaves nothing behind. The class question stays,
+because a chat still belongs to a course and that is what pulls in its files and notes.
+With one class there was never anything to ask.
+
+Driven in a browser on a scratch database with the model call stubbed: the picker, then
+an immediate composer with no prompt, a long first message becoming
+*"why does working memory have a four item limit…"*, a short one kept whole, the in-chat
+**+** opening another with no questions at all, and both listed by name back on
+Headstart.
+
+
 ### Moving a file reported failure after succeeding
 
 With the 500s gone, the move itself worked and the page still said *"Something went
