@@ -2675,6 +2675,66 @@
   .term-banner .tb-text b{ font-weight:800; }
   .term-banner.unlocked{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
 
+  /* Canvas. It is news rather than a warning, so it takes the accent and not the
+     archived term's amber. A failed check turns it red, because that one needs doing. */
+  .cv-banner, .cv-strip{ display:flex; align-items:center; gap:10px 12px; flex-wrap:wrap;
+    background:var(--accent-soft); border:1px solid transparent; color:var(--text);
+    border-radius:14px; padding:10px 12px 10px 14px; margin:0 0 14px; font-size:13px; }
+  .cv-banner.broken{ background:var(--danger-soft); }
+  .cv-banner.broken .cv-mark{ color:var(--danger); }
+  .cv-mark{ width:28px; height:28px; border-radius:50%; background:var(--surface); color:var(--accent);
+    display:inline-flex; align-items:center; justify-content:center; flex:none; box-shadow:var(--shadow-card); }
+  .cv-mark svg{ width:15px; height:15px; }
+  .cv-text{ flex:1; min-width:200px; line-height:1.45; }
+  .cv-text b{ font-weight:750; }
+  .cv-pill{ margin-left:6px; padding:1px 8px; border-radius:var(--r-pill); background:var(--accent); color:#fff;
+    font-size:11px; font-weight:700; }
+  .cv-top-actions{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .cv-checking{ font-size:13px; color:var(--text-muted); font-weight:600; }
+  .cv-spin{ display:inline-block; width:13px; height:13px; margin-right:7px; vertical-align:-2px; border-radius:50%;
+    border:2px solid var(--accent-soft); border-top-color:var(--accent); animation:cv-spin .8s linear infinite; }
+  @keyframes cv-spin{ to{ transform:rotate(360deg); } }
+  .cv-group-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .cv-group-head h2{ font-size:15px; display:flex; align-items:center; gap:8px; }
+  .cv-group-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .cv-count{ font-size:11.5px; font-weight:700; color:var(--text-muted); background:var(--surface-2);
+    border-radius:var(--r-pill); padding:2px 9px; }
+  .cv-hint{ margin:4px 0 12px; }
+  .cv-row{ display:grid; grid-template-columns:10px minmax(0,1fr) auto; align-items:center; gap:12px;
+    padding:10px 12px; border-radius:var(--r-md); border:1px solid var(--border); background:var(--surface);
+    transition:background .15s, border-color .15s, opacity .15s; }
+  .cv-row + .cv-row{ margin-top:6px; }
+  .cv-row.accept{ border-color:var(--success); background:var(--success-soft); }
+  .cv-row.reject{ opacity:.55; }
+  .cv-dot{ width:10px; height:10px; border-radius:50%; background:var(--c, var(--none)); }
+  .cv-title{ font-size:13.5px; font-weight:650; overflow-wrap:anywhere; }
+  .cv-class{ font-size:11px; font-weight:700; color:var(--text-muted); background:var(--surface-2);
+    border-radius:var(--r-pill); padding:1px 8px; margin-right:8px; vertical-align:1px; }
+  .cv-detail{ font-size:12.5px; color:var(--text-muted); margin-top:2px; }
+  .cv-detail s{ color:var(--text-faint); }
+  .cv-detail b{ color:var(--text); font-weight:650; }
+  .cv-choice{ display:inline-flex; padding:3px; gap:3px; border-radius:var(--r-pill); background:var(--surface-2); }
+  .cv-opt{ border:0; background:transparent; font:inherit; font-size:12.5px; font-weight:650; color:var(--text-muted);
+    padding:6px 12px; border-radius:var(--r-pill); cursor:pointer; white-space:nowrap; }
+  .cv-opt:hover{ color:var(--text); }
+  .cv-opt.on{ background:var(--surface); color:var(--text); box-shadow:var(--shadow-card); }
+  .cv-opt.accept.on{ background:var(--success); color:#fff; }
+  .cv-flash{ margin-bottom:16px; }
+  #cv-root .btn[disabled], #cv-settings .btn[disabled]{ opacity:.5; cursor:default; }
+  .cv-hidden > div + div{ margin-top:6px; }
+  .cv-empty h2{ font-size:15px; margin-bottom:4px; }
+  .cv-steps{ margin:10px 0 12px 20px; font-size:12.5px; color:var(--text-muted); line-height:1.7; }
+  .cv-steps b{ color:var(--text); }
+  .cv-pair{ display:grid; grid-template-columns:minmax(0,1fr) minmax(170px,260px); gap:10px; align-items:center;
+    padding:10px 0; border-top:1px solid var(--border); }
+  .cv-pair-code{ font-size:13px; font-weight:700; }
+  @media (max-width:640px){
+    .cv-row{ grid-template-columns:10px minmax(0,1fr); }
+    .cv-choice{ grid-column:2; justify-self:start; }
+    .cv-pair{ grid-template-columns:1fr; }
+    .cv-banner .btn, .cv-strip .btn{ flex:1; justify-content:center; }
+  }
+
   /* The term list in Settings. Every term is a readable row with its actions in the
      open, rather than a select plus a menu: this is the one screen where the whole
      shape of the year should be visible at once. */
@@ -2989,6 +3049,7 @@
   </aside>
   <main id="main">
     <div id="term-banner"></div>
+    <div id="canvas-banner"></div>
     <div id="view-header"></div>
     <div id="view-actions"></div>
     <div id="view"></div>
@@ -3055,6 +3116,7 @@
 
   // ---------------- line icons ----------------
   var ICONS = {
+    refresh: '<path d="M20 11a8 8 0 0 0-14.9-3.8L3 9.5"/><path d="M3 4v5.5h5.5"/><path d="M4 13a8 8 0 0 0 14.9 3.8l2.1-2.3"/><path d="M21 20v-5.5h-5.5"/>',
     home: '<path d="M3 10.2 12 3l9 7.2"/><path d="M5.6 9.2V20h12.8V9.2"/>',
     calendar: '<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.6v3.8M16 2.6v3.8"/>',
     classes: '<path d="M12 3 3 7.4l9 4.4 9-4.4L12 3Z"/><path d="M3 12.3 12 16.7l9-4.4"/><path d="M3 16.9 12 21.3l9-4.4"/>',
@@ -3876,6 +3938,8 @@
       var wasOn = gsyncOn;
       gsyncOn = !!data.googleSync;
       adoptState(data);
+      // Canvas starts once the term is known: its banner and class strips point at classes.
+      canvasBoot();
       // The whole term, stringified and written to disk on the main thread. Doing it
       // on every poll and every save that reloads was work for nothing, because the
       // stored copy is usually already this exact payload.
@@ -4820,6 +4884,7 @@
     var navTab = (activeTab==='class') ? 'classes' : activeTab;
     document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.tab===navTab); });
     renderTermBanner();
+    renderCanvasBanner();
     renderSideStats();
     renderHeader();
     renderView();
@@ -7958,11 +8023,12 @@
   ];
   function fileTypeLabel(m){
     var probe = (m.mimetype||'') + ' ' + (m.filename||m.title||m.url||'');
-    if(m.kind!=='file') return 'Link';
+    // A Canvas file not downloaded yet is still the PDF or deck it will be, not a link.
+    if(m.kind!=='file' && !m.notFetched) return 'Link';
     for(var i=0;i<MIME_LABEL.length;i++){ if(MIME_LABEL[i][0].test(probe)) return MIME_LABEL[i][1]; }
     return 'File';
   }
-  function fileSizeLabel(m){ return (m.kind==='file' && m.size!=null) ? humanSize(m.size) : '—'; }
+  function fileSizeLabel(m){ return ((m.kind==='file' || m.notFetched) && m.size!=null) ? humanSize(m.size) : '—'; }
 
   // The type filter groups the labels above into the handful of things worth
   // filtering by. Kept as chips rather than a select so every option is on screen.
@@ -11417,6 +11483,8 @@
   function openFilePreviewModal(id){
     var m = findMaterial(id);
     if(!m) return;
+    // From Canvas and not downloaded yet: fetch it, then come back here as a file.
+    if(m.notFetched){ openCanvasFileFetch(m); return; }
     var name = m.filename || m.title || m.url;
     var body;
     if(m.kind==='file' && m.missing){
@@ -11577,6 +11645,7 @@
         return '<button type="button" class="cp-tab'+(classDetailTab===tb.key?' active':'')+'" data-action="class-tab" data-tab="'+tb.key+'" data-id="'+c.id+'">'+tb.label+'</button>';
       }).join('') + '</div>'
       + '<div class="cp-tab-actions">'
+      + canvasClassButtonHtml(c)
       + '<button type="button" class="btn" data-action="si-open" data-class="'+c.id+'" data-mode="supplement"'
       + ' title="Add a schedule or any other course document the syllabus left out">'
       + iconSvg('upload')+'Add a document</button>'
@@ -11598,7 +11667,7 @@
     else if(classDetailTab==='notes') body = notesTabHtml(c);
     else if(classDetailTab==='grades') body = gradesTabHtml(c);
     else body = assignmentsTabHtml(c);
-    return tabBar + '<div class="cp-body">' + body + '</div>';
+    return tabBar + '<div class="cp-body">' + canvasClassStripHtml(c) + body + '</div>';
   }
 
   // The class detail used to be a modal. It's a full page now, so every existing
@@ -11924,6 +11993,729 @@
   // ---- Google Calendar -----------------------------------------------------
   // Deadlines and exams go out to a calendar Vesta owns. Vesta is the source of truth:
   // anything that changed on both sides keeps Vesta's version and says so here.
+  // ---------------- Canvas ----------------
+  // Canvas finds things in the background and nothing reaches a class until it has been
+  // reviewed here. Four places show it: a banner across the top that names what
+  // happened, a strip on each class page it affects, a full-screen review with a pair
+  // of choices on every change, and a card in Settings > Integrations for the
+  // connection and the course pairings. The rules live on the server (canvas_sync.py);
+  // this only shows them and sends back what was decided. See CANVAS.md.
+  var cv = null;              // GET /api/canvas: connection, stale, checking, banner summary
+  var cvReview = null;        // GET /api/canvas/review, only while the review is open
+  var cvOpen = null;          // { classId } while the review screen is showing
+  var cvDecisions = {};       // change id -> 'accept' | 'reject', held until Apply
+  var cvBusy = false;
+  var cvFlash = null;         // what the last Apply did, shown at the top of the review
+  var cvPollTimer = null;
+  var cvLastLoad = 0;
+  var cvBooted = false;
+  var cvConnect = { host:'', token:'', busy:false, error:null, replacing:false,
+                    courses:null, loadingCourses:false };
+
+  // What each kind of change calls its two choices. The server's own labels win where
+  // it gives them, for the file cases whose wording matters most.
+  var CV_CHOICES = {
+    moved:       ['Keep mine', 'Use Canvas'],
+    grade:       ['Keep mine', 'Use Canvas'],
+    newItem:     ['Skip', 'Add'],
+    dateAdded:   ['Skip', 'Add date'],
+    newFile:     ['Skip', 'Add'],
+    updatedFile: ['Keep this version', 'Update'],
+    conflict:    ['Keep mine', 'Add Canvas’s copy too'],
+    other:       ['Keep mine', 'Use Canvas']
+  };
+  var CV_ALL = {
+    moved:['Keep all mine','Use Canvas for all'], grade:['Keep all mine','Use Canvas for all'],
+    newItem:['Skip all','Add all'], dateAdded:['Skip all','Add all'], newFile:['Skip all','Add all'],
+    updatedFile:['Keep all','Update all'], conflict:['Keep all mine','Add all'],
+    other:['Keep all mine','Use Canvas for all']
+  };
+  var CV_HINTS = {
+    moved: 'Canvas has a different due date or time from the one in Vesta.',
+    grade: 'Scores posted on Canvas. Where you typed your own, it stays unless you choose Canvas.',
+    newItem: 'Assignments on Canvas that are not in Vesta yet.',
+    dateAdded: 'Assignments you already have that have no due date in Vesta.',
+    newFile: 'Small files are saved to Vesta straight away. Bigger ones, and video, stay on Canvas until you open them.',
+    updatedFile: 'Files your professor has replaced on Canvas since Vesta saved them.',
+    conflict: 'A file with the same name is already in this class, and Canvas’s copy is different. Yours is never replaced.',
+    other: 'Everything else Canvas disagrees with.'
+  };
+
+  /** "5 minutes ago" from a server timestamp, which is UTC without a zone marker. */
+  function cvAgo(iso){
+    if(!iso) return 'never';
+    var t = Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z');
+    if(isNaN(t)) return '';
+    var mins = Math.round((Date.now() - t) / 60000);
+    if(mins < 1) return 'just now';
+    if(mins < 60) return mins + ' minute' + (mins===1?'':'s') + ' ago';
+    var hrs = Math.round(mins / 60);
+    if(hrs < 24) return hrs + ' hour' + (hrs===1?'':'s') + ' ago';
+    return relTimeAgo(new Date(t).toISOString().slice(0,10));
+  }
+  function cvPct(v){ return v==null ? '' : (Math.round(Number(v)*10)/10) + '%'; }
+  function cvPlural(n, one, many){ return n + ' ' + (n===1 ? one : (many || one + 's')); }
+
+  function cvClassSummary(classId){
+    var list = (cv && cv.review && cv.review.classes) || [];
+    for(var i=0;i<list.length;i++){ if(list[i].classId===classId) return list[i]; }
+    return null;
+  }
+  function cvPaired(classId){
+    var courses = (cv && cv.courses) || {};
+    return Object.keys(courses).some(function(k){ return courses[k].classId === classId; });
+  }
+
+  // -- loading, and checking when Vesta is opened -----------------------------------
+
+  function loadCanvas(){
+    return apiGet('/api/canvas').then(function(s){
+      cv = s;
+      cvLastLoad = Date.now();
+      cvRepaintAll();
+      if(s && s.checking) cvPoll();
+      return s;
+    }).catch(function(){ return null; });
+  }
+
+  function cvRepaintAll(){
+    renderCanvasBanner();
+    cvRefreshClassPage();
+    cvRepaintSettings();
+    if(cvOpen) renderCanvasReview();
+  }
+
+  /** Start a check. `ifStale` is what opening Vesta sends; `full` is Check for updates. */
+  function cvCheck(opts){
+    // An archived term refuses writes, and starting a check writes its bookkeeping.
+    if(termLocked) return Promise.resolve(null);
+    return apiPost('/api/canvas/check', opts || {}).then(function(r){
+      if(r && (r.started || r.checking)){
+        if(cv) cv.checking = true;
+        cvRepaintAll();
+        cvPoll();
+      }
+      return r;
+    });
+  }
+
+  /** Follow a check that is running on the server, then show what it found. */
+  function cvPoll(){
+    clearTimeout(cvPollTimer);
+    var tries = 0;
+    (function tick(){
+      cvPollTimer = setTimeout(function(){
+        tries++;
+        apiGet('/api/canvas').then(function(s){
+          cv = s;
+          // A first check of five courses takes about half a minute. Two minutes is
+          // the point at which it has plainly stopped, not merely got slow.
+          if(s.checking && tries < 40){ tick(); return; }
+          cvRepaintAll();
+          if(cvOpen) cvLoadReview();
+        }).catch(function(){ if(tries < 40) tick(); });
+      }, 3000);
+    })();
+  }
+
+  /**
+   * Once per page load, after the first state arrives: show the banner, and check
+   * Canvas if the last check is more than a few hours old. Coming back to the tab does
+   * the same, at most once a minute.
+   */
+  function canvasBoot(){
+    if(cvBooted) return;
+    cvBooted = true;
+    function refresh(){
+      loadCanvas().then(function(s){
+        if(s && s.connected && s.autoSync && s.stale && !s.checking){
+          cvCheck({ ifStale:true }).catch(function(){});
+        }
+      });
+    }
+    refresh();
+    function again(){
+      if(document.visibilityState !== 'visible') return;
+      if(Date.now() - cvLastLoad < 60000) return;
+      refresh();
+    }
+    document.addEventListener('visibilitychange', again);
+    window.addEventListener('focus', again);
+  }
+
+  // -- the banner ---------------------------------------------------------------------
+
+  function renderCanvasBanner(){
+    var host = document.getElementById('canvas-banner');
+    if(!host) return;
+    host.innerHTML = canvasBannerHtml();
+    paintIcons(host);
+  }
+
+  function canvasBannerHtml(){
+    if(!cv || !cv.connected) return '';
+    var r = cv.review || {};
+    var review = r.count
+      ? '<button type="button" class="btn primary" data-action="cv-review">Review '
+        + cvPlural(r.count, 'change') + '</button>'
+      : '';
+    // A failure is shown whatever else is going on: a background check with nobody
+    // watching is exactly where a dead token would otherwise go unnoticed for weeks.
+    if(cv.lastError){
+      return '<div class="cv-banner broken"><span class="cv-mark">'+iconSvg('alert')+'</span>'
+        + '<span class="cv-text"><b>The last Canvas check failed.</b> '+escapeHtml(cv.lastError)+'</span>'
+        + '<button type="button" class="btn" data-action="cv-settings">Open Settings</button>'
+        + review + '</div>';
+    }
+    if(!r.count || r.snoozed) return '';
+    return '<div class="cv-banner"><span class="cv-mark">'+iconSvg('link')+'</span>'
+      + '<span class="cv-text"><b>Canvas:</b> '+escapeHtml((r.headlines||[]).join(', '))+'</span>'
+      + '<button type="button" class="btn ghost" data-action="cv-later" data-fp="'
+      + escapeHtml(r.fingerprint||'')+'">Later</button>'
+      + review + '</div>';
+  }
+
+  // -- the class page -----------------------------------------------------------------
+
+  function canvasClassStripHtml(c){
+    var s = cvClassSummary(c.id);
+    var inner = '';
+    if(s && s.count && !s.snoozed){
+      inner = '<div class="cv-strip"><span class="cv-mark">'+iconSvg('link')+'</span>'
+        + '<span class="cv-text"><b>'+cvPlural(s.count, 'Canvas change')+' for '+escapeHtml(s.label)+':</b> '
+        + escapeHtml((s.headlines||[]).join(', '))+'</span>'
+        + '<button type="button" class="btn ghost" data-action="cv-later" data-class="'+c.id+'"'
+        + ' data-fp="'+escapeHtml(s.fingerprint||'')+'">Later</button>'
+        + '<button type="button" class="btn primary" data-action="cv-review" data-class="'+c.id+'">Review</button>'
+        + '</div>';
+    }
+    return '<div id="cv-strip-host">'+inner+'</div>';
+  }
+
+  /** Always on a paired class's page, so Check for updates is never out of reach. */
+  function canvasClassButtonHtml(c){
+    if(!cv || !cv.connected || !cvPaired(c.id)) return '<span id="cv-class-btn"></span>';
+    var s = cvClassSummary(c.id);
+    var n = s && s.count ? s.count : 0;
+    return '<span id="cv-class-btn"><button type="button" class="btn" data-action="cv-review" data-class="'+c.id+'"'
+      + ' title="What Canvas has for this class">'+iconSvg('link')+'Canvas'
+      + (n ? ' <span class="cv-pill">'+n+' to review</span>' : '')+'</button></span>';
+  }
+
+  /** Update the class page's Canvas parts without redrawing it, which would cost a caret. */
+  function cvRefreshClassPage(){
+    if(activeTab !== 'class') return;
+    var c = classById(activeClassId);
+    if(!c) return;
+    var strip = document.getElementById('cv-strip-host');
+    if(strip){ strip.outerHTML = canvasClassStripHtml(c); }
+    var btn = document.getElementById('cv-class-btn');
+    if(btn){ btn.outerHTML = canvasClassButtonHtml(c); }
+    var view = document.getElementById('view');
+    if(view) paintIcons(view);
+  }
+
+  function cvLater(fp, classId){
+    if(!fp) return;
+    apiPost('/api/canvas/snooze', { fingerprint:fp, classId:classId||null }).then(function(){
+      return loadCanvas();
+    }).catch(reportError);
+  }
+
+  // -- the review ---------------------------------------------------------------------
+
+  function openCanvasReview(classId){
+    cvOpen = { classId: classId || null };
+    cvDecisions = {};
+    cvReview = null;
+    cvFlash = null;
+    renderCanvasReview();
+    cvLoadReview();
+  }
+
+  function closeCanvasReview(){
+    cvOpen = null;
+    cvReview = null;
+    cvDecisions = {};
+    cvFlash = null;
+    var root = document.getElementById('cv-root');
+    if(root) root.innerHTML = '';
+  }
+
+  function cvLoadReview(){
+    if(!cvOpen) return Promise.resolve(null);
+    var url = '/api/canvas/review' + (cvOpen.classId ? '?classId='+encodeURIComponent(cvOpen.classId) : '');
+    return apiGet(url).then(function(r){
+      if(!cvOpen) return r;
+      cvReview = r;
+      // A decision about a change that is no longer offered means nothing any more.
+      var live = {};
+      cvUnits().forEach(function(u){ live[u.id] = 1; });
+      Object.keys(cvDecisions).forEach(function(id){ if(!live[id]) delete cvDecisions[id]; });
+      renderCanvasReview();
+      return r;
+    }).catch(reportError);
+  }
+
+  function cvUnits(kind){
+    var out = [];
+    ((cvReview && cvReview.groups) || []).forEach(function(g){
+      if(kind && g.kind !== kind) return;
+      out = out.concat(g.changes || []);
+    });
+    return out;
+  }
+
+  function cvChoiceLabels(u){
+    var d = CV_CHOICES[u.kind] || ['Keep mine', 'Use Canvas'];
+    var keep = u.keepLabel || d[0], take = u.acceptLabel || d[1];
+    // A grade Vesta never had is not "mine" to keep.
+    if(u.kind === 'grade' && u.before == null){ keep = 'Skip'; take = 'Add grade'; }
+    return [keep, take];
+  }
+
+  function cvDetailHtml(u){
+    var b = u.before, a = u.after;
+    if(u.kind === 'moved') return '<s>'+escapeHtml(b.text)+'</s> → <b>'+escapeHtml(a.text)+'</b>';
+    if(u.kind === 'dateAdded') return 'Due <b>'+escapeHtml(a.text)+'</b>';
+    if(u.kind === 'grade'){
+      return b == null ? 'Canvas has <b>'+cvPct(a)+'</b>. Nothing in Vesta yet.'
+                       : 'Yours <s>'+cvPct(b)+'</s> · Canvas <b>'+cvPct(a)+'</b>';
+    }
+    if(u.kind === 'newItem'){
+      var bits = [TYPE_LABELS[a.type] || 'Assignment',
+                  a.dueDate ? 'due '+a.due : 'no due date on Canvas'];
+      if(a.score != null) bits.push('graded '+cvPct(a.score));
+      if(a.weight != null) bits.push(cvPct(a.weight)+' of the grade');
+      return escapeHtml(bits.join(' · '));
+    }
+    if(u.kind === 'newFile'){
+      var f = [a.size != null ? humanSize(a.size) : 'size unknown'];
+      if(a.folder) f.push('into '+a.folder);
+      f.push(a.fetchNow ? 'saved to Vesta now' : 'saved when you first open it');
+      return escapeHtml(f.join(' · '));
+    }
+    if(u.kind === 'updatedFile'){
+      return escapeHtml(humanSize(b.size)+' → '+humanSize(a.size)+' · the old copy is replaced once the new one is saved');
+    }
+    if(u.kind === 'conflict'){
+      return escapeHtml('You have '+(b.title||'a file')+(b.size!=null ? ' ('+humanSize(b.size)+')' : '')
+        + '. Canvas’s copy is '+(a.size!=null ? humanSize(a.size) : 'a different size')+'.');
+    }
+    if(u.field === 'weight') return 'Weight <s>'+cvPct(b)+'</s> → <b>'+cvPct(a)+'</b>';
+    if(u.field === 'type'){
+      return 'Type <s>'+escapeHtml(TYPE_LABELS[b]||b||'none')+'</s> → <b>'+escapeHtml(TYPE_LABELS[a]||a)+'</b>';
+    }
+    if(u.field === 'categoryWeight'){
+      var drop = function(x){ return x && x.dropLowest ? ', drop lowest '+x.dropLowest : ''; };
+      return 'Worth <s>'+cvPct(b.weight)+escapeHtml(drop(b))+'</s> → <b>'+cvPct(a.weight)+escapeHtml(drop(a))+'</b>';
+    }
+    return '';
+  }
+
+  function cvRowHtml(u){
+    var d = cvDecisions[u.id] || '';
+    var labels = cvChoiceLabels(u);
+    var showClass = !(cvOpen && cvOpen.classId);
+    return '<div class="cv-row'+(d ? ' '+d : '')+'">'
+      + '<span class="cv-dot" style="--c:'+(classColor(u.classId)||'var(--none)')+'"></span>'
+      + '<div class="cv-main"><div class="cv-title">'
+      + (showClass ? '<span class="cv-class">'+escapeHtml(u.classLabel||'')+'</span>' : '')
+      + escapeHtml(u.title||'Untitled')+'</div>'
+      + '<div class="cv-detail">'+cvDetailHtml(u)+'</div></div>'
+      + '<div class="cv-choice" role="group">'
+      + '<button type="button" class="cv-opt'+(d==='reject'?' on':'')+'" data-action="cv-decide"'
+      + ' data-id="'+escapeHtml(u.id)+'" data-choice="reject" aria-pressed="'+(d==='reject')+'">'
+      + escapeHtml(labels[0])+'</button>'
+      + '<button type="button" class="cv-opt accept'+(d==='accept'?' on':'')+'" data-action="cv-decide"'
+      + ' data-id="'+escapeHtml(u.id)+'" data-choice="accept" aria-pressed="'+(d==='accept')+'">'
+      + escapeHtml(labels[1])+'</button>'
+      + '</div></div>';
+  }
+
+  function cvGroupHtml(g){
+    var all = CV_ALL[g.kind] || ['Keep all mine', 'Use Canvas for all'];
+    return '<div class="si-section cv-group">'
+      + '<div class="cv-group-head"><h2>'+escapeHtml(g.label)+' <span class="cv-count">'+g.count+'</span></h2>'
+      + '<div class="cv-group-actions">'
+      + '<button type="button" class="btn" data-action="cv-all" data-kind="'+g.kind+'" data-choice="reject">'
+      + escapeHtml(all[0])+'</button>'
+      + '<button type="button" class="btn primary" data-action="cv-all" data-kind="'+g.kind+'" data-choice="accept">'
+      + escapeHtml(all[1])+'</button></div></div>'
+      + '<div class="hint cv-hint">'+escapeHtml(CV_HINTS[g.kind]||'')+'</div>'
+      + (g.changes||[]).map(cvRowHtml).join('')
+      + '</div>';
+  }
+
+  function cvHiddenHtml(){
+    var rows = ((cvReview && cvReview.classes) || []).filter(function(c){ return c.hidden; });
+    if(!rows.length) return '';
+    return '<div class="si-keep cv-hidden">' + rows.map(function(c){
+      return '<div>'+escapeHtml(cvPlural(c.hidden, 'thing')+' you skipped or deleted in '+c.label
+          + (c.hidden===1 ? ' is' : ' are')+' hidden.')
+        + ' <button type="button" class="link-btn" data-action="cv-unhide" data-class="'+c.classId+'">'
+        + 'Show '+(c.hidden===1 ? 'it' : 'them')+' again</button></div>';
+    }).join('') + '</div>';
+  }
+
+  function renderCanvasReview(){
+    if(!cvOpen) return;
+    var root = document.getElementById('cv-root');
+    if(!root){
+      root = document.createElement('div');
+      root.id = 'cv-root';
+      document.body.appendChild(root);
+    }
+    var old = root.querySelector('.si-panel');
+    var scroll = old ? old.scrollTop : 0;
+    var r = cvReview;
+    var cls = cvOpen.classId ? classById(cvOpen.classId) : null;
+    var checking = !!(cv && cv.checking);
+    var title = cls ? 'What Canvas has for '+(cls.code||cls.name||'this class') : 'What Canvas found';
+    var checked = cv && cv.lastCheck ? 'Last checked '+cvAgo(cv.lastCheck)+'.' : '';
+
+    var head = '<div class="si-top"><h1>'+escapeHtml(title)+'</h1><div class="cv-top-actions">'
+      + (checking
+          ? '<span class="cv-checking"><span class="cv-spin"></span>Checking Canvas…</span>'
+          : '<button type="button" class="btn" data-action="cv-check-full"'
+            + (cls ? ' data-class="'+cls.id+'"' : '')
+            + ' title="Re-reads every file, which is how a file your professor replaced gets noticed">'
+            + iconSvg('refresh')+'Check for updates</button>')
+      + '<button type="button" class="btn ghost" data-action="cv-close">Close</button></div></div>'
+      + '<div class="si-sub">None of these changes are in Vesta yet. Choose for each one, or for a whole group, '
+      + 'then apply. Anything you keep as it is won’t be offered again unless Canvas changes it. '
+      + escapeHtml(checked)+'</div>';
+
+    var flash = cvFlash ? '<div class="si-keep cv-flash">'+escapeHtml(cvFlash)+'</div>' : '';
+    var body;
+    if(!r){
+      body = '<div class="si-section"><div class="hint">Loading what Canvas found…</div></div>';
+    } else if(!r.count){
+      body = '<div class="si-section cv-empty"><h2>Nothing new from Canvas</h2>'
+        + '<div class="hint">'+(checking ? 'A check is running now. Anything it finds will appear here.'
+            : 'Everything Canvas has is already in Vesta, or you chose to keep your own. '
+              + 'Check for updates re-reads every file, in case a professor replaced one.')
+        + '</div></div>';
+    } else {
+      body = '<div class="si-chips">' + r.groups.map(function(g){
+          return '<span class="si-chip">'+escapeHtml(g.label)+' · '+g.count+'</span>';
+        }).join('') + '</div>'
+        + r.groups.map(cvGroupHtml).join('');
+    }
+
+    var ids = cvUnits().map(function(u){ return u.id; });
+    var nAcc = 0, nRej = 0;
+    ids.forEach(function(id){
+      if(cvDecisions[id] === 'accept') nAcc++;
+      else if(cvDecisions[id] === 'reject') nRej++;
+    });
+    var left = ids.length - nAcc - nRej;
+    var summary = ids.length
+      ? [nAcc ? nAcc+' to accept' : '', nRej ? nRej+' to keep as they are' : '',
+         left ? left+' left for later' : ''].filter(Boolean).join(' · ')
+      : '';
+    var foot = '<div class="si-foot"><div class="si-foot-inner">'
+      + '<div class="si-left">'+escapeHtml(summary)+'</div>'
+      + '<button type="button" class="btn" data-action="cv-close">Close</button>'
+      + (ids.length || cvBusy
+          ? '<button type="button" class="btn primary'+(cvBusy?' si-waiting':'')+'" data-action="cv-apply"'
+            + ((nAcc + nRej) && !cvBusy ? '' : ' disabled')+'>'
+            + (cvBusy ? 'Applying…' : (nAcc + nRej) ? 'Apply '+cvPlural(nAcc + nRej, 'choice') : 'Choose to apply')
+            + '</button>'
+          : '')
+      + '</div></div>';
+
+    root.innerHTML = '<div class="si-panel"><div class="si-inner">'+head+flash+body+cvHiddenHtml()
+      + '</div></div>'+foot;
+    paintIcons(root);
+    var panel = root.querySelector('.si-panel');
+    if(panel) panel.scrollTop = scroll;
+  }
+
+  function cvDecide(id, choice){
+    cvDecisions[id] = cvDecisions[id] === choice ? undefined : choice;
+    if(!cvDecisions[id]) delete cvDecisions[id];
+    cvFlash = null;
+    renderCanvasReview();
+  }
+
+  function cvDecideAll(kind, choice){
+    cvUnits(kind).forEach(function(u){ cvDecisions[u.id] = choice; });
+    cvFlash = null;
+    renderCanvasReview();
+  }
+
+  function cvApply(){
+    var accept = [], reject = [];
+    Object.keys(cvDecisions).forEach(function(id){
+      if(cvDecisions[id] === 'accept') accept.push(id);
+      else if(cvDecisions[id] === 'reject') reject.push(id);
+    });
+    if(!accept.length && !reject.length) return;
+    cvBusy = true;
+    renderCanvasReview();
+    apiPost('/api/canvas/apply', { accept:accept, reject:reject }).then(function(r){
+      cvBusy = false;
+      cvDecisions = {};
+      cvFlash = cvApplyMessage(r);
+      if(cv) cv.review = r.review;
+      renderCanvasBanner();
+      cvRefreshClassPage();
+      // New assignments and files are in the term now, and every screen should know.
+      return loadState().then(function(){ return cvLoadReview(); });
+    }).catch(function(e){
+      cvBusy = false;
+      renderCanvasReview();
+      reportError(e);
+    });
+  }
+
+  function cvApplyMessage(r){
+    var a = (r && r.applied) || {};
+    var parts = [];
+    if(a.items) parts.push('added '+cvPlural(a.items, 'assignment'));
+    if(a.updated) parts.push('updated '+cvPlural(a.updated, 'assignment'));
+    if(a.files) parts.push('added '+cvPlural(a.files, 'file'));
+    if(a.replaced) parts.push('updated '+cvPlural(a.replaced, 'file'));
+    if(a.categories) parts.push('made '+cvPlural(a.categories, 'grade category', 'grade categories'));
+    var msg = parts.length ? 'Done: '+parts.join(', ')+'.' : 'Saved your choices.';
+    if(r && r.rejected) msg += ' Kept your own for '+cvPlural(r.rejected, 'change')+'.';
+    if(r && r.fetching) msg += ' '+cvPlural(r.fetching, 'file')+' downloading from Canvas now.';
+    if(r && r.stale && r.stale.length){
+      msg += ' '+cvPlural(r.stale.length, 'change')+' had moved since you looked, so '
+        + (r.stale.length===1 ? 'it was' : 'they were')+' left alone. Anything still different is shown again below.';
+    }
+    return msg;
+  }
+
+  function cvUnhide(classId){
+    apiPost('/api/canvas/unhide', { classId:classId }).then(function(){
+      return loadCanvas();
+    }).then(function(){ return cvLoadReview(); }).catch(reportError);
+  }
+
+  // -- opening a Canvas file that has not been downloaded yet -------------------------
+
+  function openCanvasFileFetch(m){
+    var name = m.filename || m.title || 'this file';
+    var modal = function(body){
+      return '<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide" data-action="modal-stop"'
+        + ' style="max-width:560px;" data-cv-fetch="'+m.id+'">'
+        + '<div class="modal-head"><h2>'+escapeHtml(m.title||name)+'</h2>'
+        + '<div class="hint" style="margin-top:6px;">From Canvas'+(m.size!=null ? ' · '+humanSize(m.size) : '')+'</div></div>'
+        + '<div class="preview-body">'+body+'</div>'
+        + '<div class="modal-foot"><span></span><div class="right">'
+        + (m.url ? '<a class="btn" href="'+escapeHtml(m.url)+'" target="_blank" rel="noopener noreferrer">Open on Canvas</a>' : '')
+        + '<button class="btn primary" data-action="modal-close">Close</button></div></div></div></div>';
+    };
+    var slow = m.size != null && m.size > 5*1024*1024;
+    document.getElementById('modal-root').innerHTML = modal(
+      '<div class="preview-fallback"><span class="cv-spin"></span>Getting '+escapeHtml(name)+' from Canvas…'
+      + '<div class="hint" style="margin-top:10px;">'
+      + (slow ? 'It is a big one, so this can take a little while. ' : '')
+      + 'After this it opens straight away, and its text is searchable.</div></div>');
+    apiPostRaw('/api/materials/'+m.id+'/fetch', {}).then(function(r){
+      var still = document.querySelector('#modal-root [data-cv-fetch="'+m.id+'"]');
+      if(r.ok){
+        return loadState().then(function(){ if(still) openFilePreviewModal(m.id); });
+      }
+      if(!still) return;
+      var b = r.body || {};
+      document.getElementById('modal-root').innerHTML = modal(
+        '<div class="preview-fallback">'+escapeHtml(b.error || 'Canvas would not send this file.')
+        + (b.needsToken
+            ? '<div style="margin-top:12px;"><button type="button" class="btn" data-action="cv-settings">Reconnect Canvas</button></div>'
+            : '<div class="hint" style="margin-top:12px;">You can still open it on Canvas.</div>')
+        + '</div>');
+    }).catch(reportError);
+  }
+
+  // -- Settings > Integrations ----------------------------------------------------------
+
+  function cvRepaintSettings(){
+    var host = document.getElementById('cv-settings');
+    if(!host) return;
+    host.outerHTML = canvasSettingsHtml();
+    var root = document.getElementById('modal-root');
+    if(root) paintIcons(root);
+  }
+
+  /** Is this a first pairing, or are pairings already saved and edited one at a time? */
+  function cvHasPairings(){
+    return !!(cv && cv.courses && Object.keys(cv.courses).length);
+  }
+
+  function cvLoadCourses(){
+    if(cvConnect.loadingCourses) return;
+    cvConnect.loadingCourses = true;
+    apiGet('/api/canvas/courses').then(function(r){
+      cvConnect.loadingCourses = false;
+      cvConnect.courses = r.courses || [];
+      cvRepaintSettings();
+    }).catch(function(e){
+      cvConnect.loadingCourses = false;
+      cvConnect.courses = [];
+      cvConnect.error = e.message;
+      cvRepaintSettings();
+    });
+  }
+
+  function cvPairSelect(course){
+    var saved = cvHasPairings();
+    var current = saved ? (course.mapped || '') : (course.classId || '');
+    var opts = '<option value="">Don’t bring this course in</option>'
+      + classes.map(function(c){
+          return '<option value="'+c.id+'"'+(c.id===current?' selected':'')+'>'
+            + escapeHtml(c.code ? c.code+(c.name ? ' · '+c.name : '') : (c.name||'Untitled'))+'</option>';
+        }).join('')
+      + '<option value="new"'+(!saved && !course.classId ? ' selected' : '')+'>Make a new class for it</option>';
+    return '<select data-cv-pair="'+escapeHtml(String(course.courseId))+'">'+opts+'</select>';
+  }
+
+  function cvConnectFormHtml(){
+    var host = cvConnect.host || (cv && cv.host) || 'canvas.sfu.ca';
+    return '<div class="hint">Bring your courses’ assignments, due dates, grades and files in from Canvas. '
+      + 'Vesta checks Canvas and tells you what it found. Nothing is added until you say so.</div>'
+      + '<ol class="cv-steps">'
+      + '<li>In Canvas, open <b>Account</b>, then <b>Settings</b>.</li>'
+      + '<li>Under Approved Integrations, choose <b>+ New Access Token</b>. Call it Vesta and leave the date empty.</li>'
+      + '<li>Copy the token Canvas shows you. It only shows it once.</li></ol>'
+      + '<div class="st-grid">'
+      + '<label class="set-field">Canvas address'
+      + '<input type="text" id="cv-host" value="'+escapeHtml(host)+'" placeholder="canvas.sfu.ca" autocomplete="off">'
+      + '<span class="hint">The address you use to open Canvas.</span></label>'
+      + '<label class="set-field">Access token'
+      + '<span class="set-input"><input type="password" id="cv-token" autocomplete="off" placeholder="Paste it here"'
+      + ' value="'+escapeHtml(cvConnect.token||'')+'">'
+      + '<button type="button" class="set-input-btn" data-action="toggle-pw-visible" data-for="cv-token"'
+      + ' title="Show token" aria-label="Show token">'+iconSvg('eye')+'</button></span>'
+      + '<span class="hint">Only Vesta’s server keeps it. It is never shown again, even to you.</span></label>'
+      + '</div>'
+      + (cvConnect.error ? '<div class="si-error">'+escapeHtml(cvConnect.error)+'</div>' : '')
+      + '<div class="set-actions">'
+      + (cvConnect.replacing ? '<button type="button" class="btn" data-action="cv-cancel-replace">Cancel</button>' : '')
+      + '<button type="button" class="btn primary" data-action="cv-connect"'+(cvConnect.busy?' disabled':'')+'>'
+      + (cvConnect.busy ? 'Checking the token…' : 'Connect Canvas')+'</button></div>';
+  }
+
+  function cvPairingsHtml(){
+    if(cvConnect.courses === null){
+      cvLoadCourses();
+      return '<div class="hint" style="margin-top:12px;">Loading your Canvas courses…</div>';
+    }
+    if(!cvConnect.courses.length){
+      return '<div class="hint" style="margin-top:12px;">Canvas has no active courses for you right now.</div>';
+    }
+    var saved = cvHasPairings();
+    return '<div class="cv-pairs">'
+      + '<div class="set-label" style="margin-top:14px;">'+(saved ? 'Your courses' : 'Which class is each course?')+'</div>'
+      + '<div class="set-help">'+(saved
+          ? 'Changes save as you make them. A new pairing is checked straight away.'
+          : 'Matches by course code are filled in for you. Check them, then start.')+'</div>'
+      + cvConnect.courses.map(function(course){
+          return '<div class="cv-pair"><div><div class="cv-pair-code">'+escapeHtml(course.label)+'</div>'
+            + '<div class="hint">'+escapeHtml([course.name, course.term].filter(Boolean).join(' · '))+'</div></div>'
+            + cvPairSelect(course)+'</div>';
+        }).join('')
+      + (saved ? '' : '<div class="set-actions"><button type="button" class="btn primary" data-action="cv-pair-save">'
+          + 'Pair these and check Canvas</button></div>')
+      + '</div>';
+  }
+
+  function canvasSettingsHtml(){
+    var s = cv;
+    var sub = s && s.connected
+      ? 'Connected'+(s.name ? ' as '+s.name : '')+(s.host ? ' on '+s.host : '')+'.'
+      : 'Assignments, due dates, grades and files from your courses.';
+    var head = '<div class="st-card" id="cv-settings"><div class="st-card-head"><div>'
+      + '<div class="st-card-title">Canvas</div><div class="st-card-sub">'+escapeHtml(sub)+'</div></div></div>';
+    if(!s) return head + '<div class="hint">Checking…</div></div>';
+    if(!s.connected || cvConnect.replacing) return head + cvConnectFormHtml() + '</div>';
+    return head
+      + '<div class="hint">'+(s.checking ? '<span class="cv-spin"></span>Checking Canvas now.'
+          : 'Last checked '+escapeHtml(cvAgo(s.lastCheck))+'.')+'</div>'
+      + (s.lastError ? '<div class="si-error">'+escapeHtml(s.lastError)+'</div>' : '')
+      + cvPairingsHtml()
+      + setRow('Check Canvas on its own',
+          'When you open Vesta, if the last check was a few hours ago, and once a day. It only ever finds '
+          + 'changes: you still choose what goes in.',
+          '<input type="checkbox" class="set-switch" data-cv-auto'+(s.autoSync?' checked':'')+'>')
+      + '<div class="set-actions">'
+      + '<button type="button" class="btn danger" data-action="cv-disconnect">Disconnect</button>'
+      + '<button type="button" class="btn" data-action="cv-replace">Use a new token</button>'
+      + '</div></div>';
+  }
+
+  function cvDoConnect(){
+    var hostEl = document.getElementById('cv-host');
+    var tokenEl = document.getElementById('cv-token');
+    cvConnect.host = hostEl ? hostEl.value.trim() : cvConnect.host;
+    cvConnect.token = tokenEl ? tokenEl.value.trim() : cvConnect.token;
+    if(!cvConnect.token){
+      cvConnect.error = 'Paste the access token from Canvas first.';
+      cvRepaintSettings();
+      return;
+    }
+    cvConnect.busy = true;
+    cvConnect.error = null;
+    cvRepaintSettings();
+    apiPost('/api/canvas/connect', { host:cvConnect.host, token:cvConnect.token }).then(function(r){
+      cvConnect.busy = false;
+      cvConnect.replacing = false;
+      cvConnect.token = '';           // held only for as long as it took to send
+      cvConnect.courses = r.courses || [];
+      return loadCanvas();
+    }).catch(function(e){
+      cvConnect.busy = false;
+      cvConnect.error = e.message;
+      cvRepaintSettings();
+    });
+  }
+
+  /** Save one pairing (a change once pairings exist) or all of them (the first time). */
+  function cvSavePairing(onlyCourse){
+    var mapping = {};
+    document.querySelectorAll('#cv-settings [data-cv-pair]').forEach(function(sel){
+      var id = sel.getAttribute('data-cv-pair');
+      if(onlyCourse && id !== onlyCourse) return;
+      mapping[id] = sel.value || null;
+    });
+    var makesClass = Object.keys(mapping).some(function(k){ return mapping[k] === 'new'; });
+    apiPut('/api/canvas/mapping', { mapping:mapping }).then(function(){
+      cvConnect.courses = null;       // re-read, so a new class shows as its own name
+      return (makesClass ? loadState() : Promise.resolve()).then(loadCanvas);
+    }).then(function(){ cvPoll(); }).catch(function(e){
+      cvConnect.courses = null;
+      cvRepaintSettings();
+      reportError(e);
+    });
+  }
+
+  function cvDisconnect(){
+    confirmAction('Disconnect Canvas?',
+      'Vesta stops checking Canvas. Everything already in your classes stays, and so do your pairings '
+      + 'and the changes you chose to skip, so connecting again picks up where you left off.',
+      'Disconnect').then(function(ok){
+        if(!ok) return;
+        return apiDelete('/api/canvas').then(function(){
+          cvConnect.courses = null;
+          return loadCanvas();
+        });
+      }).catch(reportError);
+  }
+
+  document.addEventListener('change', function(e){
+    var el = e.target;
+    if(!el || !el.matches) return;
+    if(el.matches('[data-cv-pair]')){
+      if(cvHasPairings()) cvSavePairing(el.getAttribute('data-cv-pair'));
+      return;
+    }
+    if(el.matches('[data-cv-auto]')){
+      apiPut('/api/canvas/auto', { autoSync:el.checked }).then(loadCanvas).catch(reportError);
+    }
+  });
+
   var googleStatus = null;
 
   function googleSectionHtml(){
@@ -12159,7 +12951,7 @@
     { id:'account',  label:'Account',      sub:'Profile, password and your data.',   icon:'user' },
     { id:'semester', label:'Semester',     sub:'Terms and the grading scale.',       icon:'cap' },
     { id:'prefs',    label:'Preferences',  sub:'Theme, sidebar, editor, alerts.',   icon:'sliders' },
-    { id:'calendar', label:'Integrations', sub:'Sync with Google Calendar.',         icon:'link' }
+    { id:'calendar', label:'Integrations', sub:'Google Calendar and Canvas.',        icon:'link' }
   ];
   // Sections that were folded into the four above, so an old link still lands somewhere.
   var SETTINGS_ALIASES = { notifications:'prefs', notes:'prefs', appearance:'prefs',
@@ -12417,8 +13209,11 @@
   // Month/Week/List and Simple/Detailed both live on the calendar's own toolbar and
   // both remember what you pick, so this section is only about what it reads from.
   function secCalendar(){
-    return secHead('Integrations', 'Connect Vesta to the calendar you already use.')
-      + googleSectionHtml();
+    // Fresh on open, without waiting for it: the card paints from what is known.
+    if(!cv || Date.now() - cvLastLoad > 15000) setTimeout(loadCanvas, 0);
+    return secHead('Integrations', 'Connect Vesta to the calendar and the Canvas you already use.')
+      + googleSectionHtml()
+      + canvasSettingsHtml();
   }
 
   // ---- assignment card ---------------------------------------------------
@@ -16288,7 +17083,10 @@
       return;
     }
     if(action==='quick-start-focus'){ quickStartFocus(t.dataset.id); return; }
-    if(action==='preview-file'){ openFilePreviewModal(t.dataset.id); return; }
+    // Some file names are drawn as <a href="#">. Without this the browser follows the
+    // link, the router reads "#" as the dashboard, and the page behind the preview
+    // quietly changes to it.
+    if(action==='preview-file'){ e.preventDefault(); openFilePreviewModal(t.dataset.id); return; }
     if(action==='preview-refresh'){
       var prId = t.dataset.id;
       loadState().then(function(){ openFilePreviewModal(prId); }).catch(reportError);
@@ -17202,6 +18000,28 @@
       window.location.href = '/api/export';
       return;
     }
+    if(action==='cv-review'){ openCanvasReview(t.dataset.class||null); return; }
+    if(action==='cv-close'){ closeCanvasReview(); return; }
+    if(action==='cv-later'){ cvLater(t.dataset.fp, t.dataset.class||null); return; }
+    if(action==='cv-decide'){ cvDecide(t.dataset.id, t.dataset.choice); return; }
+    if(action==='cv-all'){ cvDecideAll(t.dataset.kind, t.dataset.choice); return; }
+    if(action==='cv-apply'){ cvApply(); return; }
+    if(action==='cv-check-full'){
+      // From a class's review, check only that class's course.
+      var cvCourse = null;
+      if(t.dataset.class && cv && cv.courses){
+        Object.keys(cv.courses).forEach(function(k){ if(cv.courses[k].classId===t.dataset.class) cvCourse = k; });
+      }
+      cvCheck({ full:true, courseId:cvCourse }).catch(reportError);
+      return;
+    }
+    if(action==='cv-unhide'){ cvUnhide(t.dataset.class); return; }
+    if(action==='cv-settings'){ closeCanvasReview(); openSettingsModal('calendar'); return; }
+    if(action==='cv-connect'){ cvDoConnect(); return; }
+    if(action==='cv-replace'){ cvConnect.replacing = true; cvConnect.error = null; cvRepaintSettings(); return; }
+    if(action==='cv-cancel-replace'){ cvConnect.replacing = false; cvConnect.error = null; cvRepaintSettings(); return; }
+    if(action==='cv-disconnect'){ cvDisconnect(); return; }
+    if(action==='cv-pair-save'){ cvSavePairing(null); return; }
     if(action==='google-connect'){ googleConnect(); return; }
     if(action==='google-sync'){ googleSync(); return; }
     if(action==='toggle-feed'){ toggleFeed(t.dataset.cal, t.checked); return; }

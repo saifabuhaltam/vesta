@@ -1159,7 +1159,15 @@ def migrate_file_folders(conn):
         conn.execute("ALTER TABLE materials ADD COLUMN preview_name TEXT")
     if "preview_status" not in mcols:
         conn.execute("ALTER TABLE materials ADD COLUMN preview_status TEXT")
+    # Canvas import. `items` has carried `import_key` since the syllabus importer, and
+    # files need the same thing for the same reason: it is what lets a second sync
+    # recognise the row the first one wrote instead of adding it a second time. The
+    # partner block is migration 010 in cloud/migrate/pg_migrations.sql, added in the
+    # same commit as this line.
+    if "import_key" not in mcols:
+        conn.execute("ALTER TABLE materials ADD COLUMN import_key TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS materials_by_folder ON materials(folder_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS materials_by_import_key ON materials(import_key)")
     conn.commit()
 
     for c in conn.execute("SELECT id FROM classes").fetchall():

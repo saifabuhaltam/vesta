@@ -74,6 +74,16 @@ app.register_blueprint(calendar_bp)
 # Per-account preferences: everything the Settings screen writes.
 from prefs import bp as prefs_bp  # noqa: E402
 app.register_blueprint(prefs_bp)
+# Canvas: checks find changes in the background, and nothing reaches a class until it
+# has been reviewed. Its two helpers from this file are handed over the same way the
+# syllabus importer gets EXTRACT_TEXT, looked up at call time, because both are
+# defined further down and importing this module back from there would load it twice
+# under `python app.py`.
+app.config["GUESS_FILE_CATEGORY"] = lambda name: guess_file_category(name)
+app.config["CANVAS_FETCH"] = lambda mid, user_id=None, replace=False: \
+    fetch_canvas_material(mid, user_id=user_id, replace=replace)
+import canvas_sync  # noqa: E402
+app.register_blueprint(canvas_sync.bp)
 # Accounts, and the gate in front of every /api route. Entirely a no-op locally,
 # where no Supabase is configured: Vesta stays the single-user tool it started as.
 import auth as vesta_auth  # noqa: E402
@@ -334,6 +344,16 @@ def serialize_material(m, item_ids=None):
         d["missing"] = not (m["stored_name"] and os.path.exists(os.path.join(UPLOAD_DIR, m["stored_name"])))
     else:
         d["url"] = m["url"]
+    # A file that came from Canvas. While it is still a link, opening it should fetch it
+    # (POST /api/materials/<id>/fetch) rather than send him to Canvas, and `size` lets
+    # the page say how long that will take.
+    key = m["import_key"] if "import_key" in m.keys() else None
+    d["fromCanvas"] = bool(key and key.startswith("canvas:file:"))
+    if d["fromCanvas"] and m["kind"] != "file":
+        d["notFetched"] = True
+        d["filename"] = m["filename"]
+        d["size"] = m["size"]
+        d["mimetype"] = m["mimetype"]
     return d
 
 
@@ -1740,6 +1760,9 @@ def backfill_office_previews():
 
 backfill_office_previews()
 backfill_office_text()
+# The daily Canvas check. A backup to the check that starts when Vesta is opened; see
+# `canvas_sync.start_daily` for why it waits ten minutes before its first run.
+canvas_sync.start_daily()
 
 
 # ---------------- file folders ----------------
@@ -2078,6 +2101,88 @@ def download_material(mid):
         as_attachment=not inline,
         download_name=m["filename"],
     )
+
+
+# One lock per material, so two clicks on the same unfetched Canvas file download it
+# once. The second click waits, finds it already fetched, and returns.
+_canvas_fetch_locks = {}
+_canvas_fetch_guard = threading.Lock()
+
+
+def fetch_canvas_material(mid, user_id=None, replace=False):
+    """Bring a Canvas file's bytes into Vesta, turning its link row into a file row.
+
+    A file from Canvas is inserted as `kind='link'` with no `stored_name`, which is what
+    "not fetched yet" means. This downloads it with the stored token, then does exactly
+    what an upload does: text extracted for search and Headstart, an Office preview
+    queued. After that it is an ordinary file, and `download_material` serves it.
+
+    `replace` is for a file the professor replaced on Canvas and he chose to update: the
+    new bytes land under a new name first, the row is switched over, and only then is
+    the old copy removed, so a failed download never leaves him with nothing.
+
+    `user_id` is required on a worker thread, for the reason `make_office_preview` gives.
+    """
+    import canvas
+    with _canvas_fetch_guard:
+        lock = _canvas_fetch_locks.setdefault(mid, threading.Lock())
+    with lock:
+        conn = get_db(user_id=user_id)
+        try:
+            m = conn.execute("SELECT * FROM materials WHERE id=?", (mid,)).fetchone()
+            if not m:
+                raise LookupError(mid)
+            key = m["import_key"] if "import_key" in m.keys() else None
+            if not (key or "").startswith("canvas:file:"):
+                raise ValueError("Only a file that came from Canvas can be fetched from it.")
+            if m["kind"] == "file" and m["stored_name"] and not replace:
+                return m["stored_name"]
+            state = canvas_sync.load_state(conn)
+            client = canvas.Client(state.get("host"), state.get("token"))
+            original = secure_filename(m["filename"] or "") or "file"
+            stored = f"{uuid.uuid4()}_{original}"
+            path = os.path.join(UPLOAD_DIR, stored)
+            partial = path + ".part"
+            size = client.download(m["url"], partial)
+            os.replace(partial, path)
+            text = extract_text(path, original)
+            old = [m["stored_name"], m["preview_name"] if "preview_name" in m.keys() else None]
+            conn.execute(
+                "UPDATE materials SET kind='file', stored_name=?, size=?, extracted_text=?,"
+                " preview_name=NULL, preview_status=NULL WHERE id=?",
+                (stored, size, text, mid))
+            conn.commit()
+        finally:
+            conn.close()
+    if replace:
+        for name in old:
+            if name and name != stored:
+                try:
+                    os.remove(os.path.join(UPLOAD_DIR, name))
+                except OSError:
+                    pass
+    if office_ext(original) and soffice_path():
+        threading.Thread(target=make_office_preview, args=(mid, path, original, user_id),
+                         daemon=True).start()
+    return stored
+
+
+@app.route("/api/materials/<mid>/fetch", methods=["POST"])
+def fetch_material(mid):
+    """Opening a Canvas file that has not been fetched yet. Waits for the download."""
+    import canvas
+    try:
+        fetch_canvas_material(mid, user_id=current_user_id())
+    except LookupError:
+        abort(404)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except canvas.CanvasError as e:
+        # Too big, a dead token, or Canvas refusing: the row stays a link, and the
+        # page can offer to open it on Canvas instead.
+        return jsonify({"error": e.message, "needsToken": e.needs_token,
+                        "openOnCanvas": True}), 502
+    return jsonify({"ok": True, "id": mid})
 
 
 # ---------------- rubrics ----------------

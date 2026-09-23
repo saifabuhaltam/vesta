@@ -23,3 +23,6 @@ os.environ.setdefault("SUPABASE_ANON_KEY", "stub-anon-key")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 # The test client speaks http, and a Secure-only cookie would never come back.
 os.environ.setdefault("HTTPS_ONLY", "0")
+# No daily Canvas check thread. It would wait ten minutes before doing anything, but a
+# test run has no business starting it at all.
+os.environ.setdefault("VESTA_NO_BACKGROUND", "1")

@@ -391,3 +391,21 @@ select apply_owner_rls('calendar_channels');
 
 grant select, insert, update, delete on calendar_channels to authenticated;
 revoke all on calendar_channels from anon;
+
+
+-- migration: 010_materials_import_key
+-- What lets a second Canvas sync recognise a file the first one wrote.
+--
+-- `items` has carried `import_key` since the syllabus importer and this is the same
+-- idea for files: a Canvas file is stored as `canvas:file:<id>`, so a re-sync updates
+-- that row rather than adding the same lecture slides again. `canvas_sync.py` falls
+-- back to matching on filename and byte count, which is what recognises a file the
+-- student uploaded by hand before ever connecting Canvas, but only the key survives a
+-- rename on either side.
+--
+-- Nullable on purpose: every file already in this table was uploaded by hand and has
+-- no key, and that is exactly what a null means here.
+
+alter table materials add column if not exists "import_key" text;
+
+create index if not exists materials_by_import_key on materials("import_key");
