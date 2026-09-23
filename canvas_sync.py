@@ -983,6 +983,8 @@ def check_account(user_id, full=False, course_id=None, reason=""):
             conn.close()
     finally:
         lock.release()
+    if report.get("checked"):
+        read_missing_text(user_id, reason)
     return report
 
 
@@ -1165,7 +1167,7 @@ def _units_for_class(draft, existing_cats, course_entry, course_id, class_id, cl
         if f["change"] == "new":
             add("newFile", key, title, key + "|new", None,
                 {"size": f.get("size"), "folder": f.get("folderName"),
-                 "fetchNow": should_prefetch(f)}, _file=f)
+                 "fetchNow": should_prefetch(f), "video": is_video(f)}, _file=f)
         elif f["change"] == "changed":
             add("conflict", key, title, key + "|conflict",
                 {"size": f["conflict"]["existingSize"], "title": f["conflict"]["existingTitle"]},
@@ -1761,19 +1763,23 @@ def apply():
         report["review"] = review_summary(build_review(conn, state))
     finally:
         conn.close()
-    if to_fetch and fetch:
+    if fetch:
+        # Always, not only when there are small files to fetch: the big ones still
+        # need their text read.
         _run_in_background(_prefetch, fetch, uid, to_fetch)
     report["fetching"] = len(to_fetch)
     return jsonify(report)
 
 
 def _prefetch(fetch, user_id, entries):
-    """Fetch each file in turn. One failure leaves that file a link, and the rest go on."""
+    """Fetch each file in turn. One failure leaves that file a link, and the rest go on.
+    Then read the text of the ones too big to keep."""
     for entry in entries:
         try:
             fetch(entry["materialId"], user_id=user_id, replace=bool(entry.get("replace")))
         except Exception:
             continue
+    read_missing_text(user_id, "apply")
 
 
 @bp.route("/api/canvas/snooze", methods=["POST"])
@@ -2492,3 +2498,76 @@ def _resolve_categories(conn, unit, use_canvas, snapshot, journal):
             journal.append({"op": "cat-", "id": c["id"], "row": _row_snapshot(row)})
             conn.execute("DELETE FROM grade_categories WHERE id=?", (c["id"],))
     return loose
+
+
+# ===========================================================================
+# reading every file's text
+#
+# Headstart's source picker showed most of IAT 201 as "no readable text": every file
+# over the 5 MB automatic-download line (8 to 113 MB, lecture decks and readings),
+# although every one had text. A file's text is now read for everything that is not
+# video, whatever its size, without keeping the big files: see `app.read_canvas_text`.
+# ===========================================================================
+
+READ_TEXT = None            # set by app.py: read_canvas_text(mid, user_id)
+_text_locks = {}
+
+
+def read_missing_text(user_id, reason=""):
+    """Read the text of every Canvas file that is still a link and has none.
+
+    One at a time, in the background, after a check or an apply. A file already tried
+    is not tried again unless Canvas's copy changed size: a scanned PDF has no text to
+    find, and re-downloading it on every check would waste minutes each time. Runs
+    under its own lock, not the check's, so a long first pass through a term's decks
+    never holds up the next check.
+    """
+    import threading
+    import db
+
+    if READ_TEXT is None:
+        return {"read": 0}
+    with (_locks_guard or threading.Lock()):
+        lock = _text_locks.setdefault(user_id or "local", threading.Lock())
+    if not lock.acquire(blocking=False):
+        return {"busy": True}
+    done = 0
+    try:
+        conn = db.get_db(user_id=user_id)
+        try:
+            rows = conn.execute(
+                "SELECT id, import_key, filename, title, mimetype, size FROM materials"
+                " WHERE import_key LIKE ? AND kind<>'file'"
+                " AND (extracted_text IS NULL OR extracted_text='')", ("canvas:file:%",)).fetchall()
+            state = load_state(conn)
+        finally:
+            conn.close()
+        tried = dict(state.get("textTried") or {})
+        todo = []
+        for r in rows:
+            entry = {"filename": _col(r, "filename") or _col(r, "title"),
+                     "mimetype": _col(r, "mimetype"), "size": _col(r, "size")}
+            if is_video(entry):
+                continue
+            if tried.get(_col(r, "import_key")) == _col(r, "size"):
+                continue
+            todo.append((_col(r, "id"), _col(r, "import_key"), _col(r, "size")))
+        newly = {}
+        for mid, key, size in todo:
+            try:
+                if READ_TEXT(mid, user_id=user_id):
+                    done += 1
+            except Exception:
+                pass
+            newly[key] = size
+        if newly:
+            conn = db.get_db(user_id=user_id)
+            try:
+                fresh = load_state(conn)
+                fresh.setdefault("textTried", {}).update(newly)
+                save_state(conn, fresh)
+            finally:
+                conn.close()
+    finally:
+        lock.release()
+    return {"read": done}

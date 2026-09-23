@@ -362,3 +362,35 @@ def test_merging_a_duplicate_and_undoing_it_on_postgres():
     assert conn.execute("SELECT 1 FROM grade_categories WHERE id=?", (canvas_cat,)).fetchone()
     assert conn.execute("SELECT import_key FROM items WHERE id=?", (mine,)).fetchone()["import_key"] is None
     conn.close()
+
+
+def test_reading_missing_text_runs_on_postgres(monkeypatch):
+    """A background job: a query Postgres rejected here would fail with nobody watching."""
+    cid = make_class(ALICE, code="IAT 201")
+    conn = as_user(ALICE)
+    ids = []
+    for name, mime in (("Deck.pdf", "application/pdf"), ("Talk.mp4", "video/mp4")):
+        mid = str(uuid.uuid4())
+        ids.append(mid)
+        conn.execute("INSERT INTO materials (id, semester_id, class_id, title, kind, url, filename,"
+                     " size, mimetype, import_key, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                     (mid, vdb.active_semester_id(conn), cid, name, "link", "https://x/" + name, name,
+                      20 * 1024 * 1024, mime, "canvas:file:" + mid[:6], "2026-09-01"))
+    conn.commit()
+    conn.close()
+    connect(ALICE, cid)
+    read = []
+
+    def fake_read(mid, user_id=None):
+        read.append(mid)
+        c = as_user(user_id)
+        c.execute("UPDATE materials SET extracted_text=? WHERE id=? AND kind<>'file'"
+                  " AND (extracted_text IS NULL OR extracted_text='')", ("words", mid))
+        c.commit()
+        c.close()
+        return True
+
+    monkeypatch.setattr(sync, "READ_TEXT", fake_read)
+    assert sync.read_missing_text(ALICE)["read"] == 1
+    assert read == [ids[0]]                                  # the video is left alone
+    assert sync.read_missing_text(ALICE)["read"] == 0        # and nothing is read twice

@@ -12128,7 +12128,8 @@
     description: 'Assignments you already have with no description in Vesta. Canvas’s is copied in with its formatting. One you wrote yourself is never replaced.',
     layout: 'Descriptions saved before Vesta kept Canvas’s formatting, so they arrived as one long paragraph. '
       + 'These are the same words, laid out the way Canvas has them: bold headings, numbered questions, lists and links.',
-    newFile: 'Small files are saved to Vesta straight away. Bigger ones, and video, stay on Canvas until you open them.',
+    newFile: 'Every file’s text is read straight away, so search and Headstart can use it. Small files are saved '
+      + 'to Vesta too; bigger ones and video stay on Canvas until you open them.',
     updatedFile: 'Files your professor has replaced on Canvas since Vesta saved them.',
     conflict: 'A file with the same name is already in this class, and Canvas’s copy is different. Yours is never replaced.',
     other: 'Everything else Canvas disagrees with.'
@@ -12408,7 +12409,8 @@
     if(u.kind === 'newFile'){
       var f = [a.size != null ? humanSize(a.size) : 'size unknown'];
       if(a.folder) f.push('into '+a.folder);
-      f.push(a.fetchNow ? 'saved to Vesta now' : 'saved when you first open it');
+      f.push(a.video ? 'video, stays on Canvas until you open it'
+             : a.fetchNow ? 'saved to Vesta now' : 'text read now, file saved when you open it');
       return escapeHtml(f.join(' · '));
     }
     if(u.kind === 'updatedFile'){

@@ -82,8 +82,11 @@ app.register_blueprint(prefs_bp)
 app.config["GUESS_FILE_CATEGORY"] = lambda name: guess_file_category(name)
 app.config["CANVAS_FETCH"] = lambda mid, user_id=None, replace=False: \
     fetch_canvas_material(mid, user_id=user_id, replace=replace)
+app.config["CANVAS_READ_TEXT"] = lambda mid, user_id=None: read_canvas_text(mid, user_id=user_id)
 import canvas_sync  # noqa: E402
 app.register_blueprint(canvas_sync.bp)
+# Background checks run with no app context, so the text reader is handed over here.
+canvas_sync.READ_TEXT = lambda mid, user_id=None: read_canvas_text(mid, user_id=user_id)
 # Accounts, and the gate in front of every /api route. Entirely a no-op locally,
 # where no Supabase is configured: Vesta stays the single-user tool it started as.
 import auth as vesta_auth  # noqa: E402
@@ -601,8 +604,16 @@ def extract_pdf_text(filepath):
         from pypdf import PdfReader
 
         reader = PdfReader(filepath)
-        text = "\n".join((page.extract_text() or "") for page in reader.pages)
-        return db_safe_text(text[:200000])
+        # Stop at the most that is kept anyway. A 1,000-page textbook from Canvas would
+        # otherwise be read to the end to throw nine tenths of it away.
+        parts, total = [], 0
+        for page in reader.pages:
+            t = page.extract_text() or ""
+            parts.append(t)
+            total += len(t) + 1
+            if total >= 200000:
+                break
+        return db_safe_text("\n".join(parts)[:200000])
     except Exception:
         return None
 
@@ -2171,6 +2182,63 @@ def fetch_canvas_material(mid, user_id=None, replace=False):
         threading.Thread(target=make_office_preview, args=(mid, path, original, user_id),
                          daemon=True).start()
     return stored
+
+
+# The largest file whose text is read without keeping it. Bigger than the ceiling for a
+# kept download, because the bytes live only in a temporary folder for a few seconds.
+CANVAS_TEXT_MAX_BYTES = 150 * 1024 * 1024
+
+
+def read_canvas_text(mid, user_id=None):
+    """Read a Canvas file's text without keeping the file. Returns True when it did.
+
+    Files over 5 MB stay on Canvas until opened, which keeps the volume small, but a
+    file with no text is invisible to search and to Headstart. In IAT 201 that was
+    every lecture deck and most of the readings (8 to 113 MB), all shown as "no
+    readable text" in Headstart's source picker, although every one had text. So the
+    text is read now for every file that is not video: downloaded into a temporary
+    folder, read (a PowerPoint through the same LibreOffice PDF the preview uses), and
+    the folder deleted. The row stays a link, so opening it still downloads it properly.
+
+    Written only if the row is still a link with no text, so a file he opened in the
+    meantime, or an apply he undid, is left alone.
+    """
+    import canvas
+    import shutil
+    import tempfile
+
+    conn = get_db(user_id=user_id)
+    try:
+        m = conn.execute("SELECT * FROM materials WHERE id=?", (mid,)).fetchone()
+        if not m or not ((m["import_key"] if "import_key" in m.keys() else "") or "").startswith("canvas:file:"):
+            return False
+        if m["kind"] == "file" or (m["extracted_text"] or "").strip() or not m["url"]:
+            return False
+        state = canvas_sync.load_state(conn)
+        client = canvas.Client(state.get("host"), state.get("token"))
+    finally:
+        conn.close()
+    original = secure_filename(m["filename"] or "") or "file"
+    tmp = tempfile.mkdtemp(prefix="vesta-text-")
+    try:
+        path = os.path.join(tmp, original)
+        client.download(m["url"], path, max_bytes=CANVAS_TEXT_MAX_BYTES)
+        text = extract_text(path, original)
+        if not text and office_ext(original):
+            pdf = convert_to_pdf(path, tmp)
+            text = extract_pdf_text(pdf) if pdf else None
+        if not text:
+            return False
+        conn = get_db(user_id=user_id)
+        try:
+            conn.execute("UPDATE materials SET extracted_text=? WHERE id=? AND kind<>'file'"
+                         " AND (extracted_text IS NULL OR extracted_text='')", (text, mid))
+            conn.commit()
+        finally:
+            conn.close()
+        return True
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 @app.route("/api/materials/<mid>/fetch", methods=["POST"])

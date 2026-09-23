@@ -708,3 +708,25 @@ Undoable.
 header, tabs and footer stay put and only the middle scrolls. At his window size
 (1220 by 710) it now sits between 40px and 670px with Save changes on screen. Phones
 already get a bottom sheet with its own height cap and are unaffected.
+
+## Every file's text is read, whatever its size, 2026-09-23
+
+**Found on vesta.study.** Headstart's source picker showed most of IAT 201 as "no
+readable text". Every one was over the 5 MB automatic-download line (lecture decks,
+readings, textbooks of 8 to 113 MB), and a file had no text until its bytes were in
+Vesta. Every one of them has text. The 5 MB rule kept the volume small at the cost of
+making Headstart and search blind to exactly the material that matters most.
+
+**Fix:** the text of every Canvas file that is not video is read now, whatever its size,
+without keeping the big ones (`app.read_canvas_text`): downloaded to a temporary folder
+(up to 150 MB), read (PowerPoint through the same LibreOffice PDF the preview uses),
+and the folder deleted. The row stays a link, so opening it still downloads it. It
+runs in the background after every check and every apply (`read_missing_text`), one
+file at a time under its own lock, so a first pass through a term's decks never holds
+up a check. A file that yields no text (a scanned PDF) is not downloaded again unless
+Canvas's copy changes size. PDF reading now stops at the 200,000 characters that are
+kept, rather than reading a 1,000-page book to the end.
+
+Checked on his real IAT 201 files: the three lecture PDFs (10 to 25 MB), the 33 MB and
+113 MB textbooks, and the 21.8 MB Week 2 PowerPoint all came back with text, in 23 and
+32 seconds, with nothing left on disk. Videos and a zip were left alone.
