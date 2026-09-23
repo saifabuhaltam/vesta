@@ -539,16 +539,31 @@ file with its text extracted (Vesta's related-assignment suggestions found it). 
 deadline and a disagreeing grade, simulated by editing the database, show in their own
 groups; accepting the move and keeping the grade does exactly that. No page errors.
 
-## What is left
+## Shipped, 2026-09-22
 
-- **Committing.** `static/index.html` and `NEXT.md` also hold another session's
-  uncommitted chat-naming change. It is intact and can be separated: a copy of that
-  session's diff was saved before this work started, and it still reverse-applies
-  cleanly, so the Canvas work can be staged without it.
-- **Deploying.** On push, Railway runs migration `010_materials_import_key` on its own.
-  Per `NEXT.md`, check `/health` for `migrations` afterwards. The token is then pasted
-  into Settings on vesta.study; the `CANVAS_TOKEN` line in `.env` was only for testing
-  scripts, and the app never reads it.
+Pushed as `c834888` (with the chat-naming change in its own commit before it). Railway
+deployed in about 80 seconds; `/health` lists `010_materials_import_key` and reports
+ok, and `/api/canvas` answers the signed-out 401 rather than a 404 or 500.
+
+Then run against a real Postgres, which it had not been before shipping:
+`tests/pg/test_canvas_pg.py` drives every Canvas query as a non-superuser with row
+level security forced, including the review, a full apply, the parameterised `LIKE`,
+the case-insensitive folder lookup, the `LEFT JOIN` onto semesters, a class made from a
+course, one account unable to read another's token or snapshot, and the background
+check connecting as the right account. All pass. Found on the way: Postgres refuses a
+NUL byte in text, and Canvas titles and descriptions did not go through the guard
+uploads get, so one odd character could have failed a whole apply on the deployment
+only. Fixed, and `canvas_sync.py` is now in the `IS ?` scan in
+`tests/test_postgres_dialect.py`.
+
+## What is left (older notes above predate shipping)
+
+- **Connect on vesta.study**: paste the token into Settings > Integrations > Canvas.
+  The `CANVAS_TOKEN` line in `.env` was only for testing scripts; the app never reads it.
+- **Never clicked in a browser**, though the server side of each is tested: Later,
+  Check for updates, Show them again, changing a pairing after setup, Use a new token,
+  Disconnect, the automatic-check switch, the same-name and replaced-file rows, the red
+  failed-check banner, a file too big to fetch, and the review at phone width.
 - **More than one gunicorn worker** would run one daily loop per worker. Harmless today
   (one worker, see `Procfile`), and at worst one redundant check, but worth knowing.
 - **Parked, not built:** Canvas rubrics into the rubric-criteria path; announcements

@@ -121,7 +121,15 @@ def plain_text(html):
     this.
     """
     from ai import strip_html
-    return re.sub(r"\s+([.,;:!?)\]])", r"\1", strip_html(html))
+    return _pg_safe(re.sub(r"\s+([.,;:!?)\]])", r"\1", strip_html(html)))
+
+
+def _pg_safe(text):
+    """Text Postgres will store. It refuses a NUL byte outright, and the whole apply
+    then fails, which is how a single odd character in one instructor's description
+    would stop a sync that works everywhere else. SQLite accepts it, so only the
+    deployment would ever find out. Uploads get the same guard in `app.db_safe_text`."""
+    return (text or "").replace("\x00", "")
 
 
 def due_local(due_at):
@@ -335,7 +343,7 @@ def plan_course(course, groups):
             items.append({
                 "canvasId": a.get("id"),
                 "importKey": import_key(a.get("id")),
-                "title": (a.get("name") or "").strip() or "Untitled",
+                "title": _pg_safe((a.get("name") or "").strip()) or "Untitled",
                 "type": item_type(a, group_name),
                 "dueDate": due_date,
                 "dueTime": due_time,

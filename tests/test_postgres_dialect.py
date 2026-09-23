@@ -124,7 +124,8 @@ def test_no_query_compares_with_is_placeholder():
     import pathlib
     root = pathlib.Path(vesta_app.__file__).resolve().parent
     offenders = []
-    for name in ("app.py", "db.py", "links.py", "threads.py", "prefs.py", "auth.py"):
+    for name in ("app.py", "db.py", "links.py", "threads.py", "prefs.py", "auth.py",
+                 "canvas_sync.py"):
         src = (root / name).read_text()
         for n, line in enumerate(src.splitlines(), 1):
             if line.lstrip().startswith("#"):

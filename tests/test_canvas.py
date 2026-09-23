@@ -615,3 +615,13 @@ def test_a_course_name_loses_the_code_canvas_repeats_in_it():
     assert canvas.course_title(course) == "Introduction to Logic and Reasoning"
     assert canvas.suggest_mapping([dict(course, id=1)], [])[0]["name"] == \
         "Introduction to Logic and Reasoning"
+
+
+def test_a_nul_byte_never_reaches_postgres():
+    """Postgres refuses NUL in text, and one in a description would fail the whole
+    apply on the deployment while SQLite let it through everywhere else."""
+    plan = canvas.plan_course(POINTS_COURSE, [{"id": 1, "name": "W", "assignments": [
+        {"id": 5, "name": "Essay\x00 1", "description": "<p>Due\x00 soon</p>",
+         "points_possible": 1}]}])
+    item = plan["items"][0]
+    assert "\x00" not in item["title"] and "\x00" not in item["notes"]
