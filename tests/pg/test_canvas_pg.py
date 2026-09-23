@@ -312,3 +312,53 @@ def test_an_empty_description_fills_in_on_postgres():
     conn = as_user(ALICE)
     assert conn.execute("SELECT notes FROM items WHERE id=?", (iid,)).fetchone()["notes"] == "Read ch 1"
     conn.close()
+
+
+def test_merging_a_duplicate_and_undoing_it_on_postgres():
+    """His SD 381 case: undo re-creates Canvas's copy and its category from a snapshot,
+    which is exactly the kind of write where Postgres and SQLite differ."""
+    cid = make_class(ALICE, code="SD 381")
+    conn = as_user(ALICE)
+    sem = vdb.active_semester_id(conn)
+    mine_cat, canvas_cat, mine, copy = (str(uuid.uuid4()) for _ in range(4))
+    for c, name, w in ((mine_cat, "Low-stakes weekly assignments", 35.0),
+                       (canvas_cat, "Low-stakes module 1", 8.0)):
+        conn.execute("INSERT INTO grade_categories (id, class_id, name, weight, drop_lowest,"
+                     " sort_order, created_at) VALUES (?,?,?,?,?,?,?)", (c, cid, name, w, 0, 0, "2026-09-01"))
+    conn.execute("INSERT INTO items (id, semester_id, class_id, title, type, due_date, status,"
+                 " score, category_id, notes, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                 (mine, sem, cid, "Reading quiz (Week 1)", "quiz", "2026-09-13", "done", 60.0,
+                  mine_cat, "mine", "2026-09-01"))
+    conn.execute("INSERT INTO items (id, semester_id, class_id, title, type, due_date, due_time,"
+                 " status, score, category_id, import_key, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                 (copy, sem, cid, "Week 1 Readings Quiz", "quiz", "2026-09-13", "23:59", "todo", 60.0,
+                  canvas_cat, "canvas:100", "2026-09-20"))
+    conn.commit()
+    conn.close()
+    connect(ALICE, cid, items=[planned(title="Week 1 Readings Quiz", dueDate="2026-09-13",
+                                       dueTime="23:59", categoryCanvasId=1, score=60.0)],
+            categories=[{"canvasId": 1, "name": "Low-stakes module 1", "weight": 8.0, "dropLowest": 0}])
+
+    conn = as_user(ALICE)
+    state = sync.load_state(conn)
+    rev = sync.build_review(conn, state)
+    twin = [u for c in rev["classes"] for g in c["groups"] for u in g["changes"] if u["kind"] == "twin"]
+    assert len(twin) == 1
+    report, _ = sync.apply_selection(conn, state, [twin[0]["id"]], [])
+    conn.commit()
+    sync.save_state(conn, state)
+    sync.record_undo(conn, report.pop("_undo"))
+    conn.commit()
+    assert report["applied"]["merged"] == 1
+    assert conn.execute("SELECT import_key FROM items WHERE id=?", (mine,)).fetchone()["import_key"] == "canvas:100"
+    assert conn.execute("SELECT 1 FROM items WHERE id=?", (copy,)).fetchone() is None
+    assert conn.execute("SELECT 1 FROM grade_categories WHERE id=?", (canvas_cat,)).fetchone() is None
+
+    state = sync.load_state(conn)
+    sync.undo_apply(conn, state, sync.load_undo(conn)[0])
+    conn.commit()
+    back = conn.execute("SELECT title, category_id FROM items WHERE id=?", (copy,)).fetchone()
+    assert (back["title"], back["category_id"]) == ("Week 1 Readings Quiz", canvas_cat)
+    assert conn.execute("SELECT 1 FROM grade_categories WHERE id=?", (canvas_cat,)).fetchone()
+    assert conn.execute("SELECT import_key FROM items WHERE id=?", (mine,)).fetchone()["import_key"] is None
+    conn.close()

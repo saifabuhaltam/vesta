@@ -637,3 +637,45 @@ Found while testing it: a failed assertion in `tests/pg` left its connection ope
 the cleanup's `ALTER TABLE` then waited on that lock forever, so the run hung instead
 of failing. `tests/pg/test_canvas_pg.py` now closes every connection before cleaning
 up. The other files in `tests/pg` have the same shape and the same exposure.
+
+## Duplicates under two names, and categories that count twice, 2026-09-22
+
+**Found on vesta.study.** SD 381 had every assignment twice: the syllabus import's
+"Reading quiz (Week 1)", done, beside Canvas's "Week 1 Readings Quiz", overdue. Matching
+was by exact title, so every Canvas assignment arrived as new; the pairs also sat in two
+sets of grade categories, and Vesta adds every category's weight to the course total
+whether or not anything is in it, so the course was counting the same work twice.
+
+**What Saif chose:** his row survives, gains Canvas's link and syncs from then on;
+Canvas's copy goes. Where categories overlap, show both and let him choose.
+
+**Recognising one assignment under two names** (`looks_same`): the shorter title's
+significant words must mostly appear in the longer; due dates more than a day apart rule
+a pair out; and numbers are compared by what they label, so "Week 1" contradicts
+"Week 2" but "Module 1" does not contradict "Week 2" (Canvas titles SD 381 as "MODULE 1,
+Week 2, short discussion on adulting"). A one-word title ("Quiz 3") must also agree on
+a labelled number. Checked against his real SD 381: all four real pairs found, and none
+of eight look-alike traps (Quiz 01/02, Week 3/4, Discussion 06/07 and so on). One
+syllabus row covering two Canvas quizzes is correctly not merged: that is not one
+assignment.
+
+**In the review**, "Possible duplicates" comes first, one row per pair with Different /
+Same assignment. It covers both the copies already here and a new Canvas assignment
+that would have become one, which now asks instead of arriving. Nothing else about that
+assignment is asked until he decides. Same assignment links his row, removes Canvas's
+copy if he never worked on it (otherwise it says so and merges nothing), and removes a
+Canvas category the copy leaves empty. Undo re-creates the copy and the category.
+
+**Overlapping categories** are offered once duplicates are settled, when his and
+Canvas's categories both exist and together pass 100%: both sets side by side with
+weights and counts. Use Canvas's moves each of his assignments linked to Canvas into
+its Canvas category and removes his; Keep mine removes Canvas's. Either way, anything
+left outside every category is named in the result, since it no longer counts. Undoable.
+
+Also: the review now calls an assignment by his name for it rather than Canvas's; a due
+time Canvas fills into a date that had none is a fill, not a "moved" deadline; and a
+row in one of his categories is never offered a weight of its own.
+
+Reproduced his SD 381 in a browser against the real course (Canvas's assignments in
+first, then his six done syllabus rows): four possible duplicates, merged in one Accept
+all; his rows kept their done status and grades; the overlap (108%) came up next.

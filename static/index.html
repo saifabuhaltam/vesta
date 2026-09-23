@@ -12021,6 +12021,8 @@
   // What each kind of change calls its two choices. The server's own labels win where
   // it gives them, for the file cases whose wording matters most.
   var CV_CHOICES = {
+    twin:        ['Different', 'Same assignment'],
+    categories:  ['Keep mine', 'Use Canvas’s'],
     moved:       ['Keep mine', 'Use Canvas'],
     grade:       ['Keep mine', 'Use Canvas'],
     newItem:     ['Skip', 'Add'],
@@ -12032,6 +12034,7 @@
     other:       ['Keep mine', 'Use Canvas']
   };
   var CV_ALL = {
+    twin:['All different','All the same'], categories:['Keep mine for all','Use Canvas’s for all'],
     moved:['Keep all mine','Use Canvas for all'], grade:['Keep all mine','Use Canvas for all'],
     newItem:['Skip all','Add all'], dateAdded:['Skip all','Add all'], description:['Skip all','Add all'],
     newFile:['Skip all','Add all'],
@@ -12039,10 +12042,16 @@
     other:['Keep all mine','Use Canvas for all']
   };
   var CV_HINTS = {
+    twin: 'Canvas has an assignment that looks like one you already have under another name. '
+      + 'Same assignment keeps yours exactly as it is, done or graded, and links it to Canvas so it syncs '
+      + 'from now on; Canvas’s extra copy is removed. Different leaves both.',
+    categories: 'Your categories and Canvas’s are both counting the same work, so the weights add up to '
+      + 'more than 100%. Choose which set stands. Assignments are moved across where Canvas says where they '
+      + 'belong, and anything left outside a category is named. Undo reverses it.',
     moved: 'Canvas has a different due date or time from the one in Vesta.',
     grade: 'Scores posted on Canvas. Where you typed your own, it stays unless you choose Canvas.',
     newItem: 'Assignments on Canvas that are not in Vesta yet.',
-    dateAdded: 'Assignments you already have that have no due date in Vesta.',
+    dateAdded: 'Assignments you already have with no due date, or no due time, in Vesta.',
     description: 'Assignments you already have with no description in Vesta. Canvas’s is copied in as plain text. One you wrote yourself is never replaced.',
     newFile: 'Small files are saved to Vesta straight away. Bigger ones, and video, stay on Canvas until you open them.',
     updatedFile: 'Files your professor has replaced on Canvas since Vesta saved them.',
@@ -12287,7 +12296,25 @@
   function cvDetailHtml(u){
     var b = u.before, a = u.after;
     if(u.kind === 'moved') return '<s>'+escapeHtml(b.text)+'</s> → <b>'+escapeHtml(a.text)+'</b>';
-    if(u.kind === 'dateAdded') return 'Due <b>'+escapeHtml(a.text)+'</b>';
+    if(u.kind === 'dateAdded'){
+      return (b && b.date ? 'Due <s>'+escapeHtml(b.text)+'</s> → ' : 'Due ')+'<b>'+escapeHtml(a.text)+'</b>';
+    }
+    if(u.kind === 'twin'){
+      var m = u.mine || {};
+      return 'Looks like your <b>'+escapeHtml(m.title||'assignment')+'</b>'
+        + escapeHtml((m.due ? ', due '+m.due : '') + (m.done ? ', done' : ''))
+        + (u.alreadyHere ? escapeHtml('. Canvas’s copy is already in Vesta'
+            + (u.theirs && u.theirs.due ? ', due '+u.theirs.due : '') + '.') : '');
+    }
+    if(u.kind === 'categories'){
+      var list = function(cs){
+        return cs.map(function(c){
+          return escapeHtml(c.name)+' '+cvPct(c.weight)+' ('+c.count+')';
+        }).join(', ');
+      };
+      return 'Adds up to <b>'+cvPct(a.total)+'</b>. Yours: '+list(a.mine||[])
+        + '. Canvas’s: '+list(a.canvas||[])+'.';
+    }
     if(u.kind === 'description'){
       var flat = String(a||'').replace(/\s+/g, ' ').trim();
       return escapeHtml(flat.length > 180 ? flat.slice(0, 180).replace(/\s+\S*$/, '')+'…' : flat);
@@ -12538,9 +12565,21 @@
     if(a.files) parts.push('added '+cvPlural(a.files, 'file'));
     if(a.replaced) parts.push('updated '+cvPlural(a.replaced, 'file'));
     if(a.categories) parts.push('made '+cvPlural(a.categories, 'grade category', 'grade categories'));
+    if(a.merged) parts.push('merged '+cvPlural(a.merged, 'duplicate'));
+    if(a.categoriesResolved) parts.push('settled the overlapping categories');
     var msg = parts.length ? 'Done: '+parts.join(', ')+'.' : 'Saved your choices.';
     if(r && r.rejected) msg += ' Kept your own for '+cvPlural(r.rejected, 'change')+'.';
     if(r && r.fetching) msg += ' '+cvPlural(r.fetching, 'file')+' downloading from Canvas now.';
+    if(r && r.notMerged && r.notMerged.length){
+      msg += ' Not merged, because '+r.notMerged.map(function(k){
+        return k.title+' ('+k.why+')';
+      }).join('; ')+'.';
+    }
+    if(r && r.leftOutOfCategories && r.leftOutOfCategories.length){
+      msg += ' Now in no grade category, so they don’t count until you place them: '
+        + r.leftOutOfCategories.slice(0, 6).join(', ')
+        + (r.leftOutOfCategories.length > 6 ? ' and '+(r.leftOutOfCategories.length-6)+' more' : '')+'.';
+    }
     if(r && r.stale && r.stale.length){
       msg += ' '+cvPlural(r.stale.length, 'change')+' had moved since you looked, so '
         + (r.stale.length===1 ? 'it was' : 'they were')+' left alone. Anything still different is shown again below.';

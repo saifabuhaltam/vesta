@@ -119,6 +119,9 @@ def compare_items(existing, plan, seen=()):
 
         used.add(_col(match, "id"))
         item["existingId"] = _col(match, "id")
+        # His name for it, which is what the review should call it: once a duplicate is
+        # merged, his "Reading quiz (Week 1)" is linked to Canvas's "Week 1 Readings Quiz".
+        item["existingTitle"] = _col(match, "title")
         changes = []
         for field, column in ITEM_FIELDS:
             after = item.get(field)
@@ -132,6 +135,10 @@ def compare_items(existing, plan, seen=()):
                 # are not offered at all. Offering them unticked was the first design,
                 # and against his real courses it put 32 junk weight changes in front
                 # of him on every review, for good. See CANVAS.md.
+                continue
+            if field == "weight" and _col(match, "category_id"):
+                # His row sits in a grade category, which decides its weight. A weight of
+                # its own would sit unused beside it, and look like it counted.
                 continue
             before = _col(match, column)
             if _same(before, after):
@@ -319,7 +326,7 @@ def compare(existing_items, existing_materials, plan, files, folder_for=None, se
     screen needs to offer "3 you deleted are hidden, show them" rather than pretending
     they do not exist.
     """
-    items = compare_items(existing_items, plan, seen)
+    items = find_twins(existing_items, compare_items(existing_items, plan, seen))
     materials = compare_files(existing_materials, files, folder_for, seen)
     categories = plan.get("categories") or []
     shown_items = [i for i in items if i["change"] != "dismissed"]
@@ -736,10 +743,12 @@ DAILY_AFTER_HOURS = 20
 # because those are the changes with consequences; files trail, because they are the
 # changes with volume.
 GROUPS = (
+    ("twin", "Possible duplicates"),
+    ("categories", "Grade categories that overlap"),
     ("moved", "Deadlines that moved"),
     ("grade", "Grades"),
     ("newItem", "New assignments"),
-    ("dateAdded", "Due dates Canvas can fill in"),
+    ("dateAdded", "Due dates and times Canvas can fill in"),
     ("description", "Descriptions Canvas can fill in"),
     ("newFile", "New files"),
     ("updatedFile", "Files the professor replaced"),
@@ -1091,6 +1100,18 @@ def _units_for_class(draft, existing_cats, course_entry, course_id, class_id, cl
 
     for item in draft["items"]:
         key, title = item["importKey"], item["title"]
+        twin = item.get("twin")
+        if twin and not _is_rejected(rejected_entry, key + "|twin", twin["mineId"]):
+            # Until he says whether they are one assignment, nothing else about it is
+            # worth asking: its date or grade may be about to belong to his row.
+            add("twin", key, title, key + "|twin", None, twin["mineId"],
+                mine={"title": twin["mineTitle"],
+                      "due": _fmt_due(twin["mineDue"], twin["mineTime"]) if twin["mineDue"] else None,
+                      "done": twin["mineDone"]},
+                theirs={"due": _fmt_due(item.get("dueDate"), item.get("dueTime"))
+                        if item.get("dueDate") else None},
+                alreadyHere=bool(twin.get("copyId")), _item=item)
+            continue
         if item["change"] == "new":
             add("newItem", key, title, key + "|new", None,
                 {"type": item.get("type"), "due": _fmt_due(item.get("dueDate"), item.get("dueTime")),
@@ -1101,6 +1122,7 @@ def _units_for_class(draft, existing_cats, course_entry, course_id, class_id, cl
             continue
         if item["change"] != "changed":
             continue
+        title = item.get("existingTitle") or title
         by_field = {c["field"]: c for c in item["changes"]}
         due_changes = [by_field[f] for f in ("dueDate", "dueTime") if f in by_field]
         if due_changes:
@@ -1109,7 +1131,10 @@ def _units_for_class(draft, existing_cats, course_entry, course_id, class_id, cl
             after = (by_field["dueDate"]["after"] if "dueDate" in by_field else before[0],
                      by_field["dueTime"]["after"] if "dueTime" in by_field else before[1])
             had_date = bool(before[0])
-            add("moved" if had_date else "dateAdded", key, title, key + "|due",
+            # Only a real disagreement is a move. Canvas supplying a time Vesta never had
+            # (Sep 13 becoming Sep 13 11:59pm) is filling a gap, not moving a deadline.
+            filling = all(c.get("fill") for c in due_changes)
+            add("dateAdded" if filling else "moved", key, title, key + "|due",
                 {"date": before[0], "time": before[1], "text": _fmt_due(*before) if had_date else None},
                 {"date": after[0], "time": after[1], "text": _fmt_due(*after)},
                 _item=item, _changes=due_changes)
@@ -1190,6 +1215,12 @@ def _headlines(units, limit=3):
     kind. Three at most, in the groups' order of importance.
     """
     lines = []
+    twins = sum(1 for u in units if u["kind"] == "twin")
+    if twins:
+        lines.append("%d possible duplicate%s" % (twins, "" if twins == 1 else "s"))
+    for u in units:
+        if u["kind"] == "categories":
+            lines.append("%s's grade weights add up to %s%%" % (u["classLabel"], _pct(u["after"]["total"])))
     moved = [u for u in units if u["kind"] == "moved"]
     for u in moved[:2]:
         lines.append("%s %s moved %s to %s" % (u["classLabel"], u["title"],
@@ -1217,6 +1248,10 @@ def _headlines(units, limit=3):
         if n:
             lines.append("%d %s" % (n, one if n == 1 else many))
     return lines[:limit]
+
+
+def _pct(v):
+    return ("%.1f" % v).rstrip("0").rstrip(".")
 
 
 def _fingerprint(units):
@@ -1247,6 +1282,17 @@ def build_review(conn, state, class_id=None):
         draft = compare(items, materials, snap.get("plan") or {}, snap.get("files") or [],
                         seen=seen_keys(state, cid))
         units = _units_for_class(draft, cats, entry, cid, cls_id, label)
+        # Overlapping categories are only worth deciding once duplicates are settled:
+        # merging one can empty one of Canvas's categories, which then goes on its own.
+        if not any(u["kind"] == "twin" for u in units):
+            ov = category_overlap(items, cats, snap.get("plan") or {})
+            if ov:
+                units.append({
+                    "id": "categories:" + _digest(cid, cls_id, ov),
+                    "kind": "categories", "classId": cls_id, "courseId": str(cid),
+                    "classLabel": label, "key": "categories:" + cls_id,
+                    "title": "Grade categories in " + label, "before": None, "after": ov,
+                    "_rejectKey": cls_id + "|categories"})
         fp = _fingerprint(units)
         dismissed = draft["dismissed"]["items"] + draft["dismissed"]["files"]
         classes.append({
@@ -1342,15 +1388,38 @@ def apply_selection(conn, state, accept, reject, guess_category=None):
     before = copy.deepcopy(state.get("courses") or {})
     journal = []
 
+    decided_categories = []
     for uid in reject:
         if uid in units:
-            _reject(state, units[uid])
+            if units[uid]["kind"] == "categories":
+                decided_categories.append((units[uid], False))    # keep mine: an action
+            else:
+                _reject(state, units[uid])
 
     by_class = {}
+    kept, merged = [], 0
     for uid in accept:
         u = units.get(uid)
-        if u:
+        if not u:
+            continue
+        if u["kind"] == "twin":
+            snap = load_snapshot(conn, u["courseId"]) or {}
+            names = {(c.get("name") or "").lower()
+                     for c in ((snap.get("plan") or {}).get("categories") or [])}
+            why = _merge_twin(conn, u, journal, names)
+            if why:
+                kept.append({"title": u["title"], "why": why})
+            else:
+                merged += 1
+                remember(state, u["courseId"], u["classId"], [u["key"]])
+        elif u["kind"] == "categories":
+            decided_categories.append((u, True))
+        else:
             by_class.setdefault(u["classId"], []).append(u)
+    loose = []
+    for u, use_canvas in decided_categories:
+        loose += _resolve_categories(conn, u, use_canvas,
+                                     load_snapshot(conn, u["courseId"]) or {}, journal)
 
     totals = {"items": 0, "updated": 0, "files": 0, "categories": 0, "folders": 0,
               "replaced": 0}
@@ -1385,8 +1454,11 @@ def apply_selection(conn, state, accept, reject, guess_category=None):
                 to_fetch.append({"materialId": f["existingId"], "url": f.get("url"),
                                  "filename": f.get("filename"), "size": f.get("size"),
                                  "replace": True})
-    report = {"applied": totals, "stale": stale,
-              "rejected": len(reject) - len([i for i in reject if i in stale])}
+    totals["merged"] = merged
+    totals["categoriesResolved"] = len(decided_categories)
+    rejected_count = len([i for i in reject if i in units and units[i]["kind"] != "categories"])
+    report = {"applied": totals, "stale": stale, "rejected": rejected_count,
+              "notMerged": kept, "leftOutOfCategories": loose}
     undo = _undo_entry(before, state.get("courses") or {}, journal, report,
                        sorted({u["classLabel"] for u in units.values()
                                if u["id"] in set(accept) | set(reject)}))
@@ -1832,6 +1904,10 @@ def _undo_summary(report):
         parts.append("added " + n(a["files"], "file"))
     if a.get("replaced"):
         parts.append("updated " + n(a["replaced"], "file"))
+    if a.get("merged"):
+        parts.append("merged " + n(a["merged"], "duplicate"))
+    if a.get("categoriesResolved"):
+        parts.append("settled " + n(a["categoriesResolved"], "category overlap"))
     if report.get("rejected"):
         parts.append("kept yours for " + n(report["rejected"], "change"))
     text = ", ".join(parts) or "saved your choices"
@@ -1850,7 +1926,7 @@ def load_undo(conn):
 
 def save_undo(conn, entries):
     import json
-    db_set_setting(conn, UNDO_KEY, json.dumps(entries))
+    db_set_setting(conn, UNDO_KEY, json.dumps(entries, default=str))
 
 
 def record_undo(conn, entry):
@@ -2014,6 +2090,16 @@ def undo_apply(conn, state, entry, extract_text=None):
             conn.execute("DELETE FROM items WHERE id=?", (rid,))
             done["items"] += 1
 
+        elif kind == "item-":
+            snap = op.get("row") or {}
+            if not conn.execute("SELECT 1 FROM items WHERE id=?", (rid,)).fetchone():
+                _reinsert(conn, "items", snap)
+                done["restored"] += 1
+
+        elif kind == "cat-":
+            if not conn.execute("SELECT 1 FROM grade_categories WHERE id=?", (rid,)).fetchone():
+                _reinsert(conn, "grade_categories", op.get("row") or {})
+
         elif kind == "cat~":
             row = conn.execute("SELECT * FROM grade_categories WHERE id=?", (rid,)).fetchone()
             after, old = op.get("after") or {}, op.get("before") or {}
@@ -2095,3 +2181,305 @@ def undo_route():
         except OSError:
             pass
     return jsonify(report)
+
+
+# ===========================================================================
+# duplicates: the same assignment under two names
+#
+# Found on vesta.study, 2026-09-22: SD 381 had every assignment twice. The syllabus
+# import calls one "Reading quiz (Week 1)"; Canvas calls it "Week 1 Readings Quiz".
+# Matching by exact title missed every pair, so each Canvas assignment arrived as new,
+# the course showed done work as overdue, and the two copies sat in two sets of grade
+# categories counting the same work twice.
+#
+# `looks_same` decides whether two titles are plausibly one assignment. It is only
+# ever a suggestion: the review asks, and Saif's rule is that his row survives and is
+# linked to Canvas, while Canvas's copy goes.
+# ===========================================================================
+
+# Words that say nothing about which assignment it is. "week" is here because the
+# week *number* is what carries the meaning, and numbers are compared on their own.
+_TWIN_STOP = {"the", "a", "an", "and", "or", "of", "on", "to", "in", "for", "your", "my",
+              "with", "part", "activity", "activities", "module", "week", "due", "complete",
+              "about", "this", "that", "is", "at", "by", "from"}
+_ORDINALS = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6,
+             "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10, "final": None}
+# Types too general to tell two assignments apart.
+_LOOSE_TYPES = {"assignment", "other", "homework", "", None}
+
+
+def _stem(word):
+    if word.endswith("zzes"):
+        return word[:-3]                  # quizzes -> quiz
+    if word.endswith("ies") and len(word) > 4:
+        return word[:-3] + "y"
+    if word.endswith("s") and not word.endswith("ss") and len(word) > 3:
+        return word[:-1]
+    return word
+
+
+def _title_parts(title):
+    """(significant words, labelled numbers) for a title.
+
+    A number is labelled by the word before it: "Week 2" is ("week", 2), "Quiz 03" is
+    ("quiz", 3). The label is what makes numbers comparable. Canvas titles SD 381 as
+    "MODULE 1, Week 2, short discussion on adulting" while the syllabus says "Short
+    discussion (Week 2)": the 1 labels the module, the 2 the week, and only the week
+    can be compared with the syllabus's week. Ordinals ("second discussion") count as
+    words, so they have to match as words.
+    """
+    words, labelled = [], []
+    prev = ""
+    for tok in re.findall(r"[a-z]+|\d+", (title or "").lower()):
+        if tok.isdigit():
+            labelled.append((prev, int(tok)))
+            prev = ""
+            continue
+        stem = _stem(tok)
+        if tok not in _TWIN_STOP and len(tok) > 1:
+            words.append(stem)
+        prev = stem
+    return words, labelled
+
+
+def _numbers_by_label(labelled):
+    out = {}
+    for label, n in labelled:
+        out.setdefault(label, set()).add(n)
+    return out
+
+
+def _days_apart(a, b):
+    from datetime import date
+    try:
+        x, y = date.fromisoformat(str(a)[:10]), date.fromisoformat(str(b)[:10])
+    except ValueError:
+        return None
+    return abs((x - y).days)
+
+
+def looks_same(mine, theirs):
+    """How strongly two assignments look like one, 0 for not at all.
+
+    Each takes a dict of title, type and due_date. Three things rule a pair out:
+
+    * a number labelling the same thing differently: Week 1 against Week 2, Quiz 01
+      against Quiz 02. Module 1 against Week 2 is not a contradiction;
+    * due dates more than a day apart;
+    * too few shared words: the shorter title's words must mostly appear in the
+      longer one. A title of one significant word ("Quiz 3", "Discussion 6") has to
+      agree on a labelled number as well, since the word alone says nothing.
+    """
+    ta, tb = (mine.get("type") or ""), (theirs.get("type") or "")
+    if ta != tb and ta not in _LOOSE_TYPES and tb not in _LOOSE_TYPES:
+        return 0.0
+    wa, la = _title_parts(mine.get("title"))
+    wb, lb = _title_parts(theirs.get("title"))
+    na, nb = _numbers_by_label(la), _numbers_by_label(lb)
+    for label in set(na) & set(nb):
+        if not (na[label] & nb[label]):
+            return 0.0
+    agreeing = sum(1 for label in set(na) & set(nb) if label)
+
+    short, long_ = sorted((set(wa), set(wb)), key=len)
+    if not short:
+        return 0.0
+    overlap = len(short & long_) / float(len(short))
+    if len(short) >= 2:
+        if overlap < 0.75:
+            return 0.0
+    elif overlap < 1.0 or not agreeing:
+        return 0.0
+
+    apart = _days_apart(mine.get("due_date"), theirs.get("due_date")) \
+        if mine.get("due_date") and theirs.get("due_date") else None
+    if apart is not None and apart > 1:
+        return 0.0
+    score = overlap + 0.1 * len(short & long_) + 0.2 * agreeing
+    if apart == 0:
+        score += 0.5
+    elif apart == 1:
+        score += 0.25
+    return round(score, 4)
+
+
+def find_twins(existing, items):
+    """Mark each Canvas assignment that looks like one of his under another name.
+
+    Two cases, and both end the same way when he says they are one assignment:
+
+    * the Canvas assignment is new: nothing matched it exactly, but one of his rows
+      looks like it. Without this it would arrive as a second copy.
+    * Canvas's copy is already here, from an earlier sync that missed the match, and
+      one of his rows looks like it. That is SD 381 as found: done work beside an
+      overdue copy of itself.
+
+    Only his rows are candidates: ones no Canvas assignment already claims. Pairs are
+    taken best first, so each row and each assignment is in at most one.
+    """
+    rows = list(existing or [])
+    by_id = {_col(r, "id"): r for r in rows}
+    claimed = {i.get("existingId") for i in items if i.get("existingId")}
+    mine = [r for r in rows if _col(r, "id") not in claimed
+            and not str(_col(r, "import_key") or "").startswith("canvas:")]
+    pairs = []
+    for it in items:
+        copy = None
+        if it.get("existingId"):
+            row = by_id.get(it["existingId"])
+            if not row or _col(row, "import_key") != it.get("importKey"):
+                continue        # matched one of his own rows by title: already one
+            copy = row
+        elif it.get("change") != "new":
+            continue
+        theirs = {"title": it.get("title"), "type": it.get("type"), "due_date": it.get("dueDate")}
+        for r in mine:
+            score = looks_same({"title": _col(r, "title"), "type": _col(r, "type"),
+                                "due_date": _col(r, "due_date")}, theirs)
+            if score > 0:
+                pairs.append((score, it, r, copy))
+    pairs.sort(key=lambda p: -p[0])
+    taken_items, taken_rows = set(), set()
+    for score, it, r, copy in pairs:
+        if id(it) in taken_items or _col(r, "id") in taken_rows:
+            continue
+        taken_items.add(id(it))
+        taken_rows.add(_col(r, "id"))
+        it["twin"] = {"mineId": _col(r, "id"), "mineTitle": _col(r, "title"),
+                      "mineDue": _col(r, "due_date"), "mineTime": _col(r, "due_time"),
+                      "mineDone": (_col(r, "status") or "") == "done",
+                      "copyId": _col(copy, "id") if copy else None, "score": score}
+    return items
+
+
+def _row_snapshot(row):
+    """Every column of a row, for putting it back on undo. Not `user_id`: on Postgres
+    the column's own default fills it, and a UUID object does not survive JSON."""
+    return {k: row[k] for k in row.keys() if k != "user_id"}
+
+
+def _reinsert(conn, table, snap):
+    cols = list(snap.keys())
+    conn.execute("INSERT INTO %s (%s) VALUES (%s)" % (table, ", ".join(cols), ",".join("?" * len(cols))),
+                 tuple(snap[c] for c in cols))
+
+
+def _copy_untouched(conn, row):
+    """Canvas's copy can go only if he never did anything with it."""
+    if (_col(row, "status") or "todo") != "todo" or _col(row, "completed_at") or \
+            (canvas._number(_col(row, "focus_seconds")) or 0) > 0:
+        return "you've worked on Canvas's copy"
+    return _attached(conn, ITEM_DEPENDENTS, _col(row, "id"))
+
+
+def _merge_twin(conn, unit, journal, canvas_cat_names):
+    """Same assignment: his row gains Canvas's link; Canvas's copy, if any, goes.
+
+    A grade category Canvas's copy leaves empty goes with it, if it is one of
+    Canvas's: Vesta counts every category's weight towards the course total whether
+    or not anything is in it, so an emptied one would go on inflating the total.
+    Returns a reason when it could not merge, or None.
+    """
+    t = unit["_item"]["twin"]
+    mine = conn.execute("SELECT * FROM items WHERE id=?", (t["mineId"],)).fetchone()
+    if not mine:
+        return "your copy is gone"
+    copy = conn.execute("SELECT * FROM items WHERE id=?", (t["copyId"],)).fetchone() \
+        if t.get("copyId") else None
+    if copy is not None:
+        why = _copy_untouched(conn, copy)
+        if why:
+            return why
+    conn.execute("UPDATE items SET import_key=? WHERE id=?", (unit["key"], t["mineId"]))
+    journal.append({"op": "item~", "id": t["mineId"], "class": unit["classId"],
+                    "title": _col(mine, "title"),
+                    "fields": {"import_key": [_col(mine, "import_key"), unit["key"]]}})
+    if copy is not None:
+        journal.append({"op": "item-", "id": t["copyId"], "row": _row_snapshot(copy)})
+        conn.execute("DELETE FROM items WHERE id=?", (t["copyId"],))
+        cat_id = _col(copy, "category_id")
+        if cat_id and not conn.execute("SELECT 1 FROM items WHERE category_id=? LIMIT 1",
+                                       (cat_id,)).fetchone():
+            cat = conn.execute("SELECT * FROM grade_categories WHERE id=?", (cat_id,)).fetchone()
+            if cat and (_col(cat, "name") or "").lower() in canvas_cat_names:
+                journal.append({"op": "cat-", "id": cat_id, "row": _row_snapshot(cat)})
+                conn.execute("DELETE FROM grade_categories WHERE id=?", (cat_id,))
+    return None
+
+
+# ---------------------------------------------------------------------------
+# grade categories that count the same work twice
+# ---------------------------------------------------------------------------
+
+def category_overlap(items, cats, plan):
+    """His categories and Canvas's side by side, when together they pass 100%.
+
+    Returns None when there is nothing to choose: only one set, or a total at or under
+    100%. Canvas's are the ones named like a Canvas assignment group; the rest are his.
+    The total is worked out exactly as the page's grade maths does it, every
+    category's weight plus the weights of assignments in no category.
+    """
+    canvas_names = {(c.get("name") or "").lower() for c in (plan.get("categories") or [])}
+    counts = {}
+    for it in items:
+        counts[_col(it, "category_id")] = counts.get(_col(it, "category_id"), 0) + 1
+    cat_ids = {_col(c, "id") for c in cats}
+    total = sum(canvas._number(_col(c, "weight")) or 0.0 for c in cats)
+    total += sum(canvas._number(_col(it, "weight")) or 0.0 for it in items
+                 if _col(it, "category_id") not in cat_ids)
+    describe = lambda c: {"id": _col(c, "id"), "name": _col(c, "name"),
+                          "weight": canvas._number(_col(c, "weight")),
+                          "count": counts.get(_col(c, "id"), 0)}
+    theirs = [describe(c) for c in cats if (_col(c, "name") or "").lower() in canvas_names]
+    mine = [describe(c) for c in cats if (_col(c, "name") or "").lower() not in canvas_names]
+    if not theirs or not mine or total <= 100.5:
+        return None
+    return {"mine": mine, "canvas": theirs, "total": round(total, 2)}
+
+
+def _resolve_categories(conn, unit, use_canvas, snapshot, journal):
+    """Make one set of categories stand. Returns the titles left outside any category.
+
+    Keep mine: Canvas's categories go, and their assignments are left in none, because
+    no category of his is known to cover them. Use Canvas's: his go, and each of his
+    assignments linked to Canvas moves into the category its Canvas assignment is in
+    (or takes its own weight, where Canvas gives it one alone); the rest are left in
+    none. Either way the result names what was left out, so nothing drops out of the
+    grade unnoticed.
+    """
+    class_id = unit["classId"]
+    ov = unit["after"]
+    going = ov["mine"] if use_canvas else ov["canvas"]
+    going_ids = {c["id"] for c in going}
+    plan = snapshot.get("plan") or {}
+    by_key = {i.get("importKey"): i for i in (plan.get("items") or [])}
+    canvas_cat = {}
+    for pc in plan.get("categories") or []:
+        row = conn.execute("SELECT id FROM grade_categories WHERE class_id=? AND lower(name)=lower(?)",
+                           (class_id, pc.get("name") or "")).fetchone()
+        if row:
+            canvas_cat[pc.get("canvasId")] = _col(row, "id")
+    loose = []
+    for it in conn.execute("SELECT * FROM items WHERE class_id=?", (class_id,)).fetchall():
+        if _col(it, "category_id") not in going_ids:
+            continue
+        new_cat, new_weight = None, _col(it, "weight")
+        planned = by_key.get(_col(it, "import_key")) if use_canvas else None
+        if planned:
+            new_cat = canvas_cat.get(planned.get("categoryCanvasId"))
+            if not new_cat and planned.get("weight") is not None and plan.get("weightsFromCanvas"):
+                new_weight = planned.get("weight")
+        if not new_cat and new_weight is None:
+            loose.append(_col(it, "title") or "An assignment")
+        conn.execute("UPDATE items SET category_id=?, weight=? WHERE id=?",
+                     (new_cat, new_weight, _col(it, "id")))
+        journal.append({"op": "item~", "id": _col(it, "id"), "class": class_id,
+                        "title": _col(it, "title"),
+                        "fields": {"category_id": [_col(it, "category_id"), new_cat],
+                                   "weight": [_col(it, "weight"), new_weight]}})
+    for c in going:
+        row = conn.execute("SELECT * FROM grade_categories WHERE id=?", (c["id"],)).fetchone()
+        if row:
+            journal.append({"op": "cat-", "id": c["id"], "row": _row_snapshot(row)})
+            conn.execute("DELETE FROM grade_categories WHERE id=?", (c["id"],))
+    return loose
