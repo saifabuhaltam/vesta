@@ -66,6 +66,14 @@ Easier: put it in a `.env` file next to `app.py` as `ANTHROPIC_API_KEY=sk-ant-..
 
 Every other feature works without this key — Headstart and rubric parsing just return a clear error until it's set.
 
+### The notes editor
+
+The notes editor is [TipTap](https://tiptap.dev), plus Vesta's own blocks (callouts, equations, file chips, checklists) and the `/` menu. Its source is `editor/src/index.js`, bundled into `static/editor.js`, which is committed so that running and deploying Vesta never needs Node. Rebuild it only after changing the editor source:
+
+```bash
+cd editor && npm install && npm run build
+```
+
 ## Deploying to Railway
 
 1. Code is already pushed to [github.com/saifabuhaltam/vesta](https://github.com/saifabuhaltam/vesta).

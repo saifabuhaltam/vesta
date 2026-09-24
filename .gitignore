@@ -1,5 +1,6 @@
 data/
 __pycache__/
+editor/node_modules/
 *.pyc
 .venv/
 venv/

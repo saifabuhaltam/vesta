@@ -1291,24 +1291,13 @@
   .file-row .fr-meta, .note-row .fr-meta{ font-size:11px; color:var(--text-muted); margin-top:1px; }
 
   /* ---------- Rich text editor ---------- */
-  /* No overflow here. A scroll container clips absolutely-positioned children, and
-     every dropdown in this bar hangs below it, so overflow:auto made them invisible.
-     It wraps instead on a narrow window. */
-  .rte-toolbar{ display:flex; flex-wrap:wrap; gap:2px; border:1px solid var(--border); border-bottom:none; border-radius:var(--r-md) var(--r-md) 0 0; background:var(--surface-2); padding:6px; }
-  .rte-btn{ border:none; background:transparent; color:var(--text-muted); width:28px; height:28px; border-radius:var(--r-sm); cursor:pointer; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; }
-  .rte-btn:hover{ background:var(--surface-3); color:var(--text); }
-  .rte-btn.active{ background:var(--accent-soft); color:var(--accent-ink); }
-  .rte-sep{ width:1px; background:var(--border); margin:3px 4px; }
-  .rte-editor{
-    border:1px solid var(--border); border-radius:0 0 var(--r-md) var(--r-md); padding:14px 16px; min-height:160px;
-    font-size:13.5px; line-height:1.65; background:var(--surface);
-  }
-  .rte-editor:focus{ outline:2px solid var(--accent); outline-offset:-1px; }
-  .rte-editor:empty:before{ content:attr(data-placeholder); color:var(--text-faint); pointer-events:none; }
+  .rte-editor{ padding:14px 16px; min-height:160px; font-size:13.5px; line-height:1.65; }
+  .rte-editor:focus{ outline:none; }
   .rte-editor h2{ font-size:17px; margin:14px 0 6px; }
   .rte-editor h3{ font-size:15px; margin:12px 0 5px; }
   .rte-editor p{ margin:0 0 8px; }
   .rte-editor ul, .rte-editor ol{ margin:0 0 8px; padding-left:22px; }
+  .rte-editor li > p{ margin:0 0 2px; }
   .rte-editor blockquote{ margin:8px 0; padding:4px 12px; border-left:3px solid var(--accent); color:var(--text-muted); font-style:italic; }
   .rte-editor mark{ background:#FDE68A; color:#1a1608; border-radius:2px; padding:0 2px; }
   .rte-content h2{ font-size:17px; margin:14px 0 6px; }
@@ -1318,34 +1307,93 @@
   .rte-content blockquote{ margin:8px 0; padding:4px 12px; border-left:3px solid var(--accent); color:var(--text-muted); font-style:italic; }
   .rte-content mark{ background:#FDE68A; color:#1a1608; border-radius:2px; padding:0 2px; }
 
-  /* ---- document editor: the block types a note can contain ---- */
-  .rte-toolbar{ position:sticky; top:0; z-index:5; align-items:center; padding:7px 8px;
-    background:var(--surface); border-color:var(--border); }
-  .rte-grp{ display:flex; gap:2px; align-items:center; flex:none; }
-  .rte-sep{ flex:none; }
-  .rte-btn.wide{ width:auto; padding:0 9px; font-size:12.5px; gap:5px; }
-  .rte-btn svg{ width:15px; height:15px; }
+  /* what an empty line says: the note's first line, then "/" on any empty one */
+  .rte-editor .is-empty::before{ content:attr(data-placeholder); float:left; height:0;
+    pointer-events:none; color:var(--text-faint); }
+  .rte-editor .ProseMirror-selectednode{ outline:2px solid var(--accent); outline-offset:2px; border-radius:6px; }
+  .rte-editor .rte-math{ cursor:pointer; }
+  .rte-editor .tableWrapper{ overflow-x:auto; }
+  .rte-editor td, .rte-editor th{ position:relative; }
+  .rte-editor .selectedCell::after{ content:""; position:absolute; inset:0; background:var(--accent-soft);
+    opacity:.6; pointer-events:none; }
+  .rte-editor td p, .rte-editor th p{ margin:0; }
+  .rte-callout-body{ flex:1; min-width:0; }
+  .rte-callout-body > :last-child{ margin-bottom:0; }
 
-  /* a control that opens a small menu, the way the mockup's Normal text / font / size do */
-  .rte-dd{ position:relative; display:inline-flex; }
-  .rte-dd > .rte-btn{ font-weight:600; color:var(--text); }
-  .rte-dd-caret{ font-size:9px; opacity:.55; margin-left:2px; }
-  .rte-dd-menu{ display:none; position:absolute; top:100%; left:0; margin-top:5px; z-index:30;
-    min-width:150px; background:var(--surface); border:1px solid var(--border);
-    border-radius:var(--r-md); box-shadow:var(--shadow-pop); padding:5px; }
-  .rte-dd.open > .rte-dd-menu{ display:block; }
-  .rte-dd.right > .rte-dd-menu{ left:auto; right:0; }
-  .rte-dd-menu button{ display:flex; align-items:center; gap:8px; width:100%; text-align:left;
-    border:none; background:transparent; color:var(--text); font-family:inherit; font-size:13px;
-    padding:7px 9px; border-radius:var(--r-sm); cursor:pointer; line-height:1.35; }
-  .rte-dd-menu button > span{ display:block; }
-  .rte-dd-menu button:hover{ background:var(--surface-2); }
-  .rte-dd-menu .rte-dd-label{ font-size:10.5px; font-weight:700; text-transform:uppercase;
-    letter-spacing:.06em; color:var(--text-faint); padding:6px 9px 3px; }
-  .rte-swatches{ display:grid; grid-template-columns:repeat(6,1fr); gap:5px; padding:6px; }
-  .rte-swatch{ width:20px; height:20px; border-radius:50%; border:1px solid rgba(0,0,0,.12);
-    cursor:pointer; padding:0; }
-  .rte-swatch:hover{ transform:scale(1.12); }
+  /* ---- the notes editor's bar: one row, everything visible ---- */
+  .ne-bar{ position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:2px 1px;
+    padding:5px 6px; margin:0 0 22px; background:var(--surface); border:1px solid var(--border);
+    border-radius:14px; box-shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 20px -14px rgba(16,24,40,.25); }
+  .ne-grp{ display:flex; align-items:center; gap:1px; flex:none; }
+  .ne-sep{ width:1px; height:18px; background:var(--border); margin:0 3px; flex:none; }
+  .ne-spacer{ flex:1 1 0; min-width:4px; }
+  .ne-btn{ height:30px; min-width:28px; padding:0 5px; border:none; border-radius:9px; background:transparent;
+    color:var(--text-muted); font-family:inherit; font-size:12.5px; font-weight:600; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center; gap:5px; cursor:pointer;
+    transition:background .12s ease, color .12s ease; }
+  .ne-btn:hover{ background:var(--surface-2); color:var(--text); }
+  .ne-btn.on{ background:var(--accent-soft); color:var(--accent-ink); }
+  .ne-btn:disabled{ opacity:.35; cursor:default; background:transparent; color:var(--text-muted); }
+  .ne-btn svg{ width:16px; height:16px; flex:none; }
+  .ne-size{ min-width:28px; padding:0 4px; color:var(--text); font-variant-numeric:tabular-nums; }
+  .ne-hide-btn{ color:var(--text-faint); }
+  .ne-bar:not(.in-table) .ne-table-grp{ display:none; }
+
+  /* colour, highlight and font: the one control with a menu */
+  .ne-dd{ position:relative; display:inline-flex; flex:none; }
+  .ne-colour-a{ font-size:14px; font-weight:800; color:var(--text); text-decoration:underline;
+    text-decoration-thickness:3px; text-underline-offset:3px; text-decoration-color:var(--text); }
+  .ne-caret{ font-size:9px; opacity:.55; }
+  .ne-pop{ display:none; position:absolute; top:100%; left:0; margin-top:6px; z-index:30; width:236px;
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    box-shadow:var(--shadow-pop); padding:8px; }
+  .ne-dd.open > .ne-pop{ display:block; }
+  .ne-pop-label{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--text-faint); padding:6px 4px 5px; }
+  .ne-swatches{ display:flex; flex-wrap:wrap; gap:4px; padding:0 2px 4px; }
+  .ne-swatch{ width:22px; height:22px; border-radius:7px; border:1px solid var(--border); background:var(--surface);
+    font-family:inherit; font-size:12.5px; font-weight:800; line-height:1; padding:0; cursor:pointer;
+    color:var(--text); transition:transform .1s ease; }
+  .ne-swatch:hover{ transform:scale(1.12); }
+  .ne-swatch.hl{ border-color:rgba(0,0,0,.08); border-radius:50%; }
+  .ne-swatch.none{ background:linear-gradient(135deg, transparent 45%, var(--text-faint) 46%, var(--text-faint) 54%, transparent 55%), var(--surface); }
+  .ne-swatch.none:not(.hl){ background:var(--surface); }
+  .ne-fonts{ display:flex; gap:4px; padding:0 2px 6px; }
+  .ne-font{ flex:1; height:30px; border:1px solid var(--border); border-radius:9px; background:var(--surface);
+    color:var(--text); font-size:13px; cursor:pointer; }
+  .ne-font:hover{ background:var(--surface-2); }
+  .ne-font.on{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent-ink); }
+  .ne-clear{ display:flex; align-items:center; gap:8px; width:100%; border:none; border-top:1px solid var(--border);
+    background:transparent; color:var(--text-muted); font-family:inherit; font-size:12.5px; padding:9px 4px 3px;
+    margin-top:2px; cursor:pointer; }
+  .ne-clear:hover{ color:var(--text); }
+  .ne-clear svg{ width:15px; height:15px; }
+
+  /* hidden: a blank page, and the one way back sits in the header */
+  .nt-editor.ne-hidden .ne-bar{ display:none; }
+  .nt-editor:not(.ne-hidden) .ne-show-btn{ display:none; }
+
+  /* over selected text */
+  .ne-bubble{ position:absolute; top:0; left:0; width:max-content; visibility:hidden;
+    display:flex; gap:1px; padding:4px; background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; box-shadow:var(--shadow-pop); z-index:150; }
+  .ne-bubble .ne-btn{ height:28px; min-width:28px; }
+
+  /* the / menu */
+  .ne-slash{ width:300px; max-height:min(360px, 60vh); overflow-y:auto; padding:6px; z-index:150;
+    background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-pop); }
+  .ne-slash-group{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--text-faint); padding:8px 8px 4px; }
+  .ne-slash-item{ display:flex; align-items:center; gap:10px; width:100%; padding:5px 8px; border:none;
+    background:transparent; border-radius:10px; text-align:left; cursor:pointer; color:var(--text); font-family:inherit; }
+  .ne-slash-item.on{ background:var(--surface-2); }
+  .ne-slash-ic{ width:34px; height:34px; border-radius:9px; border:1px solid var(--border); background:var(--surface);
+    display:flex; align-items:center; justify-content:center; color:var(--text-muted); flex:none; }
+  .ne-slash-item.on .ne-slash-ic{ color:var(--accent-ink); border-color:var(--accent-soft); background:var(--accent-soft); }
+  .ne-slash-ic svg{ width:17px; height:17px; }
+  .ne-slash-title{ display:block; font-size:13px; font-weight:600; line-height:1.3; }
+  .ne-slash-hint{ display:block; font-size:11.5px; color:var(--text-muted); line-height:1.3; }
+  .ne-slash-empty{ padding:10px; font-size:12.5px; color:var(--text-muted); }
 
   .rte-editor h1, .rte-content h1{ font-size:22px; margin:16px 0 8px; font-weight:800; letter-spacing:-.01em; }
   .rte-editor h4, .rte-content h4{ font-size:13.5px; margin:10px 0 4px; font-weight:700; color:var(--text-muted); }
@@ -1358,6 +1406,11 @@
   ul.rte-check li{ display:flex; align-items:flex-start; gap:8px; margin:2px 0; }
   ul.rte-check input[type="checkbox"]{ margin-top:3px; width:14px; height:14px; flex:none; accent-color:var(--accent); cursor:pointer; }
   ul.rte-check li[data-done="1"]{ color:var(--text-faint); text-decoration:line-through; }
+  ul.rte-check li > label{ flex:none; display:flex; user-select:none; }
+  ul.rte-check li > div{ flex:1; min-width:0; }
+  ul.rte-check li > div > p{ margin:0; }
+  ul.rte-check ul.rte-check{ margin:2px 0 0; }
+  .rte-editor ul.rte-check li[data-checked="true"] > div{ color:var(--text-faint); text-decoration:line-through; }
 
   /* callouts */
   .rte-callout, .rte-content .rte-callout{
@@ -1397,6 +1450,7 @@
     border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface-2);
     font-size:12.5px; text-decoration:none; color:var(--text);
   }
+  .rte-editor a.rte-embed, .rte-content a.rte-embed{ color:var(--text); text-decoration:none; }
   .rte-embed:hover{ background:var(--surface-3); }
   .rte-embed .file-ic{ width:26px; height:26px; font-size:9px; }
 
@@ -1414,7 +1468,7 @@
     padding:26px 40px 80px; }
   .nt-wrap.fullscreen .nt-body{ min-height:64vh; border:none; background:transparent; padding-left:0; padding-right:0; }
   .nt-wrap.fullscreen .nt-body:focus{ outline:none; }
-  .nt-wrap.fullscreen .rte-toolbar{ background:var(--bg); border-left:none; border-right:none; border-top:none; }
+  .nt-wrap.fullscreen .ne-bar{ top:0; }
   /* zen: even the note list goes */
   .nt-wrap.fullscreen.zen{ grid-template-columns:minmax(0,1fr); }
   .nt-wrap.fullscreen.zen .nt-tree, .nt-wrap.fullscreen.zen .nt-ctx{ display:none; }
@@ -1887,7 +1941,7 @@
   .nt-editor-actions .btn.ghost{ padding:6px 8px; }
   .nt-editor-actions .spacer{ flex:1; }
   .nt-folder-select{ width:auto; font-size:12.5px; padding:7px 10px; }
-  input.nt-title{ width:100%; border:none; outline:none; background:transparent; font-family:inherit;
+  input.nt-title{ display:block; width:100%; border:none; outline:none; background:transparent; font-family:inherit;
     font-size:34px; font-weight:800; letter-spacing:-0.02em; color:var(--text);
     padding:0; margin-bottom:4px; line-height:1.15; }
   input.nt-title:focus{ outline:none; box-shadow:none; border:none; }
@@ -1902,10 +1956,6 @@
   .nt-body{ min-height:340px; border:none; border-radius:0; background:transparent;
     padding:16px 0 40px; font-size:14px; }
   .nt-body:focus{ outline:none; }
-  /* the toolbar becomes a rule under the header rather than a bordered tray */
-  .nt-editor .rte-toolbar{ border:none; border-top:1px solid var(--border);
-    border-bottom:1px solid var(--border); border-radius:0; background:var(--surface);
-    padding:6px 0; margin-bottom:22px; }
   .nt-title-rule{ margin:12px 0 0; }
   .nt-editor-empty{ display:flex; flex-direction:column; align-items:center; justify-content:center;
     min-height:380px; color:var(--text-faint); font-size:13.5px; gap:4px; }
@@ -3121,6 +3171,7 @@
 <div id="search-root"></div>
 <div id="focus-root"></div>
 
+<script src="/editor.js"></script>
 <script>
 (function(){
   "use strict";
@@ -3938,8 +3989,8 @@
    * the next redraw -- whenever it comes -- would show the older text.
    */
   function keepLiveNoteText(){
-    var body = document.getElementById('nt-body');
-    if(body && body.dataset.noteId) patchCachedNote(body.dataset.noteId, { text: noteHtmlForSave(body) });
+    var live = neLiveHtml();
+    if(live !== null) patchCachedNote(NE.noteId, { text: live });
     var title = document.getElementById('nt-title');
     if(title && title.dataset.id) patchCachedNote(title.dataset.id, { title: title.value });
   }
@@ -5167,6 +5218,7 @@
 
   function renderView(){
     var view = document.getElementById('view');
+    neBeforeRender();
     // A Headstart chat is rebuilt by every redraw, and a rebuilt panel starts scrolled to
     // the top: Saif found the chat "resets to the top of the chat anytime a new message
     // pops up", because something always redraws a moment after a reply arrives. So its
@@ -5188,6 +5240,7 @@
     else if(activeTab==='grades') view.innerHTML = viewGradesPage();
     else if(activeTab==='focus') view.innerHTML = viewFocusPage();
     else view.innerHTML = viewAssignments();
+    neMount();
     if(activeTab==='notes') loadNoteSuggestions();
     var newChat = document.getElementById('th-scroll');
     if(newChat){
@@ -9188,416 +9241,351 @@
     return html;
   }
 
-  // Every button carries data-cmd for the browser's own editing commands, or
-  // data-ins for the things execCommand has no idea about (tables, callouts,
-  // checklists, maths). Grouped so the bar stays readable as it grew.
-  function rteBtn(cmd, label, title, opts){
-    opts = opts || {};
-    return '<button type="button" class="rte-btn'+(opts.wide?' wide':'')+'"'
-      + ' data-action="rte-cmd" data-cmd="'+cmd+'"'
-      + (opts.val!==undefined ? ' data-val="'+escapeHtml(String(opts.val))+'"' : '')
-      + ' title="'+escapeHtml(title)+'" aria-label="'+escapeHtml(title)+'">'+label+'</button>';
-  }
-  function rteIns(kind, label, title, opts){
-    opts = opts || {};
-    return '<button type="button" class="rte-btn'+(opts.wide?' wide':'')+'"'
-      + ' data-action="rte-ins" data-ins="'+kind+'"'
-      + (opts.val!==undefined ? ' data-val="'+escapeHtml(String(opts.val))+'"' : '')
-      + ' title="'+escapeHtml(title)+'" aria-label="'+escapeHtml(title)+'">'+label+'</button>';
-  }
+  // ---------------- the notes editor ----------------
+  // TipTap, bundled into /editor.js as window.VestaEditor (source in editor/). The
+  // editor is kept alive across redraws: render() rebuilds the page from HTML, and
+  // rebuilding the editor with it would wipe its undo history and the caret. So the
+  // page leaves an empty host, and neMount() moves the same editor into it.
+  var NE = { editor:null, noteId:null, wrap:null, bubble:null, refocus:false, syncQueued:false };
+  var NE_MOD = /Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘' : 'Ctrl+';
+  var neBarHidden = false;
+  try{ neBarHidden = localStorage.getItem('vesta.noteBarHidden') === '1'; }catch(e){}
 
-  // Each option is drawn the way the text will actually look, so the menu is a
-  // preview rather than a list of names.
-  var RTE_BLOCKS = [
-    { tag:'P',  label:'Normal text',   css:'font-size:13.5px;' },
-    { tag:'H1', label:'Title',         css:'font-size:21px;font-weight:800;letter-spacing:-.01em;color:var(--note-heading);' },
-    { tag:'H2', label:'Heading',       css:'font-size:17px;font-weight:700;color:var(--note-heading);' },
-    { tag:'H3', label:'Subheading',    css:'font-size:15px;font-weight:700;color:var(--note-heading);' },
-    { tag:'H4', label:'Small heading', css:'font-size:13px;font-weight:700;color:var(--text-muted);' },
-    { tag:'BLOCKQUOTE', label:'Quote', css:'font-size:13.5px;font-style:italic;color:var(--text-muted);border-left:3px solid var(--accent);padding-left:9px;' },
-    { tag:'PRE', label:'Code block',   css:'font-family:var(--mono, ui-monospace, monospace);font-size:12.5px;background:var(--surface-2);padding:2px 6px;border-radius:5px;' }
+  var NE_COLORS = [
+    { c:'',        t:'Default' }, { c:'#1D4ED8', t:'Blue' },   { c:'#0F766E', t:'Teal' },
+    { c:'#18794E', t:'Green' },   { c:'#B4560D', t:'Orange' }, { c:'#C0342E', t:'Red' },
+    { c:'#6D3FC4', t:'Purple' },  { c:'#E0568F', t:'Pink' },   { c:'#6B7280', t:'Grey' }
   ];
-  var RTE_FONTS = ['Inter', 'Georgia', 'IBM Plex Mono', 'Times New Roman', 'Arial'];
-  var RTE_SIZES = [9, 10, 11, 12, 14, 18, 24, 32];
-  var RTE_COLORS = ['#131722','#1D4ED8','#0F766E','#B4560D','#C0342E','#6D3FC4',
-                    '#6B7280','#2563EB','#18794E','#8A6005','#E0568F','#9CA3AF'];
-  var RTE_HIGHLIGHTS = ['#FDE68A','#BFE3C6','#F9C9D4','#CFE3FF','#E6D9FB','transparent'];
+  var NE_HIGHLIGHTS = [
+    { c:'',        t:'None' },    { c:'#FDE68A', t:'Yellow' }, { c:'#BFE3C6', t:'Green' },
+    { c:'#CFE3FF', t:'Blue' },    { c:'#F9C9D4', t:'Pink' },   { c:'#E6D9FB', t:'Purple' }
+  ];
+  // Three families, the way Notion offers them. Matched by a word in the stored
+  // style, because the browser rewrites the quoting of a font list as it pleases.
+  var NE_FONTS = [
+    { val:'',                                       match:'',      label:'Sans',  css:'inherit' },
+    { val:'Georgia, serif',                         match:'Georgia', label:'Serif', css:'Georgia, serif' },
+    { val:"'IBM Plex Mono', ui-monospace, monospace", match:'Mono', label:'Mono',  css:"'IBM Plex Mono', ui-monospace, monospace" }
+  ];
 
-  function rteDd(label, inner, opts){
-    opts = opts || {};
-    return '<span class="rte-dd'+(opts.right?' right':'')+'">'
-      + '<button type="button" class="rte-btn wide" data-action="rte-dd" title="'+escapeHtml(opts.title||label)+'">'
-      + label + '<span class="rte-dd-caret">▾</span></button>'
-      + '<span class="rte-dd-menu">'+inner+'</span></span>';
+  function neIcon(name){ return window.VestaEditor ? window.VestaEditor.icon(name) : ''; }
+  function neBtn(cmd, iconName, title, keys, val){
+    var tip = title + (keys ? '  (' + keys + ')' : '');
+    return '<button type="button" class="ne-btn" data-action="ne" data-cmd="'+cmd+'"'
+      + (val !== undefined ? ' data-val="'+escapeHtml(val)+'"' : '')
+      + ' title="'+escapeHtml(tip)+'" aria-label="'+escapeHtml(title)+'">'+neIcon(iconName)+'</button>';
   }
+  function neSep(){ return '<span class="ne-sep"></span>'; }
 
-  function rteToolbarHtml(editorId, opts){
-    opts = opts || {};
-    var g = function(inner){ return '<span class="rte-grp">'+inner+'</span><span class="rte-sep"></span>'; };
-
-    var blockMenu = RTE_BLOCKS.map(function(b){
-      return '<button type="button" data-action="rte-block" data-val="'+b.tag+'">'
-        + '<span style="'+b.css+'">'+b.label+'</span></button>';
-    }).join('');
-
-    var fontMenu = RTE_FONTS.map(function(f){
-      return '<button type="button" data-action="rte-font" data-val="'+f+'" style="font-family:\''+f+'\',sans-serif;">'+f+'</button>';
-    }).join('');
-
-    var sizeMenu = RTE_SIZES.map(function(n){
-      return '<button type="button" data-action="rte-size" data-val="'+n+'">'+n+'</button>';
-    }).join('');
-
-    var colorMenu = '<div class="rte-dd-label">Text colour</div><div class="rte-swatches">'
-      + RTE_COLORS.map(function(c){
-          return '<button type="button" class="rte-swatch" style="background:'+c+'" data-action="rte-cmd" data-cmd="foreColor" data-val="'+c+'" title="'+c+'"></button>';
+  /**
+   * One row, everything on it visible. The old bar hid paragraph style, font, size,
+   * lists and every insert behind menus; the only menu left is colour, because
+   * fifteen swatches do not fit in a row.
+   */
+  function neBarHtml(){
+    var colours = '<div class="ne-pop-label">Text colour</div><div class="ne-swatches">'
+      + NE_COLORS.map(function(o){
+          return '<button type="button" class="ne-swatch'+(o.c?'':' none')+'" data-action="ne" data-cmd="color" data-val="'+o.c+'"'
+            + ' title="'+o.t+'" style="'+(o.c?'color:'+o.c:'')+'">A</button>';
         }).join('')
-      + '</div><div class="rte-dd-label">Highlight</div><div class="rte-swatches">'
-      + RTE_HIGHLIGHTS.map(function(c){
-          var t = c === 'transparent' ? 'None' : c;
-          return '<button type="button" class="rte-swatch" style="background:'+(c==='transparent'?'var(--surface-2)':c)+'" data-action="rte-cmd" data-cmd="hiliteColor" data-val="'+c+'" title="'+t+'"></button>';
+      + '</div><div class="ne-pop-label">Highlight</div><div class="ne-swatches">'
+      + NE_HIGHLIGHTS.map(function(o){
+          return '<button type="button" class="ne-swatch hl'+(o.c?'':' none')+'" data-action="ne" data-cmd="highlight" data-val="'+o.c+'"'
+            + ' title="'+o.t+'" style="'+(o.c?'background:'+o.c:'')+'"></button>';
         }).join('')
-      + '</div>';
+      + '</div><div class="ne-pop-label">Font</div><div class="ne-fonts">'
+      + NE_FONTS.map(function(f){
+          return '<button type="button" class="ne-font" data-action="ne" data-cmd="font" data-val="'+escapeHtml(f.val)+'"'
+            + ' data-match="'+f.match+'" style="font-family:'+escapeHtml(f.css)+'">'+f.label+'</button>';
+        }).join('')
+      + '</div><button type="button" class="ne-clear" data-action="ne" data-cmd="clear">'+neIcon('clear')+'Clear formatting</button>';
 
-    var listMenu = '<button type="button" data-action="rte-cmd" data-cmd="insertUnorderedList">• Bulleted list</button>'
-      + '<button type="button" data-action="rte-cmd" data-cmd="insertOrderedList">1. Numbered list</button>'
-      + '<button type="button" data-action="rte-ins" data-ins="checklist">☑ Checklist</button>'
-      + '<div class="rte-dd-label">Indent</div>'
-      + '<button type="button" data-action="rte-cmd" data-cmd="indent">→ Increase</button>'
-      + '<button type="button" data-action="rte-cmd" data-cmd="outdent">← Decrease</button>';
-
-    var insertMenu = '<button type="button" data-action="rte-ins" data-ins="table">▦ Table</button>'
-      + '<button type="button" data-action="rte-ins" data-ins="callout" data-val="info">ⓘ Callout</button>'
-      + '<button type="button" data-action="rte-ins" data-ins="code">&lt;/&gt; Code block</button>'
-      + '<button type="button" data-action="rte-ins" data-ins="math">∑ Equation</button>'
-      + '<button type="button" data-action="rte-ins" data-ins="hr">— Divider</button>'
-      + '<button type="button" data-action="rte-ins" data-ins="embed">📎 Embed a file</button>'
-      + '<div class="rte-dd-label">Formatting</div>'
-      + '<button type="button" data-action="rte-cmd" data-cmd="removeFormat">⌫ Clear formatting</button>';
-
-    return '<div class="rte-toolbar" data-target="'+editorId+'">'
-      + g(rteBtn('undo','↺','Undo') + rteBtn('redo','↻','Redo'))
-      + g(rteDd('<span id="rte-block-label">Normal text</span>', blockMenu, { title:'Paragraph style' }))
-      + g(rteDd('Inter', fontMenu, { title:'Font' }) + rteDd('11', sizeMenu, { title:'Size' }))
-      + g(rteBtn('bold','<b>B</b>','Bold')
-        + rteBtn('italic','<i>I</i>','Italic')
-        + rteBtn('underline','<u>U</u>','Underline')
-        + rteBtn('strikeThrough','<s>S</s>','Strikethrough')
-        + rteDd('<span style="text-decoration:underline;text-decoration-color:#1D4ED8;text-decoration-thickness:3px;">A</span>', colorMenu, { title:'Colour and highlight' }))
-      + g(rteIns('link','🔗','Add link') + rteBtn('unlink','⛓','Remove link') + rteIns('image','🖼','Insert image'))
-      + '<span class="rte-grp">'
-      + rteDd('☰', listMenu, { title:'Lists' })
-      + rteDd('＋', insertMenu, { title:'Insert', right:true })
+    return '<div class="ne-bar">'
+      + '<span class="ne-grp">'
+        + neBtn('undo','undo','Undo', NE_MOD+'Z') + neBtn('redo','redo','Redo', NE_MOD+'Shift+Z')
+      + '</span>' + neSep()
+      + '<span class="ne-grp">'
+        + neBtn('h1','h1','Heading 1', '# space') + neBtn('h2','h2','Heading 2', '## space')
+        + neBtn('h3','h3','Heading 3', '### space')
+      + '</span>' + neSep()
+      + '<span class="ne-grp">'
+        + neBtn('bold','bold','Bold', NE_MOD+'B') + neBtn('italic','italic','Italic', NE_MOD+'I')
+        + neBtn('underline','underline','Underline', NE_MOD+'U') + neBtn('strike','strike','Strikethrough', NE_MOD+'Shift+X')
+        + neBtn('link','link','Link', NE_MOD+'K')
+      + '</span>' + neSep()
+      + '<span class="ne-grp" title="Text size">'
+        + neBtn('size-down','minus','Smaller text')
+        + '<button type="button" class="ne-btn ne-size" data-action="ne" data-cmd="size-reset" id="ne-size"'
+          + ' title="Text size. Click to go back to normal." aria-label="Text size">16</button>'
+        + neBtn('size-up','plus','Bigger text')
+      + '</span>' + neSep()
+      + '<span class="ne-dd"><button type="button" class="ne-btn ne-colour-btn" data-action="ne-pop"'
+        + ' title="Colour, highlight and font" aria-label="Colour, highlight and font">'
+        + '<span class="ne-colour-a">A</span><span class="ne-caret">▾</span></button>'
+        + '<span class="ne-pop">'+colours+'</span></span>' + neSep()
+      + '<span class="ne-grp">'
+        + neBtn('bullet','bullet','Bulleted list', '- space') + neBtn('ordered','ordered','Numbered list', '1. space')
+        + neBtn('task','task','To-do list', '[] space') + neBtn('quote','quote','Quote', '> space')
+      + '</span>' + neSep()
+      + '<span class="ne-grp">'
+        + neBtn('table','table','Table') + neBtn('math','math','Equation')
+        + neBtn('image','image','Image') + neBtn('embed','file','File from a class')
       + '</span>'
+      + '<span class="ne-grp ne-table-grp">' + neSep()
+        + neBtn('row-add','rowAdd','Add a row below') + neBtn('col-add','colAdd','Add a column to the right')
+        + neBtn('row-del','rowDel','Delete this row') + neBtn('col-del','colDel','Delete this column')
+        + neBtn('table-del','trash','Delete the table')
+      + '</span>'
+      + '<span class="ne-spacer"></span>'
+      + '<button type="button" class="ne-btn ne-hide-btn" data-action="ne-bar-toggle"'
+        + ' title="Hide the toolbar and just write  ('+NE_MOD+'Shift+.)" aria-label="Hide the toolbar">'+neIcon('hide')+'</button>'
       + '</div>';
   }
 
-  // ---- insertion helpers -------------------------------------------------
-  // ---- markdown-style shortcuts ------------------------------------------
-  // Type the marker and press space, the way Notion works: "- " opens a bullet,
-  // "1. " a numbered list, "# " a title. Tab finishes a marker too, for anyone who
-  // learned it that way. Undo puts the literal characters back.
-  var MD_TRIGGERS = [
-    { re: /^\s*[*\-+]\s*$/,  apply: function(){ document.execCommand('insertUnorderedList'); } },
-    { re: /^\s*1\.\s*$/,     apply: function(){ document.execCommand('insertOrderedList'); } },
-    { re: /^\s*\[\s*\]\s*$/, apply: function(ed){ rteInsertCommand(ed, 'checklist'); } },
-    { re: /^\s*#\s*$/,       apply: function(){ document.execCommand('formatBlock', false, 'H1'); } },
-    { re: /^\s*##\s*$/,      apply: function(){ document.execCommand('formatBlock', false, 'H2'); } },
-    { re: /^\s*###\s*$/,     apply: function(){ document.execCommand('formatBlock', false, 'H3'); } },
-    { re: /^\s*>\s*$/,       apply: function(){ document.execCommand('formatBlock', false, 'BLOCKQUOTE'); } },
-    { re: /^\s*```\s*$/,     apply: function(){ document.execCommand('formatBlock', false, 'PRE'); } },
-    { re: /^\s*---\s*$/,     apply: function(ed){ rteInsertCommand(ed, 'hr'); } }
-  ];
-
-  /**
-   * The marker sitting between the start of the line and the caret, if there is one.
-   *
-   * This reads the caret's own text run rather than the block element around it. A
-   * note that has only ever been typed into has no block wrapper at all -- its text
-   * sits directly under the editor -- so looking for a wrapper meant the first line
-   * of every note, the one people actually start a list on, could never match.
-   */
-  function rteMarkerBefore(editor){
-    var sel = window.getSelection();
-    if(!sel || !sel.rangeCount || !sel.isCollapsed) return null;
-    var node = sel.anchorNode;
-    if(!node || node.nodeType !== 3 || !editor.contains(node)) return null;
-    // Only the first run on a line can carry a marker.
-    var prev = node.previousSibling;
-    while(prev && prev.nodeType === 3 && !prev.textContent) prev = prev.previousSibling;
-    if(prev && prev.nodeName !== 'BR') return null;
-    var text = node.textContent.slice(0, sel.anchorOffset).replace(/\u00a0/g, ' ');
-    if(!text.trim()) return null;
-    var trigger = MD_TRIGGERS.find(function(t){ return t.re.test(text); });
-    return trigger ? { trigger: trigger, node: node, offset: sel.anchorOffset } : null;
+  /** The small bar over selected text. Built once per editor and kept on <body>. */
+  function neBubbleEl(){
+    var el = document.createElement('div');
+    el.className = 'ne-bubble';
+    el.innerHTML = neBtn('bold','bold','Bold', NE_MOD+'B') + neBtn('italic','italic','Italic', NE_MOD+'I')
+      + neBtn('underline','underline','Underline', NE_MOD+'U') + neBtn('strike','strike','Strikethrough', NE_MOD+'Shift+X')
+      + neBtn('code','code','Inline code', NE_MOD+'E') + neBtn('link','link','Link', NE_MOD+'K')
+      + neBtn('mark','highlight','Highlight', NE_MOD+'Shift+H');
+    return el;
   }
 
-  /**
-   * Give the caret's line a block element if it has none.
-   *
-   * Text typed into a note that has never been formatted sits directly under the
-   * editor with no wrapper of its own, and formatBlock has nothing to change. That
-   * is why "# " at the top of a fresh note did nothing at all, while "- " worked:
-   * the list commands build their own wrapper, formatBlock does not.
-   */
-  function rteEnsureBlock(editor){
-    var sel = window.getSelection();
-    if(!sel || !sel.rangeCount) return null;
-    var node = sel.anchorNode, offset = sel.anchorOffset;
-    if(!node || !editor.contains(node) || rteBlockOf(editor, node)) return null;
-    // This line is everything between the line breaks around it.
-    var start = node;
-    while(start.previousSibling && start.previousSibling.nodeName !== 'BR') start = start.previousSibling;
-    var line = [], cur = start;
-    while(cur && cur.nodeName !== 'BR'){ line.push(cur); cur = cur.nextSibling; }
-    if(!line.length) return null;
-    var para = document.createElement('p');
-    editor.insertBefore(para, line[0]);
-    line.forEach(function(el){ para.appendChild(el); });
-    var back = document.createRange();
-    back.setStart(node, Math.min(offset, node.nodeType === 3 ? node.textContent.length : node.childNodes.length));
-    back.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(back);
-    return para;
-  }
-
-  /** Swap a typed marker for the block it names. False when there is no marker. */
-  function rteApplyMarker(editor, e){
-    var hit = rteMarkerBefore(editor);
-    if(!hit) return false;
-    e.preventDefault();
-    var cut = document.createRange();
-    cut.setStart(hit.node, 0);
-    cut.setEnd(hit.node, hit.offset);
-    cut.deleteContents();
-    var sel = window.getSelection();
-    var caret = document.createRange();
-    caret.setStart(hit.node, 0);
-    caret.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(caret);
-    var wrapper = rteEnsureBlock(editor);
-    hit.trigger.apply(editor);
-    // A list builds its own block and leaves the wrapper behind empty, which would
-    // read as a blank line under every list started this way.
-    if(wrapper && wrapper.parentNode && !wrapper.textContent.trim() && !wrapper.querySelector('*')){
-      var live = window.getSelection();
-      var anchor = live && live.anchorNode;
-      if(!(anchor && wrapper.contains(anchor))) wrapper.parentNode.removeChild(wrapper);
-    }
-    rteChanged(editor);
-    syncBlockLabel(editor);
-    return true;
-  }
-
-  /** The block-level element the caret sits in, directly under the editor. */
-  function rteBlockOf(editor, node){
-    var el = node && node.nodeType === 1 ? node : (node && node.parentNode);
-    while(el && el !== editor){
-      if(el.parentNode === editor) return el;
-      el = el.parentNode;
-    }
-    return null;
-  }
-
-  function rteHandleTab(e, editor){
-    var sel = window.getSelection();
-    if(!sel || !sel.rangeCount) return;
-    if(rteApplyMarker(editor, e)) return;
-
-    // Tab must never move focus out of a document. Inside a list it changes the
-    // level, which is what it does in every other editor.
-    e.preventDefault();
-    var inList = sel.anchorNode && rteClosestTag(sel.anchorNode, 'LI');
-    if(inList){
-      document.execCommand(e.shiftKey ? 'outdent' : 'indent');
-      rteChanged(editor);
-      return;
-    }
-    if(!e.shiftKey){
-      document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
-      rteChanged(editor);
+  /** What each button reports as "on", or null for buttons that have no state. */
+  function neIsOn(ed, cmd, b){
+    switch(cmd){
+      case 'h1': return ed.isActive('heading', { level:1 });
+      case 'h2': return ed.isActive('heading', { level:2 });
+      case 'h3': return ed.isActive('heading', { level:3 });
+      case 'bold': case 'italic': case 'underline': case 'strike': case 'code': case 'link':
+        return ed.isActive(cmd);
+      case 'mark': return ed.isActive('highlight');
+      case 'bullet': return ed.isActive('bulletList');
+      case 'ordered': return ed.isActive('orderedList');
+      case 'task': return ed.isActive('taskList');
+      case 'quote': return ed.isActive('blockquote');
+      case 'callout': return ed.isActive('callout');
+      case 'codeblock': return ed.isActive('codeBlock');
+      case 'font':
+        var fam = ed.getAttributes('textStyle').fontFamily || '';
+        return b.dataset.match ? fam.indexOf(b.dataset.match) > -1 : !fam;
+      default: return null;
     }
   }
 
-  function rteClosestTag(node, tag){
-    var el = node.nodeType === 1 ? node : node.parentNode;
-    while(el){
-      if(el.tagName === tag) return el;
-      el = el.parentNode;
-    }
-    return null;
-  }
-
-  function closeRteMenus(){
-    document.querySelectorAll('.rte-dd.open').forEach(function(el){ el.classList.remove('open'); });
-  }
-  function fontOrSize(ed){ return ed; }
-
-  /**
-   * execCommand('fontName') leaves <font face="...">, which is deprecated markup
-   * that styles badly and bloats the saved note. Apply it, then swap the tags for
-   * a span carrying the style, which is what everything else in the note uses.
-   */
-  /**
-   * Sweep up any <font> the browser left behind and turn it into a span with the
-   * equivalent style. These tags were removed from HTML years ago, they ignore the
-   * note's own styling, and they make the saved document larger than it needs to be.
-   */
-  function rteTidyFontTags(editor){
-    editor.querySelectorAll('font').forEach(function(f){
-      var span = document.createElement('span');
-      if(f.getAttribute('color')) span.style.color = f.getAttribute('color');
-      if(f.getAttribute('face'))  span.style.fontFamily = "'" + f.getAttribute('face') + "', sans-serif";
-      if(f.getAttribute('size'))  span.style.fontSize = FONT_SIZE_PX[f.getAttribute('size')] || null;
-      while(f.firstChild) span.appendChild(f.firstChild);
-      f.parentNode.replaceChild(span, f);
+  /** Light the bar up for wherever the caret is. Once per frame, however many transactions. */
+  function neSyncBar(){
+    if(NE.syncQueued) return;
+    NE.syncQueued = true;
+    requestAnimationFrame(function(){
+      NE.syncQueued = false;
+      var ed = NE.editor;
+      if(!ed || ed.isDestroyed) return;
+      document.querySelectorAll('.ne-bar [data-cmd], .ne-bubble [data-cmd]').forEach(function(b){
+        var on = neIsOn(ed, b.dataset.cmd, b);
+        if(on !== null) b.classList.toggle('on', !!on);
+      });
+      var undo = document.querySelector('.ne-bar [data-cmd="undo"]');
+      if(undo) undo.disabled = !ed.can().undo();
+      var redo = document.querySelector('.ne-bar [data-cmd="redo"]');
+      if(redo) redo.disabled = !ed.can().redo();
+      var size = document.getElementById('ne-size');
+      if(size) size.textContent = window.VestaEditor.currentFontSize(ed);
+      var bar = document.querySelector('.ne-bar');
+      if(bar) bar.classList.toggle('in-table', ed.isActive('table'));
+      var a = document.querySelector('.ne-colour-a');
+      if(a) a.style.textDecorationColor = ed.getAttributes('textStyle').color || 'var(--text)';
     });
   }
-  var FONT_SIZE_PX = { '1':'10px','2':'13px','3':'16px','4':'18px','5':'24px','6':'32px','7':'48px' };
 
-  function rteApplyFont(editor, family){
-    editor.focus();
-    try{ document.execCommand('styleWithCSS', false, true); }catch(e){}
-    try{ document.execCommand('fontName', false, family); }catch(e){}
-    rteTidyFontTags(editor);
-    rteChanged(editor);
-  }
-
-  /**
-   * The browser only understands font sizes 1 to 7, which do not map to points.
-   * Apply the largest, then rewrite those exact tags to the size actually asked
-   * for. Size 7 is used as the marker because nothing else in a note uses it.
-   */
-  function rteApplySize(editor, px){
-    editor.focus();
-    try{ document.execCommand('styleWithCSS', false, false); }catch(e){}
-    try{ document.execCommand('fontSize', false, '7'); }catch(e){}
-    editor.querySelectorAll('font[size="7"]').forEach(function(f){
-      var span = document.createElement('span');
-      span.style.fontSize = px + 'px';
-      while(f.firstChild) span.appendChild(f.firstChild);
-      f.parentNode.replaceChild(span, f);
-    });
-    rteTidyFontTags(editor);
-    try{ document.execCommand('styleWithCSS', false, false); }catch(e){}
-    rteChanged(editor);
-  }
-
-  /** Keep the "Normal text" control showing whatever block the caret is inside. */
-  function syncBlockLabel(editor){
-    var label = document.getElementById('rte-block-label');
-    if(!label) return;
-    var node = window.getSelection && window.getSelection().anchorNode;
-    if(!node || !editor.contains(node)){ return; }
-    var el = node.nodeType === 1 ? node : node.parentNode;
-    while(el && el !== editor){
-      var match = RTE_BLOCKS.find(function(b){ return b.tag === el.tagName; });
-      if(match){ label.textContent = match.label; return; }
-      el = el.parentNode;
+  function neRun(cmd, val){
+    var ed = NE.editor;
+    if(!ed || ed.isDestroyed) return;
+    var c = ed.chain().focus();
+    switch(cmd){
+      case 'undo': c.undo().run(); break;
+      case 'redo': c.redo().run(); break;
+      case 'h1': c.toggleHeading({ level:1 }).run(); break;
+      case 'h2': c.toggleHeading({ level:2 }).run(); break;
+      case 'h3': c.toggleHeading({ level:3 }).run(); break;
+      case 'bold': c.toggleBold().run(); break;
+      case 'italic': c.toggleItalic().run(); break;
+      case 'underline': c.toggleUnderline().run(); break;
+      case 'strike': c.toggleStrike().run(); break;
+      case 'code': c.toggleCode().run(); break;
+      case 'mark': c.toggleHighlight({ color:'#FDE68A' }).run(); break;
+      case 'bullet': c.toggleBulletList().run(); break;
+      case 'ordered': c.toggleOrderedList().run(); break;
+      case 'task': c.toggleTaskList().run(); break;
+      case 'quote': c.toggleBlockquote().run(); break;
+      case 'callout': c.toggleCallout('info').run(); break;
+      case 'codeblock': c.toggleCodeBlock().run(); break;
+      case 'table': c.insertTable({ rows:3, cols:3, withHeaderRow:true }).run(); break;
+      case 'row-add': c.addRowAfter().run(); break;
+      case 'col-add': c.addColumnAfter().run(); break;
+      case 'row-del': c.deleteRow().run(); break;
+      case 'col-del': c.deleteColumn().run(); break;
+      case 'table-del': c.deleteTable().run(); break;
+      case 'size-down': window.VestaEditor.stepFontSize(ed, -1); break;
+      case 'size-up': window.VestaEditor.stepFontSize(ed, 1); break;
+      case 'size-reset': c.unsetFontSize().run(); break;
+      case 'color': (val ? c.setColor(val) : c.unsetColor()).run(); break;
+      case 'highlight': (val ? c.setHighlight({ color:val }) : c.unsetHighlight().unsetBackgroundColor()).run(); break;
+      case 'font': (val ? c.setFontFamily(val) : c.unsetFontFamily()).run(); break;
+      case 'clear': c.unsetAllMarks().clearNodes().run(); break;
+      case 'link': case 'math': case 'image': case 'embed': neInsert(cmd); break;
     }
-    label.textContent = 'Normal text';
+    neSyncBar();
   }
 
-  function rteEditorFor(el){
-    var bar = el.closest('.rte-toolbar');
-    return bar ? document.getElementById(bar.dataset.target) : null;
-  }
-  function rteInsert(editor, html){
-    editor.focus();
-    try { document.execCommand('insertHTML', false, html); }
-    catch(e){ editor.insertAdjacentHTML('beforeend', html); }
-    rteChanged(editor);
-  }
-  /** Tell the autosave that the document changed, since execCommand fires no input event reliably. */
-  function rteChanged(editor){
-    editor.dispatchEvent(new Event('input', { bubbles: true }));
-  }
-
-  var RTE_CALLOUT_ICON = { info:'ⓘ', warn:'⚠', good:'✓' };
-
-  function rteInsertCommand(editor, kind, val){
-    if(kind === 'checklist'){
-      rteInsert(editor, '<ul class="rte-check"><li data-done="0">'
-        + '<input type="checkbox" contenteditable="false">'
-        + '<span>&nbsp;</span></li></ul><p><br></p>');
-      return;
-    }
-    if(kind === 'callout'){
-      var tone = val || 'info';
-      rteInsert(editor, '<div class="rte-callout" data-tone="'+tone+'">'
-        + '<span class="rte-callout-ic" contenteditable="false">'+(RTE_CALLOUT_ICON[tone]||'ⓘ')+'</span>'
-        + '<div>Write the callout here</div></div><p><br></p>');
-      return;
-    }
-    if(kind === 'code'){
-      // insertHTML rewrites <pre> into a styled span in Chrome, so turn the
-      // current block into one instead. That is what formatBlock is for, and it
-      // stays on the browser's own undo stack.
-      editor.focus();
-      try{ document.execCommand('formatBlock', false, 'PRE'); }catch(e){}
-      rteChanged(editor);
-      return;
-    }
-    if(kind === 'hr'){
-      rteInsert(editor, '<hr><p><br></p>');
-      return;
-    }
+  /** The blocks that need something from the page first: an address, LaTeX, a file. */
+  function neInsert(kind){
+    var ed = NE.editor;
+    if(!ed || ed.isDestroyed) return;
     if(kind === 'link'){
-      var sel = String(window.getSelection());
-      askForText('Insert a link', { label:'Address', value:'https://', confirmLabel:'Insert' })
-        .then(function(url){
-          if(!url) return;
-          url = rteSafeUrl(url);
-          if(!url){ reportError(new Error('That link is not a web address.')); return; }
-          editor.focus();
-          if(sel){ try{ document.execCommand('createLink', false, url); }catch(e){} rteChanged(editor); }
-          else { rteInsert(editor, '<a href="'+escapeHtml(url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(url)+'</a>&nbsp;'); }
-        });
+      var had = !ed.state.selection.empty;
+      var cur = ed.getAttributes('link').href || '';
+      askForText(cur ? 'Edit link' : 'Insert a link', {
+        label:'Address', value: cur || 'https://', confirmLabel: cur ? 'Save' : 'Insert',
+        message: cur ? 'Clear the address to remove the link.' : ''
+      }).then(function(url){
+        if(url === null){ ed.commands.focus(); return; }
+        url = url.trim();
+        if(!url || url === 'https://'){
+          if(cur) ed.chain().focus().extendMarkRange('link').unsetLink().run();
+          else ed.commands.focus();
+          return;
+        }
+        url = rteSafeUrl(url);
+        if(!url){ reportError(new Error('That link is not a web address.')); return; }
+        if(had || cur) ed.chain().focus().extendMarkRange('link').setLink({ href:url }).run();
+        else ed.chain().focus()
+          .insertContent([{ type:'text', text:url, marks:[{ type:'link', attrs:{ href:url } }] }, { type:'text', text:' ' }])
+          .run();
+      });
       return;
     }
     if(kind === 'image'){
       askForText('Insert an image', { label:'Image address', placeholder:'https://…', confirmLabel:'Insert' })
         .then(function(src){
-          if(!src) return;
+          if(!src){ ed.commands.focus(); return; }
           src = rteSafeUrl(src, true);
           if(!src){ reportError(new Error('That is not an image address I can load.')); return; }
-          rteInsert(editor, '<img src="'+escapeHtml(src)+'" alt=""><p><br></p>');
+          ed.chain().focus().setImage({ src:src }).run();
         });
-      return;
-    }
-    if(kind === 'table'){
-      askForFields('Insert a table', [
-        { id:'cols', label:'Columns', value:'3' },
-        { id:'rows', label:'Rows, not counting the header', value:'3' }
-      ], { confirmLabel:'Insert' }).then(function(v){
-        if(!v) return;
-        var cols = Math.max(1, Math.min(8, Number(v.cols) || 3));
-        var rows = Math.max(1, Math.min(20, Number(v.rows) || 3));
-        var head = '<tr>' + new Array(cols+1).join('<th>Heading</th>') + '</tr>';
-        var body = '';
-        for(var r=0;r<rows;r++){ body += '<tr>' + new Array(cols+1).join('<td><br></td>') + '</tr>'; }
-        rteInsert(editor, '<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table><p><br></p>');
-      });
       return;
     }
     if(kind === 'math'){
       askForText('Insert an equation', { label:'LaTeX',
-        placeholder:'E = mc^2', message:'For example  E = mc^2  or  \\frac{a}{b}',
+        placeholder:'E = mc^2', message:'For example  E = mc^2  or  \\frac{a}{b}. Click it later to change it.',
         confirmLabel:'Insert' }).then(function(tex){
-        if(!tex) return;
-        var block = tex.length > 24;
-        rteInsert(editor, '<span class="rte-math raw'+(block?' block':'')+'" contenteditable="false"'
-          + ' data-tex="'+escapeHtml(tex)+'">'+escapeHtml(tex)+'</span>'+(block?'<p><br></p>':'&nbsp;'));
-        renderMathIn(editor);
+        if(!tex){ ed.commands.focus(); return; }
+        ed.chain().focus().insertMath(tex).run();
       });
       return;
     }
     if(kind === 'embed'){
-      openEmbedFilePicker(editor);
+      openEmbedFilePicker();
       return;
     }
+  }
+
+  function neRenderMath(el){
+    ensureKatex().then(function(ok){
+      if(!ok || !el.isConnected) return;
+      try{
+        window.katex.render(el.getAttribute('data-tex'), el, {
+          throwOnError:false, displayMode: el.classList.contains('block')
+        });
+        el.classList.remove('raw');
+      }catch(err){ /* leave the LaTeX showing */ }
+    });
+  }
+  function neEditMath(tex, done){
+    askForText('Edit equation', { label:'LaTeX', value:tex,
+      message:'Clear it to remove the equation.', confirmLabel:'Save' })
+      .then(function(v){ done(v); });
+  }
+
+  /** Called at the start of renderView: remember whether the writing had the caret. */
+  function neBeforeRender(){
+    if(NE.editor && !NE.editor.isDestroyed && NE.editor.isFocused) NE.refocus = true;
+  }
+
+  /** Called at the end of renderView: put the editor into the page's host, or retire it. */
+  function neMount(){
+    var host = document.getElementById('nt-body-host');
+    if(!host){ neDestroy(); return; }
+    var id = host.dataset.noteId;
+    var n = allNotes().find(function(x){ return x.id === id; });
+    if(!window.VestaEditor){
+      // The bundle failed to load. Show the note rather than a blank page.
+      host.innerHTML = '<div class="hint">The editor did not load, so this note is read-only. Reload the page to try again.</div>'
+        + '<div class="rte-content nt-body">'+((n && n.text) || '')+'</div>';
+      return;
+    }
+    if(NE.editor && !NE.editor.isDestroyed && NE.noteId === id){
+      host.appendChild(NE.wrap);
+      if(NE.refocus) NE.editor.commands.focus(null, { scrollIntoView:false });
+      NE.refocus = false;
+      neSyncBar();
+      return;
+    }
+    neDestroy();
+    NE.noteId = id;
+    NE.wrap = document.createElement('div');
+    NE.wrap.className = 'nt-body-wrap';
+    host.appendChild(NE.wrap);
+    NE.bubble = neBubbleEl();
+    NE.editor = window.VestaEditor.create({
+      element: NE.wrap,
+      content: (n && n.text) || '',
+      attributes: { id:'nt-body', class:'rte-editor nt-body', 'data-note-id': id,
+                    spellcheck: PREFS && PREFS.editorSpellcheck ? 'true' : 'false' },
+      bubble: NE.bubble,
+      bubbleOn: function(){ return !neBarHidden; },
+      onInsert: neInsert,
+      renderMath: neRenderMath,
+      onEditMath: neEditMath
+    });
+    NE.editor.on('update', function(p){
+      queueNoteSave(id, { text: p.editor.getHTML() });
+    });
+    NE.editor.on('transaction', neSyncBar);
+    neSyncBar();
+  }
+
+  function neDestroy(){
+    if(NE.editor && !NE.editor.isDestroyed){
+      try{ NE.editor.destroy(); }catch(e){}
+    }
+    if(NE.bubble && NE.bubble.parentNode) NE.bubble.parentNode.removeChild(NE.bubble);
+    if(NE.wrap && NE.wrap.parentNode) NE.wrap.parentNode.removeChild(NE.wrap);
+    NE.editor = null; NE.noteId = null; NE.wrap = null; NE.bubble = null; NE.refocus = false;
+  }
+
+  /** What the open note says right now, or null when no note is open. */
+  function neLiveHtml(){
+    return NE.editor && !NE.editor.isDestroyed ? NE.editor.getHTML() : null;
+  }
+
+  /**
+   * Hide or show the bar in place, without a redraw, so the caret stays where it is.
+   * Hidden means only the keyboard: the bubble over selected text goes too.
+   */
+  function neToggleBar(){
+    neBarHidden = !neBarHidden;
+    try{ localStorage.setItem('vesta.noteBarHidden', neBarHidden ? '1' : '0'); }catch(e){}
+    document.querySelectorAll('.nt-editor').forEach(function(el){ el.classList.toggle('ne-hidden', neBarHidden); });
+    if(neBarHidden && NE.bubble){ NE.bubble.style.visibility = 'hidden'; NE.bubble.style.opacity = '0'; }
+    closeNePops();
+    if(NE.editor && !NE.editor.isDestroyed) NE.editor.commands.focus(null, { scrollIntoView:false });
+  }
+
+  function closeNePops(){
+    document.querySelectorAll('.ne-dd.open').forEach(function(el){ el.classList.remove('open'); });
   }
 
   // ---- equations -------------------------------------------------------
@@ -9642,27 +9630,10 @@
     });
   }
 
-  /**
-   * What actually gets stored for a note.
-   *
-   * Rendered equations are hundreds of elements of KaTeX markup. Only the LaTeX
-   * is worth keeping, so it is put back before saving. The note stays small and
-   * re-renders identically next time.
-   */
-  function noteHtmlForSave(editor){
-    var clone = editor.cloneNode(true);
-    Array.prototype.forEach.call(clone.querySelectorAll('.rte-math[data-tex]'), function(el){
-      el.textContent = el.getAttribute('data-tex');
-      el.className = 'rte-math raw' + (el.classList.contains('block') ? ' block' : '');
-    });
-    return clone.innerHTML;
-  }
-
   // ---- embedding a file in a note ---------------------------------------
   // The embed is a reference, never a copy: one file on disk, named from as many
   // notes as you like. The picker reaches every class because a note about an essay
   // routinely wants a rubric or reading that lives somewhere else.
-  var embedTargetEditorId = null;
   var embedPickerSearch = '';
 
   function embedPickerRowsHtml(){
@@ -9694,8 +9665,7 @@
     }).join('');
   }
 
-  function openEmbedFilePicker(editor){
-    if(editor) embedTargetEditorId = editor.id;
+  function openEmbedFilePicker(){
     embedPickerSearch = '';
     document.getElementById('modal-root').innerHTML =
       '<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop">'
@@ -9714,17 +9684,14 @@
   }
 
   function rteEmbedFile(materialId){
-    var editor = embedTargetEditorId ? document.getElementById(embedTargetEditorId) : null;
+    var ed = NE.editor;
     var m = allMaterials().find(function(x){ return x.id === materialId; });
-    if(!editor || !m) return;
+    if(!ed || ed.isDestroyed || !m) return;
     var name = m.filename || m.title || 'File';
     closeModal();
     // No href: clicking opens Vesta's own preview rather than leaving the app.
-    rteInsert(editor, '<a class="rte-embed" contenteditable="false" href="#"'
-      + ' data-action="preview-file" data-id="'+escapeHtml(m.id)+'"'
-      + ' data-file-id="'+escapeHtml(m.fileId||m.id)+'">'
-      + '<span class="file-ic" style="background:'+fileTypeColor(name)+';">'+fileTypeInitials(name)+'</span>'
-      + '<span>'+escapeHtml(m.title || name)+'</span></a><p><br></p>');
+    ed.chain().focus().insertFileEmbed({ id: m.id, fileId: m.fileId || m.id, title: m.title || name,
+      color: fileTypeColor(name), initials: fileTypeInitials(name) }).run();
     // Record the connection properly as well, not just as markup in the body, so
     // the file shows under "What this note is about" and survives an edit that
     // deletes the chip. Both backends, not just the cloud one.
@@ -9744,11 +9711,6 @@
     if(imageOk && /^data:image\//i.test(url)) return url;
     if(/^[a-z][a-z0-9+.-]*:/i.test(url)) return null;   // some other scheme, refuse it
     return 'https://' + url;
-  }
-
-  function rteBlockHtml(editorId, initialHtml, placeholder){
-    return rteToolbarHtml(editorId)
-      + '<div class="rte-editor" id="'+editorId+'" contenteditable="true" data-placeholder="'+escapeHtml(placeholder||'')+'">'+(initialHtml||'')+'</div>';
   }
 
   // ---------------- Notes workspace ----------------
@@ -9987,18 +9949,20 @@
       + '<button type="button" class="btn" data-action="note-fullscreen" title="'
         + (notesFullscreen ? 'Leave full screen (Esc)' : 'Write full screen') + '">'
         + (notesFullscreen ? '⤡' : '⤢') + '</button>'
+      + '<button type="button" class="btn ne-show-btn ne-keepfocus" data-action="ne-bar-toggle"'
+        + ' title="Show the toolbar  ('+NE_MOD+'Shift+.)">Show toolbar</button>'
       + (notesFullscreen
           ? '<button type="button" class="btn" data-action="note-zen">'
             + (notesZen ? 'Show list' : 'Hide list') + '</button>'
           : '')
       + '</div></div>'
-      + rteToolbarHtml('nt-body', { classId: c.id })
+      + neBarHtml()
       + '<input type="text" class="nt-title" id="nt-title" data-id="'+n.id+'" placeholder="Untitled note" value="'+escapeHtml(n.title||'')+'">'
       + '<div class="nt-meta">'+escapeHtml(c.code||c.name||'')+'  |  '+(n.updatedAt?fmtDate(n.updatedAt.slice(0,10)):'')
       + (linked ? ' · linked to <span class="class-chip" style="--c:'+c.color+'">'+escapeHtml(linked.title)+'</span>' : '')+'</div>'
       + '<hr class="nt-title-rule">'
       + '<div id="nt-suggest" class="nt-suggest" data-note="'+n.id+'">'+noteSuggestHtml(n.id)+'</div>'
-      + '<div class="rte-editor nt-body" id="nt-body" contenteditable="true" data-note-id="'+n.id+'" data-placeholder="Start writing…">'+(n.text||'')+'</div>';
+      + '<div class="nt-body-host" id="nt-body-host" data-note-id="'+n.id+'"></div>';
   }
 
   var notesSearch = '';
@@ -10312,7 +10276,7 @@
       + '<div class="nt-wrap'+(opts.withSwitcher?' with-ctx':'')+fsClass+'">'
       + (notesFullscreen && notesZen ? '' : switcher)
       + '<div class="nt-tree">'+noteTreeHtml(c)+'</div>'
-      + '<div class="nt-editor">'+noteEditorHtml(c)+'</div>'
+      + '<div class="nt-editor'+(neBarHidden ? ' ne-hidden' : '')+'">'+noteEditorHtml(c)+'</div>'
       + '</div>';
   }
 
@@ -17145,7 +17109,6 @@
       queueNoteSave(e.target.dataset.id, { title: e.target.value });
       return;
     }
-    if(e.target.id==='nt-body'){ queueNoteSave(e.target.dataset.noteId, { text: noteHtmlForSave(e.target) }); return; }
     if(e.target.id==='search-input'){ renderSearchResults(e.target.value); return; }
     if(e.target.id==='an-search'){ attachNoteSearch = e.target.value; refreshAttachNoteList(); return; }
     if(e.target.id==='nt-all-search'){
@@ -17339,26 +17302,9 @@
   // Pressing a toolbar button must not move focus out of the editor, or the
   // selection the command is meant to act on is gone before it runs.
   document.addEventListener('mousedown', function(e){
-    if(e.target.closest && e.target.closest('.rte-toolbar')) e.preventDefault();
-    else closeRteMenus();
-  });
-
-  // the paragraph-style control should follow the caret
-  document.addEventListener('selectionchange', function(){
-    var ed = document.getElementById('nt-body');
-    if(ed) syncBlockLabel(ed);
-  });
-
-  // Checklists: reflect the tick into the HTML, because a checkbox's checked
-  // property does not survive innerHTML, only the attribute does.
-  document.addEventListener('change', function(e){
-    var box = e.target;
-    if(!box.matches || !box.matches('.rte-check input[type="checkbox"]')) return;
-    var li = box.closest('li');
-    if(box.checked){ box.setAttribute('checked',''); if(li) li.setAttribute('data-done','1'); }
-    else { box.removeAttribute('checked'); if(li) li.setAttribute('data-done','0'); }
-    var host = box.closest('.rte-editor');
-    if(host) rteChanged(host);
+    var keep = e.target.closest && e.target.closest('.ne-bar, .ne-bubble, .ne-keepfocus');
+    if(keep) e.preventDefault();
+    if(!(e.target.closest && e.target.closest('.ne-dd'))) closeNePops();
   });
 
   /**
@@ -17442,23 +17388,19 @@
       render(); return;
     }
     if(action==='set-theme'){ setTheme(t.dataset.themeChoice); return; }
-    if(action==='rte-cmd'){
-      var rteEditor = rteEditorFor(t);
-      if(rteEditor){
-        rteEditor.focus();
-        // Colour commands emit a deprecated <font color> tag unless the browser is
-        // told to use CSS. Bold and italic are left alone, because <b> and <i> are
-        // the right markup and turning this on would make them spans instead.
-        var wantsCss = t.dataset.cmd === 'foreColor' || t.dataset.cmd === 'hiliteColor';
-        try{ document.execCommand('styleWithCSS', false, wantsCss); }catch(e){}
-        try{ document.execCommand(t.dataset.cmd, false, t.dataset.val || null); }catch(e){}
-        try{ document.execCommand('styleWithCSS', false, false); }catch(e){}
-        rteTidyFontTags(rteEditor);
-        rteChanged(rteEditor);
-      }
-      closeRteMenus();
+    if(action==='ne'){
+      if(!t.closest('.ne-pop')) closeNePops();
+      neRun(t.dataset.cmd, t.dataset.val);
       return;
     }
+    if(action==='ne-pop'){
+      var dd = t.closest('.ne-dd');
+      var wasOpen = dd.classList.contains('open');
+      closeNePops();
+      if(!wasOpen) dd.classList.add('open');
+      return;
+    }
+    if(action==='ne-bar-toggle'){ neToggleBar(); return; }
     if(action==='note-fullscreen'){
       notesFullscreen = !notesFullscreen;
       if(!notesFullscreen) notesZen = false;
@@ -17467,43 +17409,6 @@
     }
     if(action==='note-zen'){ notesZen = !notesZen; render(); return; }
     if(action==='rte-embed-pick'){ rteEmbedFile(t.dataset.mid); return; }
-    if(action==='rte-ins'){
-      var insEditor = rteEditorFor(t);
-      closeRteMenus();
-      if(insEditor) rteInsertCommand(insEditor, t.dataset.ins, t.dataset.val);
-      return;
-    }
-    if(action==='rte-dd'){
-      e.stopPropagation();
-      var dd = t.closest('.rte-dd');
-      var wasOpen = dd.classList.contains('open');
-      closeRteMenus();
-      if(!wasOpen) dd.classList.add('open');
-      return;
-    }
-    if(action==='rte-block'){
-      var blockEditor = rteEditorFor(t);
-      closeRteMenus();
-      if(blockEditor){
-        blockEditor.focus();
-        try{ document.execCommand('formatBlock', false, t.dataset.val); }catch(err){}
-        rteChanged(blockEditor);
-        syncBlockLabel(blockEditor);
-      }
-      return;
-    }
-    if(action==='rte-font'){
-      var fontEditor = rteEditorFor(t);
-      closeRteMenus();
-      if(fontEditor) rteApplyFont(fontEditor, t.dataset.val);
-      return;
-    }
-    if(action==='rte-size'){
-      var sizeEditor = rteEditorFor(t);
-      closeRteMenus();
-      if(sizeEditor) rteApplySize(fontOrSize(sizeEditor), Number(t.dataset.val));
-      return;
-    }
     if(action==='open-scale-editor'){ openScaleEditorModal(t.dataset.class); return; }
     if(action==='open-categories-editor'){ openCategoriesEditorModal(t.dataset.class); return; }
     if(action==='inline-edit'){ e.stopPropagation(); startInlineEdit(t); return; }
@@ -19290,35 +19195,12 @@
     }
     if(learnHandleKey(e)) return;
     if(fcHandleKey(e)) return;
-    // Formatting shortcuts, applied by hand rather than left to the browser: the
-    // browser's own are inconsistent across Chrome and Safari, they do not tell the
-    // autosave anything changed, and strikethrough and lists have no shortcut at all.
-    if((e.metaKey || e.ctrlKey) && !e.altKey && e.key && e.key.length === 1){
-      var shEd = e.target.closest && e.target.closest('.rte-editor');
-      var shKey = e.key.toLowerCase();
-      var shCmd = null;
-      if(!e.shiftKey && shKey === 'b') shCmd = 'bold';
-      else if(!e.shiftKey && shKey === 'i') shCmd = 'italic';
-      else if(!e.shiftKey && shKey === 'u') shCmd = 'underline';
-      else if(e.shiftKey && (shKey === 'x' || shKey === 's')) shCmd = 'strikeThrough';
-      else if(e.shiftKey && (shKey === '8' || shKey === '*')) shCmd = 'insertUnorderedList';
-      else if(e.shiftKey && (shKey === '7' || shKey === '&')) shCmd = 'insertOrderedList';
-      if(shEd && shCmd){
-        e.preventDefault();
-        try{ document.execCommand('styleWithCSS', false, false); }catch(err){}
-        try{ document.execCommand(shCmd); }catch(err){}
-        rteChanged(shEd);
-        syncBlockLabel(shEd);
-        return;
-      }
-    }
-    if(e.key === ' ' && !e.metaKey && !e.ctrlKey && !e.altKey){
-      var spEd = e.target.closest && e.target.closest('.rte-editor');
-      if(spEd && rteApplyMarker(spEd, e)) return;
-    }
-    if(e.key === 'Tab'){
-      var ed = e.target.closest && e.target.closest('.rte-editor');
-      if(ed){ rteHandleTab(e, ed); return; }
+    // The editor answers its own keys (formatting, lists, the / menu) and marks them
+    // handled. Cmd+K there is a link, not search, and Escape closes the / menu.
+    if(e.defaultPrevented && e.target && e.target.closest && e.target.closest('.rte-editor')) return;
+    // Hide or show the notes toolbar from the keyboard, since hidden leaves no button.
+    if((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === 'Period' && NE.editor){
+      e.preventDefault(); neToggleBar(); return;
     }
     // Enter on the assignment title saves, the way a one-field form would.
     if(e.key==='Enter' && e.target && e.target.id==='f-title'){

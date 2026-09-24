@@ -3,7 +3,7 @@
 A running list so nothing is lost between sessions. **needs Saif** means it cannot be
 done from a terminal: a dashboard login, an email click, or a decision that is his.
 
-_Last updated: 2026-09-21. Rewritten from scratch: the old file had grown to 1,228
+_Last updated: 2026-09-24. Rewritten on 2026-09-21 from scratch: the old file had grown to 1,228
 lines, most of it a record of work already finished, and 72 open boxes of which about
 ten were stale. What follows is what is actually open, and the history worth keeping._
 
@@ -15,6 +15,24 @@ channels are alive.
 ---
 
 ## Open now
+
+### Left open from the notes editor rewrite (2026-09-24)
+
+- [ ] **needs Saif** — Write a real note on vesta.study with the new editor: a `/`
+      menu block or two, a size change, undo after going full screen, Hide and
+      cmd+shift+. to bring the bar back. All 42 checks ran against a local copy.
+- [ ] **Dragging blocks around, the way Notion's ⋮⋮ handle does, is not built.**
+      TipTap's drag-handle extension requires its collaboration packages (Yjs), which
+      Vesta does not use. A small handle of our own is the likely route if it is
+      wanted.
+- [ ] **On a phone the bar wraps to three rows.** It works and the page does not
+      scroll sideways, but it takes a lot of the screen. Hiding it (the icon at its
+      right end) is the current answer.
+- [ ] **`reference/speed/test_eager_reload.py` fails two checks**: a new assignment is
+      not on screen before the server answers. It fails identically on the page from
+      before the editor change, so it is not the editor. Not investigated; it may be
+      the test's data (the Assignments list filtering out an undated item) rather
+      than a regression.
 
 ### Before friends lean on it
 
@@ -159,6 +177,59 @@ channels are alive.
 - **Two-factor sign-in and a profile photo.** Saif said Settings is good as it is.
 - **Categorising assignments added by a later syllabus document.** Saif does not need
   them categorised.
+
+---
+
+## Built on 2026-09-24
+
+### The notes editor is TipTap now
+
+Saif: *"sizing doesn't work, undo doesn't work, the entire bar is weird to use,
+integrate notion / options to make life easier, add an option to make the bar itself
+go away so i can write on a blank page."* He chose Notion-style editing over importing
+Notion pages, and TipTap over patching the old editor.
+
+Both bugs came from the browser's own editing commands (`execCommand`), which the
+first editor was built on. Font size could only be applied as `<font size="7">` and
+rewritten afterwards, so with nothing selected there was nothing to rewrite, and the
+next thing typed came out at 48px. Undo was the browser's history, which never saw the
+edits made by hand (sizes, the tidying of `<font>` tags, the typed markers), and every
+redraw of the page rebuilt the note from HTML and threw the history away.
+
+- **The editor** is TipTap 3, bundled from `editor/src/index.js` into
+  `static/editor.js` (see the README). Every change goes through one history, and a
+  size picked before typing is a stored mark, so it applies to what is typed next.
+- **It survives redraws.** The page renders an empty `#nt-body-host`; `neMount()` in
+  `renderView` moves the same editor into it, so undo, the caret and the selection
+  outlive full screen, Hide list, menus and background syncs. A different note gets a
+  fresh editor. The editable element keeps `id="nt-body"` and `.rte-editor`, so the
+  held-redraw and live-sync checks work unchanged.
+- **The bar** is one row with everything visible: undo and redo, three headings,
+  bold, italic, underline, strikethrough, link, a size stepper showing the real size at
+  the caret (click the number to reset), lists, to-do, quote, table, equation, image,
+  file. Only colour, highlight and font (Sans, Serif, Mono) share a menu. Table
+  controls appear only with the caret in a table. The old bar hid style, font, size,
+  lists and every insert behind dropdowns.
+- **Notion-style:** a `/` menu for every block (filter by typing, arrows and Enter,
+  Escape to close), a small bar over selected text, markdown as you type (`# `, `- `,
+  `1. `, `[] `, `> `, ` ``` `, `---`), and "Press / for blocks" on an empty line.
+  cmd+K is a link inside a note, and search everywhere else.
+- **Hide** (the icon at the bar's right, or cmd+shift+.) removes the bar and the
+  selection bubble, so only the keyboard is left; "Show toolbar" appears in the
+  note's header. Remembered per browser. With full screen and Hide list it is a blank
+  page.
+- **Old notes load unchanged** and save back in the same markup: `ul.rte-check`
+  checklists (ticks kept), `div.rte-callout`, `span.rte-math[data-tex]`, `a.rte-embed`
+  file chips, and old `<font>` tags become sized spans. The preview and the HTML export
+  style these classes, so nothing else needed to change.
+- **Fixed on the way:** the note title sat at the far left in full screen (it was
+  an inline input, so the centring never applied), and file chips took the link style.
+
+Checked by `reference/speed/test_notes_editor.py`: 42 checks, each named after a
+complaint, including undo across a redraw, size before and after typing, the bubble's
+position over the selection, the bar fitting one row at 1440 wide, and an old note
+with every block type round-tripping through a save. The other browser harnesses
+(`test_instant`, `test_bugfixes`, `test_phone`) and the 347 Python tests pass.
 
 ---
 
@@ -587,7 +658,8 @@ the runtime that serves it.
 ### Testing in a browser
 
 `reference/speed/` holds the harnesses: `test_instant.py` (edits paint before the
-server answers), `test_bugfixes.py`, `test_learn.py`, `test_phone.py`, and
+server answers), `test_notes_editor.py` (the editor, against every complaint about
+it), `test_bugfixes.py`, `test_learn.py`, `test_phone.py`, and
 `stub_stream.py`, which runs Vesta with a model that streams canned text so "does it
 appear as it is written" is answerable without spending anything. Any test that clicks
 inside a scrolling container has to pick an element already on screen: clicking one
