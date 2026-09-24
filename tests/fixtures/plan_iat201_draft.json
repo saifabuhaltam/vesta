@@ -1,0 +1,440 @@
+{
+ "sourceKey": "x",
+ "sourceTitle": "iat-201-course-progression-map-pd-September-7-2026.docx",
+ "readAt": "2026-09-24T20:17:56.009390",
+ "costUsd": 0.0633,
+ "items": [
+  {
+   "id": "d1",
+   "day": "2026-09-09",
+   "kind": "reading",
+   "title": "Read the syllabus and skim The HCI Broker (V8)",
+   "detail": "No assigned reading for lecture this week.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d0",
+   "day": "2026-09-09",
+   "kind": "start",
+   "title": "Start your work for the term",
+   "detail": "Studies start today and so does your work on the Design Reflection and Introduction.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d2",
+   "day": "2026-09-09",
+   "kind": "work",
+   "title": "Prepare the Design Reflection and Introduction",
+   "detail": "Draft answers to six questions, 1-2 pages, ready to present 16 Sep.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d3",
+   "day": "2026-09-09",
+   "kind": "topic",
+   "title": "Introduction",
+   "detail": "Lenses of Design: what cognition has to do with design.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d4",
+   "day": "2026-09-16",
+   "kind": "reading",
+   "title": "Read Noba: Why Science?, and History of Psychology",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d5",
+   "day": "2026-09-16",
+   "kind": "assignment",
+   "title": "Design Reflection and Introduction",
+   "detail": "Presented in section and submitted on Canvas; 5 points, individual.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d7",
+   "day": "2026-09-16",
+   "kind": "topic",
+   "title": "Cognition in HCI: Science & Design",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d6",
+   "day": "2026-09-23",
+   "kind": "reading",
+   "title": "Read Johnson ch. 1-3",
+   "detail": "Assigned in week 2 for the following week's section.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d8",
+   "day": "2026-09-23",
+   "kind": "reading",
+   "title": "Read Designing with the Mind in Mind, ch. 1-3",
+   "detail": "Also required for Assignment 1.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d9",
+   "day": "2026-09-23",
+   "kind": "topic",
+   "title": "Cognitive Neuroscience of Perception",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d11",
+   "day": "2026-09-30",
+   "kind": "reading",
+   "title": "Read Noba: Sensation and Perception, and Vision",
+   "detail": "Both required for Assignment 1.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d10",
+   "day": "2026-09-30",
+   "kind": "note",
+   "title": "No section \u2014 National Day for Truth and Reconciliation",
+   "detail": "University closed; lecture still posted and Muddy Points still due.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d12",
+   "day": "2026-09-30",
+   "kind": "topic",
+   "title": "Vision & Colour",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d13",
+   "day": "2026-10-04",
+   "kind": "start",
+   "title": "Start studying for Quiz 1",
+   "detail": "Ten days out; book two short study sessions.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d14",
+   "day": "2026-10-06",
+   "kind": "start",
+   "title": "Start the first draft of Assignment 1",
+   "detail": "Get a rough DeDe in front of your team ten days out.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d15",
+   "day": "2026-10-07",
+   "kind": "reading",
+   "title": "Read Noba: Attention, and Failures of Awareness",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d16",
+   "day": "2026-10-07",
+   "kind": "topic",
+   "title": "Visual Attention",
+   "detail": "Double review session covering weeks 3 and 4.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d17",
+   "day": "2026-10-14",
+   "kind": "reading",
+   "title": "Read Noba: Factors Influencing Learning, and Memory",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d18",
+   "day": "2026-10-14",
+   "kind": "quiz",
+   "title": "Quiz 1 \u2014 Design and the Brain",
+   "detail": "Written in section; covers weeks 1-6; 15 points, individual.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d20",
+   "day": "2026-10-14",
+   "kind": "start",
+   "title": "Visit the video game archive and choose your game",
+   "detail": "Between 14 and 28 October, visit Fraser Library archive and post game choice by 28 Oct.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d19",
+   "day": "2026-10-14",
+   "kind": "topic",
+   "title": "Working Memory",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d21",
+   "day": "2026-10-16",
+   "kind": "assignment",
+   "title": "Assignment 1 \u2014 A Grey Day: Usability and the Lack of Colour",
+   "detail": "Team submission, 10 points; comments happen 21 October.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d22",
+   "day": "2026-10-21",
+   "kind": "reading",
+   "title": "Read Noba: Thinking and Intelligence",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d24",
+   "day": "2026-10-21",
+   "kind": "reading",
+   "title": "Read Johnson ch. 9-10 and Norman's chapter",
+   "detail": "For next week, setting up Assignment 2.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d23",
+   "day": "2026-10-21",
+   "kind": "work",
+   "title": "Submit Assignment 1 peer feedback form",
+   "detail": "Comment on assigned teams' Assignment 1 reports in section.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d25",
+   "day": "2026-10-21",
+   "kind": "topic",
+   "title": "Intelligence, Knowledge & Affordances",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d26",
+   "day": "2026-10-28",
+   "kind": "reading",
+   "title": "Read Norman, The Psychopathology of Everyday Things",
+   "detail": "For Assignment 2; no new lecture reading.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d27",
+   "day": "2026-10-28",
+   "kind": "topic",
+   "title": "Expertise, Smart-seeing & Projecting",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d28",
+   "day": "2026-11-04",
+   "kind": "reading",
+   "title": "Read Designing with the Mind in Mind, ch. 13-14",
+   "detail": "Hand-eye coordination and time requirements.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d29",
+   "day": "2026-11-04",
+   "kind": "topic",
+   "title": "Close-coupling",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d30",
+   "day": "2026-11-08",
+   "kind": "start",
+   "title": "Start studying for Quiz 2",
+   "detail": "Ten days out; no section on 11 November to help.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d31",
+   "day": "2026-11-10",
+   "kind": "start",
+   "title": "Start the first draft of Assignment 2",
+   "detail": "Ten days out.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d33",
+   "day": "2026-11-11",
+   "kind": "reading",
+   "title": "Read Noba: Psychology of Groups, and Cognition and Theory of Mind",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d32",
+   "day": "2026-11-11",
+   "kind": "note",
+   "title": "No section \u2014 Remembrance Day",
+   "detail": "University closed; lecture and Muddy Points still due, section moves to 18 Nov.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d34",
+   "day": "2026-11-11",
+   "kind": "topic",
+   "title": "Socially Distributed Cognition",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d35",
+   "day": "2026-11-18",
+   "kind": "quiz",
+   "title": "Quiz 2 \u2014 Design and the Mind",
+   "detail": "Written in section; covers weeks 7-10; 15 points, individual.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d36",
+   "day": "2026-11-18",
+   "kind": "topic",
+   "title": "Socially Distributed Cognition & AI",
+   "detail": "",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d37",
+   "day": "2026-11-20",
+   "kind": "assignment",
+   "title": "Assignment 2 \u2014 A Visual Language for Humans",
+   "detail": "Team submission, 10 points; comments happen 25 November.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d38",
+   "day": "2026-11-24",
+   "kind": "start",
+   "title": "Progress on Assignment 3A",
+   "detail": "Draft should be ready to show at the Showcase on 2 December.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d39",
+   "day": "2026-11-25",
+   "kind": "work",
+   "title": "Submit Assignment 2 peer feedback form",
+   "detail": "Comment on assigned teams' Assignment 2 reports in section.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d40",
+   "day": "2026-11-25",
+   "kind": "topic",
+   "title": "Socially Distributed Cognition & AI",
+   "detail": "Comment period in section.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d41",
+   "day": "2026-12-02",
+   "kind": "work",
+   "title": "Games Showcase \u2014 last section of the term",
+   "detail": "Show game and draft DeDe; write peer feedback on Assignment 3A form.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d42",
+   "day": "2026-12-02",
+   "kind": "topic",
+   "title": "Review",
+   "detail": "Revisit your own Muddy Points posts.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d43",
+   "day": "2026-12-07",
+   "kind": "assignment",
+   "title": "Assignment 3A \u2014 Games for Thinking",
+   "detail": "Team submission, 10 points, due Monday 7 December.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d44",
+   "day": "2026-12-07",
+   "kind": "start",
+   "title": "Start studying for Quiz 3",
+   "detail": "Covers weeks 11-13; open on Canvas, closes Friday.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d45",
+   "day": "2026-12-11",
+   "kind": "quiz",
+   "title": "Quiz 3 \u2014 Design and Distributed Cognition",
+   "detail": "Written on Canvas, closes Friday 11 December; 15 points, individual.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d46",
+   "day": "2026-12-11",
+   "kind": "start",
+   "title": "Start Assignment 3B, your Design Manifesto",
+   "detail": "Three days out; draft an answer to at least one of the five questions.",
+   "unsure": false,
+   "include": true
+  },
+  {
+   "id": "d47",
+   "day": "2026-12-14",
+   "kind": "assignment",
+   "title": "Assignment 3B \u2014 Design Manifesto and Portfolio",
+   "detail": "Individual submission, 10 points, due Monday 14 December.",
+   "unsure": false,
+   "include": true
+  }
+ ]
+}

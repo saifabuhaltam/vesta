@@ -409,3 +409,53 @@ revoke all on calendar_channels from anon;
 alter table materials add column if not exists "import_key" text;
 
 create index if not exists materials_by_import_key on materials("import_key");
+
+
+-- migration: 011_week_marks
+-- This Week's ticks (week.py). The rows of a week are computed from the Canvas
+-- snapshots on every request, so only the tick is stored, keyed by where the row came
+-- from: `canvas:<course>:mi:<module item>` or `cue:<item id>`. The key is the same for
+-- two students in the same course, so it is unique per account, not outright.
+-- Partner of the `week_marks` table in db.SCHEMA, added the same day.
+
+create table if not exists week_marks (
+  "key"          text not null,
+  "class_id"     text references classes(id) on delete cascade,
+  "done"         integer default 0,
+  "as_task"      integer,
+  "updated_at"   text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  primary key (user_id, "key")
+);
+create index if not exists week_marks_user_idx on week_marks(user_id);
+
+select apply_owner_rls('week_marks');
+
+grant select, insert, update, delete on week_marks to authenticated;
+revoke all on week_marks from anon;
+
+
+-- migration: 012_week_plan_items
+-- A course's own week-by-week plan, read from a document by AI and approved row by row
+-- (week_plan.py). A class with rows here takes its This Week to-dos from them rather
+-- than from its Canvas modules. Partner of `week_plan_items` in db.SCHEMA.
+
+create table if not exists week_plan_items (
+  "id"           text primary key,
+  "class_id"     text not null references classes(id) on delete cascade,
+  "day"          text not null,
+  "kind"         text,
+  "title"        text,
+  "detail"       text,
+  "source"       text,
+  "sort_order"   integer default 0,
+  "created_at"   text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade
+);
+create index if not exists week_plan_items_user_idx on week_plan_items(user_id);
+create index if not exists week_plan_items_by_class on week_plan_items("class_id");
+
+select apply_owner_rls('week_plan_items');
+
+grant select, insert, update, delete on week_plan_items to authenticated;
+revoke all on week_plan_items from anon;

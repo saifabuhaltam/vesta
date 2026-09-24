@@ -87,6 +87,13 @@ import canvas_sync  # noqa: E402
 app.register_blueprint(canvas_sync.bp)
 # Background checks run with no app context, so the text reader is handed over here.
 canvas_sync.READ_TEXT = lambda mid, user_id=None: read_canvas_text(mid, user_id=user_id)
+# This Week: the checklist built from Canvas modules, assignments and START cues.
+import week  # noqa: E402
+app.register_blueprint(week.bp)
+import week_plan  # noqa: E402
+app.register_blueprint(week_plan.bp)
+# Schedules are found and read after every Canvas check, outside any request.
+week_plan.EXTRACT_TEXT = lambda path, name: extract_text(path, name)
 # Accounts, and the gate in front of every /api route. Entirely a no-op locally,
 # where no Supabase is configured: Vesta stays the single-user tool it started as.
 import auth as vesta_auth  # noqa: E402

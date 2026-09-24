@@ -145,7 +145,10 @@ def test_a_check_stores_a_snapshot_and_nothing_else(conn, class_id, monkeypatch)
                  "due_at": "2026-09-16T18:20:00Z"},
                 {"id": 101, "name": "Quiz 02", "points_possible": 10, "published": True}]}]
 
-        def course_files(self, cid, known=None):
+        def modules(self, cid):
+            return []
+
+        def course_files(self, cid, known=None, modules=None):
             return [cfile()]
 
     monkeypatch.setattr(canvas, "Client", FakeClient)
@@ -197,7 +200,10 @@ def test_a_check_does_not_overwrite_a_snooze_made_while_it_ran(conn, class_id, m
         def assignment_groups(self, cid):
             return []
 
-        def course_files(self, cid, known=None):
+        def modules(self, cid):
+            return []
+
+        def course_files(self, cid, known=None, modules=None):
             return []
 
     monkeypatch.setattr(canvas, "Client", SlowClient)

@@ -3110,6 +3110,110 @@
   }
 
 
+
+  /* ---------- This Week ---------- */
+  .wk-nav{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .wk-summary{ display:flex; align-items:center; gap:16px; margin-bottom:18px; flex-wrap:wrap; }
+  .wk-summary .wk-count{ font-size:14px; font-weight:600; }
+  .wk-summary .wk-count b{ font-size:22px; font-weight:800; margin-right:2px; }
+  .wk-bar{ flex:1; min-width:160px; height:10px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; }
+  .wk-bar > span{ display:block; height:100%; border-radius:inherit; background:var(--success); transition:width .25s ease; }
+  .wk-pills{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+  .wk-pill{ display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:var(--r-pill);
+    border:1px solid var(--border); background:var(--surface); font-size:12.5px; font-weight:600; cursor:pointer;
+    box-shadow:var(--shadow-card); color:var(--text); }
+  .wk-pill .wk-pill-n{ color:var(--text-muted); font-weight:500; }
+  .wk-pill.all-done .wk-pill-n{ color:var(--success); font-weight:700; }
+  .wk-banner{ display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:var(--r-card);
+    background:var(--accent-soft); color:var(--text); margin-bottom:18px; font-size:13px; flex-wrap:wrap; }
+  .wk-banner > div{ flex:1; min-width:200px; }
+  .wk-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(380px, 100%), 1fr)); gap:16px; align-items:start; }
+  .wk-grid > *, .wk-link-wrap, .wk-link{ min-width:0; }
+  .wk-card{ padding:16px 16px 12px; }
+  .wk-card.carried{ border-color:color-mix(in srgb, var(--warn) 45%, var(--border)); margin-top:18px; }
+  .wk-head{ display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }
+  .wk-head .dot{ margin-top:6px; }
+  .wk-head-main{ flex:1; min-width:0; }
+  .wk-head h2{ font-size:15.5px; font-weight:700; margin:0; }
+  .wk-topic{ font-size:12.5px; color:var(--text-muted); margin-top:2px; }
+  .wk-prog{ font-size:12px; font-weight:700; padding:3px 10px; border-radius:var(--r-pill); background:var(--surface-2); color:var(--text-muted); flex:none; }
+  .wk-prog.all-done{ background:var(--success-soft); color:var(--success); }
+  .wk-notes{ margin:0 0 8px 19px; padding:0; list-style:none; }
+  .wk-notes li{ font-size:12px; color:var(--text-muted); padding:2px 0; }
+  .wk-row{ display:flex; align-items:center; gap:10px; padding:7px 6px; border-radius:var(--r-md); position:relative; }
+  .wk-row:hover{ background:var(--surface-2); }
+  .wk-check{ width:22px; height:22px; border-radius:50%; border:2px solid var(--border); background:var(--surface);
+    flex:none; cursor:pointer; display:grid; place-items:center; padding:0; color:transparent;
+    transition:background .12s ease, border-color .12s ease; }
+  .wk-check:hover{ border-color:var(--success); }
+  .wk-check svg{ width:13px; height:13px; stroke-width:3; }
+  .wk-row.done .wk-check{ background:var(--success); border-color:var(--success); color:#fff; }
+  .wk-kind{ width:26px; height:26px; border-radius:8px; display:grid; place-items:center; flex:none;
+    background:color-mix(in srgb, var(--c, var(--text-faint)) 13%, transparent); color:var(--c, var(--text-muted)); }
+  .wk-kind svg{ width:14px; height:14px; }
+  .wk-main{ flex:1; min-width:0; }
+  .wk-title{ font-size:13.5px; font-weight:600; line-height:1.3; overflow-wrap:anywhere; }
+  .wk-row.done .wk-title{ text-decoration:line-through; color:var(--text-faint); font-weight:500; }
+  .wk-meta{ font-size:11.5px; color:var(--text-muted); margin-top:2px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .wk-meta .overdue{ color:var(--danger); font-weight:600; }
+  .wk-start{ font-size:10px; font-weight:800; letter-spacing:.05em; padding:2px 7px; border-radius:var(--r-pill);
+    background:var(--warn-soft); color:var(--warn); margin-right:6px; vertical-align:1px; }
+  /* Floats over the row's end on hover, so it takes no width from the title when
+     hidden. On a touch screen there is no hover, so it sits in the row instead. */
+  .wk-row-actions{ display:none; gap:2px; position:absolute; right:6px; top:50%; transform:translateY(-50%);
+    background:var(--surface-2); border-radius:var(--r-md); padding:2px; }
+  .wk-row:hover .wk-row-actions, .wk-row:focus-within .wk-row-actions{ display:flex; }
+  @media (hover:none){ .wk-row-actions{ display:flex; position:static; transform:none; background:none; flex:none; } }
+  .wk-icon-btn{ border:0; background:transparent; color:var(--text-muted); cursor:pointer; border-radius:8px;
+    padding:5px 7px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px; }
+  .wk-icon-btn:hover{ background:var(--surface); color:var(--text); }
+  .wk-icon-btn svg{ width:14px; height:14px; }
+  .wk-links-label{ font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-faint);
+    margin:10px 6px 6px; }
+  .wk-links{ display:flex; flex-wrap:wrap; gap:6px; padding:0 4px 4px; }
+  .wk-link{ display:inline-flex; align-items:center; gap:6px; max-width:100%; padding:5px 10px; border-radius:var(--r-pill);
+    background:var(--surface-2); border:1px solid transparent; font-size:12px; color:var(--text); cursor:pointer; }
+  .wk-link:hover{ border-color:var(--border); background:var(--surface); }
+  .wk-link svg{ width:13px; height:13px; flex:none; color:var(--text-muted); }
+  .wk-link span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wk-link-wrap{ display:inline-flex; align-items:center; max-width:100%; }
+  .wk-link-wrap .wk-icon-btn{ padding:3px 5px; display:none; }
+  .wk-link-wrap:hover .wk-icon-btn, .wk-link-wrap:focus-within .wk-icon-btn{ display:inline-flex; }
+  @media (hover:none){ .wk-link-wrap .wk-icon-btn{ display:inline-flex; } }
+  .wk-foot{ display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);
+    font-size:12px; color:var(--text-muted); flex-wrap:wrap; }
+  .wk-foot .wk-icon-btn{ padding:3px 8px; background:var(--surface-2); }
+  .wk-empty-line{ font-size:13px; color:var(--text-muted); padding:6px; }
+  .wk-quiet{ margin-top:18px; }
+  .wk-quiet .wk-empty-line{ display:flex; align-items:center; gap:8px; }
+  .wk-carried-group{ font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-faint); margin:8px 6px 2px; }
+  .wk-plan{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; padding-top:10px;
+    border-top:1px dashed var(--border); font-size:12px; color:var(--text-muted); }
+  .wk-plan b{ color:var(--text); font-weight:600; }
+  .wk-plan + .wk-foot{ border-top:0; margin-top:4px; padding-top:0; }
+  .wp-modal{ max-width:560px; }
+  .wp-sub{ font-size:13px; color:var(--text-muted); line-height:1.5; margin-top:4px; }
+  .wp-source .btn{ flex:none; }
+  .wp-alt, .wp-off-note{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; color:var(--text-muted);
+    padding-top:12px; border-top:1px dashed var(--border); }
+  .wp-alt span{ flex:1; min-width:180px; }
+  .wp-off-note{ border-top:0; padding:10px 12px; border-radius:var(--r-md); background:var(--surface-2); color:var(--text); }
+  .wp-modal .modal-body{ max-height:64vh; }
+  .wp-sources{ display:flex; flex-direction:column; gap:8px; }
+  .wp-source{ display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border);
+    border-radius:var(--r-md); cursor:pointer; background:var(--surface); }
+  .wp-source.on{ border-color:var(--accent); background:var(--accent-soft); }
+  .wp-source-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; font-size:13px; }
+  .wp-source-main b{ font-weight:600; overflow-wrap:anywhere; }
+  .wp-source-main span{ font-size:11.5px; color:var(--text-muted); }
+  .wp-pill{ font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:var(--r-pill); background:var(--success-soft); color:var(--success); flex:none; }
+  .wp-error{ font-size:12.5px; padding:9px 12px; border-radius:var(--r-md); background:var(--danger-soft); color:var(--danger); }
+  .wk-dash{ display:flex; align-items:center; gap:14px; }
+  .wk-dash .wk-bar{ max-width:240px; }
+  @media (max-width:700px){
+    .wk-grid{ grid-template-columns:1fr; }
+    .wk-summary{ gap:10px; }
+  }
 </style>
 </head>
 <body>
@@ -3138,6 +3242,7 @@
     <nav class="tabs" id="tabs">
       <!-- grouped by purpose: where you are, your coursework, your material, study tools -->
       <button class="tab-btn" data-action="switch-tab" data-tab="dashboard"><span class="ic" data-icon="home"></span><span class="lbl">Dashboard</span></button>
+      <button class="tab-btn" data-action="switch-tab" data-tab="week"><span class="ic" data-icon="week"></span><span class="lbl">This Week</span></button>
       <button class="tab-btn" data-action="switch-tab" data-tab="calendar"><span class="ic" data-icon="calendar"></span><span class="lbl">Calendar</span></button>
       <div class="side-divider" role="separator"></div>
       <button class="tab-btn" data-action="switch-tab" data-tab="classes"><span class="ic" data-icon="classes"></span><span class="lbl">Classes</span></button>
@@ -3227,6 +3332,10 @@
 
   // ---------------- line icons ----------------
   var ICONS = {
+    play: '<path d="M8 5.5v13l10.5-6.5L8 5.5Z"/>',
+    book: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/>',
+    help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.3-2.4 3.8"/><path d="M12 17.2h.01"/>',
+    week: '<path d="M10 6.5h10M10 12h10M10 17.5h10"/><path d="m3.6 6.4 1.4 1.4 2.6-2.8M3.6 11.9l1.4 1.4 2.6-2.8M3.6 17.4l1.4 1.4 2.6-2.8"/>',
     refresh: '<path d="M20 11a8 8 0 0 0-14.9-3.8L3 9.5"/><path d="M3 4v5.5h5.5"/><path d="M4 13a8 8 0 0 0 14.9 3.8l2.1-2.3"/><path d="M21 20v-5.5h-5.5"/>',
     home: '<path d="M3 10.2 12 3l9 7.2"/><path d="M5.6 9.2V20h12.8V9.2"/>',
     calendar: '<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.6v3.8M16 2.6v3.8"/>',
@@ -5115,7 +5224,7 @@
     }
   }
 
-  var KNOWN_TABS = ['dashboard','calendar','classes','assignments','grades','notes',
+  var KNOWN_TABS = ['dashboard','week','calendar','classes','assignments','grades','notes',
                     'files','headstart','study','focus'];
 
   /** Open whatever the page was linked to, once there is data to open it with. */
@@ -5192,6 +5301,7 @@
 
     var titles = {
       dashboard:[greetingWord()+(firstName() ? ', '+firstName()+'.' : '.'), 'Here\'s what\'s happening with your courses.'],
+      week:['This Week', wkSubtitle()],
       calendar:['Calendar','View your classes, assignments, exams, and more.'],
       classes:['Classes','Your courses and everything attached to them.'],
       assignments:['Assignments','All your assignments, deadlines, and exams.'],
@@ -5212,6 +5322,7 @@
       + '<button class="btn" data-action="cal-sfu-open">Get schedule from SFU</button>'
       + '<button class="btn" data-action="si-open">Import syllabus</button>'
       + '<button class="btn primary" data-action="open-add-class">+ Add class</button></span>';
+    if(activeTab==='week') action = wkNavHtml();
     // Assignments renders its own toolbar (tabs + search + add) inside the view.
     document.getElementById('view-actions').innerHTML = action;
   }
@@ -5231,6 +5342,7 @@
     } : null;
     if(activeTab==='class') view.innerHTML = viewClassPage();
     else if(activeTab==='dashboard') view.innerHTML = viewDashboard();
+    else if(activeTab==='week') view.innerHTML = viewWeek();
     else if(activeTab==='classes') view.innerHTML = viewClasses();
     else if(activeTab==='calendar') view.innerHTML = viewCalendar();
     else if(activeTab==='headstart') view.innerHTML = viewHeadstart();
@@ -5257,6 +5369,470 @@
     host.innerHTML = (asgView==='byclass' ? asgByClassHtml() : asgTableHtml());
   }
 
+  // ---------------- This Week ----------------
+  /*
+   * A checklist of what to do this week, per class, built on the server (week.py) from
+   * each Canvas course's modules, the assignments Vesta has, and "start now" cues ten
+   * days before anything big. The rows are recomputed on every load; the only thing
+   * stored is what was ticked. See WEEK.md.
+   *
+   * An assignment's tick is the assignment itself (toggleItemDone), so ticking it here
+   * and on the Assignments page are the same act. Everything else is a mark.
+   */
+  var WK = { data:null, start:null, loading:false, error:null, shifting:null, sawChecking:false };
+  var WK_KIND = {
+    reading:['book','Reading'], watch:['play','Watch'], quiz:['help','Quiz'],
+    exam:['alert','Exam'], discussion:['chat','Discussion'],
+    assignment:['assignments','Assignment'], homework:['assignments','Homework'],
+    project:['assignments','Project'], work:['pen','Work through'], start:['zap','Get started'],
+    link:['link','Link'], other:['assignments','To do']
+  };
+
+  function wkMonday(iso){
+    var d = parseISODate(iso || todayIso());
+    var back = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - back);
+    return isoLocal(d);
+  }
+  function wkAddDays(iso, n){
+    var d = parseISODate(iso);
+    d.setDate(d.getDate() + n);
+    return isoLocal(d);
+  }
+  function wkIsThisWeek(){ return !WK.start || WK.start === wkMonday(todayIso()); }
+
+  function wkLoad(start){
+    WK.start = start || WK.start || wkMonday(todayIso());
+    WK.loading = true; WK.error = null;
+    var want = WK.start;
+    return apiGet('/api/week?start='+want+'&today='+todayIso()).then(function(d){
+      if(want !== WK.start) return;          // stepped to another week meanwhile
+      WK.data = d; WK.loading = false;
+      wkRepaint();
+      wkWatchPlanning();
+    }).catch(function(err){
+      WK.loading = false; WK.error = (err && err.message) || 'Could not load this week.';
+      wkRepaint();
+    });
+  }
+
+  function wkRepaint(){
+    if(activeTab === 'week'){ renderHeader(); renderView(); paintIcons(); }
+    else if(activeTab === 'dashboard'){
+      var host = document.getElementById('wk-dash');
+      if(host){ host.outerHTML = wkDashHtml(); paintIcons(); }
+    }
+  }
+
+  /** A Canvas check that just finished may have brought the modules this page reads. */
+  function wkAfterCanvas(){
+    if(cv && cv.checking){ WK.sawChecking = true; return; }
+    if(WK.sawChecking && WK.data){ WK.sawChecking = false; wkLoad(); }
+  }
+
+  function wkSubtitle(){
+    var d = WK.data;
+    if(!d) return 'What to read, watch and hand in, class by class.';
+    var range = fmtDateShort(d.weekStart)+' to '+fmtDateShort(d.weekEnd);
+    return (d.week >= 1 ? 'Week '+d.week+' of the term · ' : '') + range;
+  }
+
+  function wkNavHtml(){
+    return '<div class="wk-nav">'
+      + '<button type="button" class="btn" data-action="wk-step" data-delta="-7">‹ Previous week</button>'
+      + (wkIsThisWeek() ? '' : '<button type="button" class="btn" data-action="wk-step" data-delta="0">Back to this week</button>')
+      + '<button type="button" class="btn" data-action="wk-step" data-delta="7">Next week ›</button>'
+      + '</div>';
+  }
+
+  function wkAllTasks(d){
+    var out = [];
+    (d && d.classes || []).forEach(function(c){ out = out.concat(c.tasks); });
+    return out;
+  }
+
+  function viewWeek(){
+    if(!WK.data && !WK.loading && !WK.error) wkLoad();
+    if(WK.error && !WK.data){
+      return '<div class="empty">'+escapeHtml(WK.error)
+        + '<div><button type="button" class="btn" data-action="wk-step" data-delta="0">Try again</button></div></div>';
+    }
+    if(!WK.data) return '<div class="empty">Working out your week…</div>';
+    var d = WK.data;
+    if(!d.classes.length){
+      return '<div class="empty">Add your classes first, and this page fills in from their Canvas modules and your assignments.'
+        + '<div><button type="button" class="btn primary" data-action="switch-tab" data-tab="classes">Go to Classes</button></div></div>';
+    }
+    var tasks = wkAllTasks(d);
+    var done = tasks.filter(function(t){ return t.done; }).length;
+    var pct = tasks.length ? Math.round(done / tasks.length * 100) : 0;
+    var html = '';
+
+    if(d.planning && d.planning.length){
+      var planningNames = d.classes.filter(function(c){ return d.planning.indexOf(c.classId) >= 0; })
+        .map(function(c){ return c.code || c.name; });
+      html += '<div class="wk-banner"><div><b>Reading '+escapeHtml(planningNames.join(', '))+'’s course schedule…</b> '
+        + 'This week fills in when it finishes, in about half a minute.</div></div>';
+    }
+    var stale = d.classes.filter(function(c){ return c.needsCheck; });
+    if(stale.length){
+      var checking = cv && cv.checking;
+      html += '<div class="wk-banner"><div><b>'+(checking ? 'Checking Canvas and reading course schedules…' : 'Vesta has not read these courses’ weekly modules yet.')+'</b> '
+        + escapeHtml(stale.map(function(c){ return c.code || c.name; }).join(', '))
+        + (checking ? ' will fill in when it finishes.' : ' will fill in after one Canvas check.') + '</div>'
+        + (checking ? '' : '<button type="button" class="btn primary" data-action="wk-check-canvas">Check Canvas now</button>')
+        + '</div>';
+    } else if(!d.classes.some(function(c){ return c.canvasMapped; })){
+      html += '<div class="wk-banner"><div><b>Connect Canvas to fill this in from your courses’ modules.</b> '
+        + 'Until then it shows your assignments due this week and when to start the big ones.</div></div>';
+    }
+
+    var carriedN = 0;
+    d.classes.forEach(function(c){ carriedN += (c.carried || []).length; });
+    html += '<div class="wk-summary"><div class="wk-count"><b>'+done+'</b> of '+tasks.length+' done</div>'
+      + '<div class="wk-bar" role="progressbar" aria-valuenow="'+pct+'" aria-valuemin="0" aria-valuemax="100"><span style="width:'+pct+'%"></span></div>'
+      + (carriedN ? '<button type="button" class="wk-icon-btn" data-action="wk-jump" data-id="carried">'+carriedN+' still open from earlier weeks ↓</button>' : '')
+      + '</div>';
+
+    var busy = d.classes.filter(function(c){ return c.tasks.length || c.links.length || c.notes.length; });
+    var quiet = d.classes.filter(function(c){ return busy.indexOf(c) < 0; });
+    if(busy.length > 1){
+      html += '<div class="wk-pills">' + busy.map(function(c){
+        var all = c.total && c.done === c.total;
+        return '<button type="button" class="wk-pill'+(all?' all-done':'')+'" data-action="wk-jump" data-id="'+c.classId+'">'
+          + '<span class="dot" style="--c:'+(c.color||'var(--none)')+'"></span>'+escapeHtml(c.code || c.name)
+          + ' <span class="wk-pill-n">'+c.done+'/'+c.total+'</span></button>';
+      }).join('') + '</div>';
+    }
+
+    if(busy.length){
+      html += '<div class="wk-grid">' + busy.map(wkClassCardHtml).join('') + '</div>';
+    } else {
+      html += '<div class="empty">Nothing listed for this week in any class.</div>';
+    }
+    // Below this week, not above it: on a first visit it holds every reading from the
+    // weeks before Vesta could see them, and that list would bury the week itself.
+    html += wkCarriedHtml(d);
+    if(quiet.length && busy.length){
+      html += '<div class="card wk-quiet">' + quiet.map(function(c){
+        var why = c.needsCheck ? 'waiting for a Canvas check'
+          : c.planned ? 'nothing on its schedule this week'
+          : c.connected ? 'nothing in its Canvas modules this week'
+          : 'nothing due this week';
+        return '<div class="wk-empty-line"><span class="dot" style="--c:'+(c.color||'var(--none)')+'"></span>'
+          + '<b>'+escapeHtml(c.code || c.name)+'</b> '+why
+          + (!c.connected && !c.planned && !(c.plan && c.plan.off) ? '. Upload its syllabus to Files and this fills in by itself.' : '')
+          + (c.plan && c.plan.off ? ' (using '+(c.connected ? 'Canvas modules only' : 'no course schedule')+')' : '')
+          + (c.planned || (c.plan && (c.plan.off || c.plan.error))
+              ? ' <button type="button" class="wk-icon-btn" data-action="wp-open" data-id="'+c.classId+'">Change</button>' : '')
+          + '</div>';
+      }).join('') + '</div>';
+    }
+    return html;
+  }
+
+  function wkCarriedHtml(d){
+    var groups = d.classes.filter(function(c){ return c.carried && c.carried.length; });
+    if(!groups.length) return '';
+    var n = 0, clearable = 0;
+    var body = groups.map(function(c){
+      n += c.carried.length;
+      clearable += c.carried.filter(function(r){ return !r.itemId; }).length;
+      return '<div class="wk-carried-group">'+escapeHtml(c.code || c.name)+'</div>'
+        + c.carried.map(function(r){ return wkRowHtml(r, c, true); }).join('');
+    }).join('');
+    return '<div class="card wk-card carried" id="wk-class-carried">'
+      + '<div class="wk-head"><div class="wk-head-main"><h2>Still open from earlier weeks</h2>'
+      + '<div class="wk-topic">'+n+' thing'+(n===1?'':'s')+' you have not ticked off yet.</div></div>'
+      + (clearable ? '<button type="button" class="btn" data-action="wk-clear-carried" title="Readings, lectures and start cues. Assignments stay as they are.">Mark readings and lectures done</button>' : '')
+      + '</div>' + body + '</div>';
+  }
+
+  function wkClassCardHtml(c){
+    var all = c.total && c.done === c.total;
+    var html = '<div class="card wk-card" id="wk-class-'+c.classId+'">'
+      + '<div class="wk-head"><span class="dot" style="--c:'+(c.color||'var(--none)')+'"></span>'
+      + '<div class="wk-head-main"><h2>'+escapeHtml(c.code || c.name)+'</h2>'
+      + (c.topic ? '<div class="wk-topic">'+escapeHtml(c.topic)+'</div>' : '')
+      + '</div>'
+      + (c.total ? '<span class="wk-prog'+(all?' all-done':'')+'">'+c.done+'/'+c.total+'</span>' : '')
+      + '</div>';
+    if(c.notes.length){
+      html += '<ul class="wk-notes">' + c.notes.map(function(n){ return '<li>'+escapeHtml(n)+'</li>'; }).join('') + '</ul>';
+    }
+    html += c.tasks.map(function(r){ return wkRowHtml(r, c, false); }).join('');
+    if(!c.tasks.length) html += '<div class="wk-empty-line">No to-dos this week.</div>';
+    if(c.links.length){
+      html += '<div class="wk-links-label">Slides and materials</div><div class="wk-links">'
+        + c.links.map(function(r){ return wkLinkHtml(r, c); }).join('') + '</div>';
+    }
+    html += wkPlanHtml(c);
+    if(c.connected && !c.planned) html += wkShiftHtml(c);
+    return html + '</div>';
+  }
+
+  function wkWhen(r){
+    if(!r.dueDate) return '';
+    var diff = diffDaysFromToday(r.dueDate);
+    var day = parseISODate(r.dueDate).toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+    var label = (r.source === 'cue' ? 'Due ' : 'Due ') + day + (r.dueTime && r.dueTime !== '23:59' ? ' '+fmtTime12(r.dueTime) : '');
+    if(!r.done && diff < 0 && r.source !== 'cue') return '<span class="overdue">'+escapeHtml(label)+'</span>';
+    return escapeHtml(label);
+  }
+
+  function fmtTime12(hhmm){
+    var p = (hhmm||'').split(':'); var h = +p[0], m = p[1] || '00';
+    if(isNaN(h)) return hhmm || '';
+    return ((h % 12) || 12) + ':' + m + (h < 12 ? 'am' : 'pm');
+  }
+
+  function wkRowHtml(r, c, carried){
+    var k = WK_KIND[r.kind] || WK_KIND.other;
+    var meta = [k[1]];
+    if(carried && r.dueDate == null) meta.push('Week '+r.week);
+    var when = wkWhen(r);
+    if(when) meta.push(when);
+    // The section is already a note at the top of the card when it says anything
+    // beyond "READINGS", so it is only repeated on a carried row, away from its card.
+    if(carried && r.section && r.section.length < 60) meta.push(escapeHtml(r.section));
+    if(r.detail) meta.push(escapeHtml(r.detail.length > 90 ? r.detail.slice(0, 88)+'\u2026' : r.detail));
+    var openable = r.itemId || r.materialId || r.url;
+    return '<div class="wk-row'+(r.done?' done':'')+'">'
+      + '<button type="button" class="wk-check" data-action="wk-tick" data-key="'+escapeHtml(r.key)+'"'
+      + ' data-class="'+c.classId+'"'+(r.itemId?' data-item="'+r.itemId+'"':'')
+      + ' aria-pressed="'+(r.done?'true':'false')+'" title="'+(r.done?'Mark as not done':'Mark as done')+'">'+iconSvg('check')+'</button>'
+      + '<span class="wk-kind" style="--c:'+(c.color||'var(--none)')+'" title="'+k[1]+'">'+iconSvg(k[0])+'</span>'
+      + '<div class="wk-main"><div class="wk-title">'
+      + (r.kind === 'start' ? '<span class="wk-start">START</span>' : '')
+      + escapeHtml(r.title)+'</div>'
+      + (meta.length ? '<div class="wk-meta">'+meta.join(' · ')+'</div>' : '')
+      + '</div>'
+      + '<div class="wk-row-actions">'
+      + (openable ? '<button type="button" class="wk-icon-btn" data-action="wk-open" data-key="'+escapeHtml(r.key)+'" title="Open">Open</button>' : '')
+      + (r.source === 'canvas' && !r.itemId ? '<button type="button" class="wk-icon-btn" data-action="wk-as" data-key="'+escapeHtml(r.key)+'" data-class="'+c.classId+'" data-task="0" title="Move to Slides and materials: not something to tick off">Not a to-do</button>' : '')
+      + '</div></div>';
+  }
+
+  function wkLinkHtml(r, c){
+    var icon = r.canvasType === 'File' ? 'files' : 'link';
+    return '<span class="wk-link-wrap"><button type="button" class="wk-link" data-action="wk-open" data-key="'+escapeHtml(r.key)+'" title="'+escapeHtml(r.title)+'">'
+      + iconSvg(icon)+'<span>'+escapeHtml(r.title)+'</span></button>'
+      + '<button type="button" class="wk-icon-btn" data-action="wk-as" data-key="'+escapeHtml(r.key)+'" data-class="'+c.classId+'" data-task="1" title="Make this a to-do">+ To-do</button></span>';
+  }
+
+  /** Where the to-dos came from, with one quiet way to change it. Rarely used, so one
+   *  link rather than two buttons on every card; both choices are behind it. */
+  function wkPlanHtml(c){
+    var st = c.plan || {};
+    var said = c.planned ? 'Filled in from <b>'+escapeHtml(c.planSource || st.sourceTitle || 'the course schedule')+'</b>'
+      : st.off ? (c.connected ? 'Using Canvas modules only' : 'Not using a course schedule')
+      : st.error ? escapeHtml(st.error)
+      : '';
+    if(!said) return '';
+    return '<div class="wk-plan"><span>'+said+'</span>'
+      + '<button type="button" class="wk-icon-btn" data-action="wp-open" data-id="'+c.classId+'">Change</button></div>';
+  }
+
+  function wkShiftHtml(c){
+    var open = WK.shifting === c.classId;
+    var off = c.offset || 0;
+    var d = WK.data;
+    var courseWeek = d.week - off;
+    var said = off === 0 ? 'This is Canvas’s Week '+courseWeek+' for this course.'
+      : 'Canvas numbers this course’s weeks differently: this is its Week '+courseWeek+'.';
+    var src = c.offsetSource === 'set' ? ' You set this.' : '';
+    if(!open){
+      return '<div class="wk-foot"><span>'+escapeHtml(said+src)+'</span>'
+        + '<button type="button" class="wk-icon-btn" data-action="wk-shift-open" data-id="'+c.classId+'">Wrong week?</button></div>';
+    }
+    return '<div class="wk-foot"><span>Show Canvas’s</span>'
+      + '<button type="button" class="wk-icon-btn" data-action="wk-shift" data-id="'+c.classId+'" data-shift="'+(off+1)+'">Week '+(courseWeek-1)+'</button>'
+      + '<button type="button" class="wk-icon-btn" data-action="wk-shift" data-id="'+c.classId+'" data-shift="'+(off-1)+'">Week '+(courseWeek+1)+'</button>'
+      + '<span>here instead of Week '+courseWeek+'.</span>'
+      + (c.offsetSource === 'set' ? '<button type="button" class="wk-icon-btn" data-action="wk-shift" data-id="'+c.classId+'" data-shift="">Let Vesta work it out</button>' : '')
+      + '<button type="button" class="wk-icon-btn" data-action="wk-shift-open" data-id="">Cancel</button></div>';
+  }
+
+  function wkFind(key){
+    var d = WK.data; if(!d) return null;
+    for(var i=0;i<d.classes.length;i++){
+      var c = d.classes[i];
+      var lists = [c.tasks, c.links, c.carried || []];
+      for(var j=0;j<lists.length;j++){
+        for(var k=0;k<lists[j].length;k++) if(lists[j][k].key === key) return { row:lists[j][k], cls:c };
+      }
+    }
+    return null;
+  }
+
+  /** Recount after a tick without a round trip. */
+  function wkRecount(){
+    (WK.data && WK.data.classes || []).forEach(function(c){
+      c.done = c.tasks.filter(function(t){ return t.done; }).length;
+      c.total = c.tasks.length;
+    });
+  }
+
+  function wkSetDone(key, done){
+    // The same row can be in this week and in the carried list (never both, but a
+    // cue and its assignment share an item), so every copy is updated.
+    (WK.data && WK.data.classes || []).forEach(function(c){
+      [c.tasks, c.links, c.carried || []].forEach(function(list){
+        list.forEach(function(r){ if(r.key === key) r.done = done; });
+      });
+    });
+    wkRecount();
+  }
+
+  function wkTick(el){
+    var key = el.dataset.key, itemId = el.dataset.item;
+    var hit = wkFind(key); if(!hit) return;
+    var now = !hit.row.done;
+    wkSetDone(key, now);
+    wkRepaint();
+    var p = itemId
+      ? toggleItemDone(itemId)
+      : apiPost('/api/week/marks', { marks:[{ key:key, classId:el.dataset.class, done:now }].concat(
+          (hit.row.alsoKeys || []).map(function(k){ return { key:k, classId:el.dataset.class, done:now }; })) });
+    Promise.resolve(p).catch(function(err){ wkSetDone(key, !now); wkRepaint(); reportError(err); });
+  }
+
+  function wkOpen(key){
+    var hit = wkFind(key); if(!hit) return;
+    var r = hit.row;
+    if(r.itemId){ openItemDetailModal(r.itemId); return; }
+    if(r.materialId){ openFilePreviewModal(r.materialId); return; }
+    if(r.url) window.open(r.url, '_blank', 'noopener');
+  }
+
+  function wkAs(el){
+    var asTask = el.dataset.task === '1';
+    apiPost('/api/week/marks', { marks:[{ key:el.dataset.key, classId:el.dataset.class, asTask:asTask }] })
+      .then(function(){ return wkLoad(); }).catch(reportError);
+  }
+
+  function wkClearCarried(){
+    var marks = [];
+    (WK.data && WK.data.classes || []).forEach(function(c){
+      (c.carried || []).forEach(function(r){
+        if(!r.itemId) marks.push({ key:r.key, classId:c.classId, done:true });
+      });
+    });
+    if(!marks.length) return;
+    apiPost('/api/week/marks', { marks:marks }).then(function(){ return wkLoad(); }).catch(reportError);
+  }
+
+  function wkShift(classId, shift){
+    WK.shifting = null;
+    apiPost('/api/week/shift', { classId:classId, shift: shift === '' ? null : +shift })
+      .then(function(){ return wkLoad(); }).catch(reportError);
+  }
+
+  /*
+   * Each course's own schedule is found and read automatically (week_plan.py): after
+   * every Canvas check, and for a class off Canvas when this page opens. There is
+   * nothing to press. What remains here is saying where a class's plan came from, and
+   * the two corrections: a different document, or Canvas modules only.
+   */
+  var WP = null;   // { classId, stage:'loading'|'pick'|'reading'|'error', sources, error }
+
+  function wpOpen(classId){
+    WP = { classId:classId, stage:'loading', sources:null, error:null };
+    wpPaint();
+    apiGet('/api/week/plan/'+classId+'?sources=1').then(function(r){
+      if(!WP || WP.classId !== classId) return;
+      WP.sources = r.sources || []; WP.state = r.state || {};
+      WP.stage = 'pick'; wpPaint();
+    }).catch(function(err){ if(WP){ WP.stage = 'error'; WP.error = err.message; wpPaint(); } });
+  }
+
+  function wpUse(key){
+    if(!WP) return;
+    var classId = WP.classId;
+    WP.stage = 'reading'; WP.error = null; wpPaint();
+    apiPost('/api/week/plan/'+classId+'/use', { source: key || null }).then(function(r){
+      if(r && r.state && r.state.error){ if(WP){ WP.stage = 'pick'; WP.error = r.state.error; wpPaint(); } return; }
+      closeModal(); wkLoad();
+    }).catch(function(err){ if(WP){ WP.stage = 'pick'; WP.error = err.message; wpPaint(); } });
+  }
+
+  function wpSetOff(classId, off){
+    apiPost('/api/week/plan/'+classId+'/off', { off:!!off }).then(function(){ wkLoad(); }).catch(reportError);
+  }
+
+  function wpPaint(){
+    if(!WP) return;
+    var cls = classById(WP.classId) || {};
+    var name = cls.code || cls.name || 'this class';
+    var head = '<div class="modal-head"><h2>Where '+escapeHtml(name)+'’s schedule comes from</h2>'
+      + '<div class="wp-sub">Vesta picks the document that lays out the most weeks of the term. If it picked the wrong one, choose here and it will use that from now on.</div></div>';
+    var body = '', foot = '<button class="btn" data-action="modal-close">Close</button>';
+    if(WP.stage === 'loading'){
+      body = '<div class="wp-sub">Looking through the course’s documents…</div>';
+    } else if(WP.stage === 'error'){
+      body = '<div class="wp-error">'+escapeHtml(WP.error || 'Something went wrong.')+'</div>';
+    } else if(WP.stage === 'reading'){
+      body = '<div class="wp-sub">Reading it. This takes about half a minute, and costs a few cents.</div>';
+      foot = '<button class="btn" disabled>Reading…</button>';
+    } else {
+      var st = WP.state || {};
+      body = (WP.error ? '<div class="wp-error">'+escapeHtml(WP.error)+'</div>' : '')
+        + (WP.sources.length ? '<div class="wp-sources">' + WP.sources.map(function(s){
+            var on = s.chosen;
+            return '<div class="wp-source'+(on?' on':'')+'">'
+              + '<span class="wp-source-main"><b>'+escapeHtml(s.title)+'</b>'
+              + '<span>'+(s.weeks ? 'Lays out '+s.weeks+' week'+(s.weeks===1?'':'s')+' of the term' : 'No weekly schedule found in it')+'</span></span>'
+              + (on ? '<span class="wp-pill">In use</span>'
+                    : '<button type="button" class="btn" data-action="wp-use" data-key="'+escapeHtml(s.key)+'">Use this</button>')
+              + '</div>';
+          }).join('') + '</div>'
+          : '<div class="wp-sub">No documents that look like a schedule or syllabus were found. Upload one to this class’s Files and Vesta will use it.</div>');
+      var wkc = (WK.data && WK.data.classes || []).filter(function(c){ return c.classId === WP.classId; })[0] || {};
+      body = (st.off
+          ? '<div class="wp-off-note">'+(wkc.connected ? 'This class is using its Canvas modules only.' : 'This class is not using a course schedule.')
+            + ' <button type="button" class="btn primary" data-action="wp-off" data-id="'+WP.classId+'" data-off="0">Use the course schedule again</button></div>'
+          : '') + body
+        + (!st.off ? '<div class="wp-alt"><span>'+(wkc.connected ? 'Or skip the schedule and use Canvas modules only.' : 'Or stop using a schedule for this class.')+'</span>'
+            + '<button type="button" class="btn" data-action="wp-off" data-id="'+WP.classId+'" data-off="1">'+(wkc.connected ? 'Use Canvas modules only' : 'Stop using it')+'</button></div>' : '');
+      if(st.pinned) foot = '<button class="btn ghost" data-action="wp-use" data-key="">Let Vesta choose again</button>' + foot;
+    }
+    paintModal('<div class="overlay" data-action="modal-backdrop"><div class="modal wp-modal" data-action="modal-stop">'
+      + head + '<div class="modal-body">'+body+'</div>'
+      + '<div class="modal-foot"><span></span><div class="right">'+foot+'</div></div></div></div>');
+    paintIcons();
+  }
+
+  /** Planning in the background: look again shortly, until it is done. */
+  var wkPlanTimer = null;
+  function wkWatchPlanning(){
+    clearTimeout(wkPlanTimer);
+    if(WK.data && WK.data.planning && WK.data.planning.length && activeTab === 'week'){
+      wkPlanTimer = setTimeout(function(){ wkLoad(); }, 6000);
+    }
+  }
+
+  /** The Dashboard's line about this week, filled in once the week has loaded. */
+  function wkDashHtml(){
+    var d = WK.data;
+    if(!d || !wkIsThisWeek()){
+      if(!WK.loading && (!d || !wkIsThisWeek())) wkLoad(wkMonday(todayIso()));
+      return '<div class="card study-nudge" id="wk-dash"><div class="card-head"><h2>This week</h2>'
+        + '<a class="see-all" href="#" data-action="switch-tab" data-tab="week">Open This Week →</a></div>'
+        + '<div class="wk-empty-line">Working out your week…</div></div>';
+    }
+    var tasks = wkAllTasks(d);
+    var done = tasks.filter(function(t){ return t.done; }).length;
+    var carried = 0;
+    d.classes.forEach(function(c){ carried += (c.carried || []).length; });
+    var pct = tasks.length ? Math.round(done / tasks.length * 100) : 0;
+    return '<div class="card study-nudge" id="wk-dash"><div class="card-head"><h2>This week</h2>'
+      + '<a class="see-all" href="#" data-action="switch-tab" data-tab="week">Open This Week →</a></div>'
+      + '<div class="wk-dash"><div class="wk-count"><b>'+done+'</b> of '+tasks.length+' done</div>'
+      + '<div class="wk-bar"><span style="width:'+pct+'%"></span></div>'
+      + (carried ? '<span class="wk-topic">'+carried+' still open from earlier weeks</span>' : '')
+      + '</div></div>';
+  }
+
   // ---------------- Dashboard ----------------
   function viewDashboard(){
     var totalAssignments = items.length;
@@ -5276,6 +5852,7 @@
       + '</div>';
 
     html += studyNudgeHtml();
+    html += wkDashHtml();
     html += '<div class="dash-row">' + focusHighlightHtml() + upcomingWeekCardHtml() + '</div>';
     html += classesPreviewCardHtml();
     html += '<div class="dash-row">' + recentFilesCardHtml() + recentNotesCardHtml() + '</div>';
@@ -9006,6 +9583,7 @@
     if(SI && SI.stage !== 'review' && SI.stage !== 'reading'){ siDiscard(); }
     syllabusModalClassId = null;
     HW = QM = QZ = FC = TH = null;
+    WP = null;
     hsBackItemId = null;
     document.getElementById('modal-root').innerHTML='';
   }
@@ -12271,6 +12849,7 @@
   }
 
   function cvRepaintAll(){
+    wkAfterCanvas();
     renderCanvasBanner();
     cvRefreshClassPage();
     cvRepaintSettings();
@@ -17386,6 +17965,27 @@
       activeTab = t.dataset.tab;
       setNavOpen(false);          // on a phone the drawer has done its job
       render(); return;
+    }
+    if(action==='wk-step'){
+      var wkDelta = +t.dataset.delta;
+      var wkTo = wkDelta === 0 ? wkMonday(todayIso()) : wkAddDays(WK.start || wkMonday(todayIso()), wkDelta);
+      WK.data = null; WK.error = null; WK.shifting = null;
+      wkLoad(wkTo); renderHeader(); renderView(); return;
+    }
+    if(action==='wk-tick'){ wkTick(t); return; }
+    if(action==='wk-open'){ wkOpen(t.dataset.key); return; }
+    if(action==='wk-as'){ wkAs(t); return; }
+    if(action==='wk-clear-carried'){ wkClearCarried(); return; }
+    if(action==='wk-shift-open'){ WK.shifting = t.dataset.id || null; renderView(); paintIcons(); return; }
+    if(action==='wk-shift'){ wkShift(t.dataset.id, t.dataset.shift); return; }
+    if(action==='wk-check-canvas'){ cvCheck({}).then(function(){ WK.sawChecking = true; renderView(); }).catch(reportError); return; }
+    if(action==='wp-open'){ wpOpen(t.dataset.id); return; }
+    if(action==='wp-use'){ wpUse(t.dataset.key); return; }
+    if(action==='wp-off'){ if(WP) closeModal(); wpSetOff(t.dataset.id, t.dataset.off === '1'); return; }
+    if(action==='wk-jump'){
+      var wkCard = document.getElementById('wk-class-'+t.dataset.id);
+      if(wkCard) wkCard.scrollIntoView({ behavior:'smooth', block:'start' });
+      return;
     }
     if(action==='set-theme'){ setTheme(t.dataset.themeChoice); return; }
     if(action==='ne'){

@@ -339,7 +339,10 @@ def test_a_check_converts_in_the_zone_his_account_uses(conn, class_id, monkeypat
                 {"id": 9, "name": "Discussion 09", "points_possible": 3, "published": True,
                  "due_at": "2026-11-23T07:59:59Z"}]}]
 
-        def course_files(self, cid, known=None):
+        def modules(self, cid):
+            return []
+
+        def course_files(self, cid, known=None, modules=None):
             return []
 
     monkeypatch.setattr(canvas, "Client", FakeClient)
@@ -366,7 +369,10 @@ def test_a_profile_canvas_will_not_give_falls_back_rather_than_failing(conn, cla
         def assignment_groups(self, cid):
             return []
 
-        def course_files(self, cid, known=None):
+        def modules(self, cid):
+            return []
+
+        def course_files(self, cid, known=None, modules=None):
             return []
 
     monkeypatch.setattr(canvas, "Client", NoProfile)

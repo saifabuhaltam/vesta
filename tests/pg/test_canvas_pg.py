@@ -248,7 +248,10 @@ def test_a_check_outside_a_request_writes_as_the_right_account(monkeypatch):
             return [{"id": 1, "name": "Quizzes", "group_weight": 10, "assignments": [
                 {"id": 100, "name": "Quiz 01", "points_possible": 10, "published": True}]}]
 
-        def course_files(self, course_id, known=None):
+        def modules(self, course_id):
+            return []
+
+        def course_files(self, course_id, known=None, modules=None):
             return []
 
     monkeypatch.setattr(canvas, "Client", FakeClient)

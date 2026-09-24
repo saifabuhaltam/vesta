@@ -169,7 +169,10 @@ def test_a_check_reads_the_text_it_is_missing(conn, class_id, downloads, reader,
         def assignment_groups(self, cid):
             return []
 
-        def course_files(self, cid, known=None):
+        def modules(self, cid):
+            return []
+
+        def course_files(self, cid, known=None, modules=None):
             return []
 
     monkeypatch.setattr(canvas, "Client", FakeClient)

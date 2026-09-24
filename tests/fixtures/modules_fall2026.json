@@ -1,0 +1,2583 @@
+{
+ "IAT201": [
+  {
+   "id": 107729,
+   "name": "Course Overview (Start here!)",
+   "position": 2,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 761835,
+     "title": "Core Resources",
+     "type": "SubHeader",
+     "indent": 2
+    },
+    {
+     "id": 858697,
+     "title": "Lecture video and slides in Files/Lecture Videos and Files/Lecture Slides -- Posted on Mondays (I hope!)",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 833048,
+     "title": "iat-201-course-progression-map-pd-September-7-2026.docx",
+     "type": "File",
+     "content_id": 3237483,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/833048",
+     "indent": 0
+    },
+    {
+     "id": 761834,
+     "title": "IAT 201 Fall 2026 Schedule",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761834",
+     "indent": 1
+    },
+    {
+     "id": 797442,
+     "title": "The HCI Broker_V8.work.pdf",
+     "type": "File",
+     "content_id": 3143547,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/797442",
+     "indent": 1
+    },
+    {
+     "id": 761857,
+     "title": "Design Reflection ",
+     "type": "Assignment",
+     "content_id": 206065,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761857",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-24T06:59:59Z",
+      "points_possible": 5.0
+     }
+    },
+    {
+     "id": 761836,
+     "title": "Cognition for Designers.pdf (Noba readings)",
+     "type": "File",
+     "content_id": 3012435,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761836",
+     "indent": 1
+    },
+    {
+     "id": 761843,
+     "title": "Designing with the Mind in Mind 3rd - Johnson, Jeff copy.pdf",
+     "type": "File",
+     "content_id": 3012429,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761843",
+     "indent": 1
+    },
+    {
+     "id": 797444,
+     "title": "Recommended Readings",
+     "type": "SubHeader",
+     "indent": 2
+    },
+    {
+     "id": 761837,
+     "title": "The Broker 2011 Spence.pdf",
+     "type": "File",
+     "content_id": 3012440,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761837",
+     "indent": 1
+    },
+    {
+     "id": 761839,
+     "title": "\"Unflattening\" comic book ",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17051/module_item_redirect/761839",
+     "external_url": "https://www-jstor-org.proxy.lib.sfu.ca/stable/j.ctt1c84d7z",
+     "indent": 1
+    },
+    {
+     "id": 761840,
+     "title": "Ethics in HCI",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17051/module_item_redirect/761840",
+     "external_url": "https://uxplanet.org/the-ethical-dimensions-of-human-computer-interaction-3b6df7f514bd",
+     "indent": 2
+    },
+    {
+     "id": 761841,
+     "title": "IEEE Tech Ethics",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17051/module_item_redirect/761841",
+     "external_url": "https://www.ieee.org/about/ethics?",
+     "indent": 2
+    },
+    {
+     "id": 761842,
+     "title": "IEEE CS Ethics",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17051/module_item_redirect/761842",
+     "external_url": "https://www.computer.org/education/code-of-ethics",
+     "indent": 2
+    }
+   ]
+  },
+  {
+   "id": 107730,
+   "name": "Lenses of Design",
+   "position": 3,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 761846,
+     "title": "Week 1",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 761852,
+     "title": "Natasha Jen Design Thinking is BS",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17051/module_item_redirect/761852",
+     "external_url": "https://vimeo.com/228126880",
+     "indent": 1
+    },
+    {
+     "id": 847451,
+     "title": "IAT201.1_Fall2026.key.pdf",
+     "type": "File",
+     "content_id": 3281293,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/847451",
+     "indent": 1
+    },
+    {
+     "id": 855847,
+     "title": "IAT201.1_Fall2026.mp4",
+     "type": "File",
+     "content_id": 3305272,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/855847",
+     "indent": 1
+    },
+    {
+     "id": 847452,
+     "title": "IAT201.1b_Fall2026.key.pdf",
+     "type": "File",
+     "content_id": 3281294,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/847452",
+     "indent": 1
+    },
+    {
+     "id": 855848,
+     "title": "IAT201.1b_Fall2026.mp4",
+     "type": "File",
+     "content_id": 3305257,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/855848",
+     "indent": 1
+    },
+    {
+     "id": 761847,
+     "title": "Muddy Points lecture 1",
+     "type": "Discussion",
+     "content_id": 254638,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761847",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 1.0
+     }
+    },
+    {
+     "id": 761853,
+     "title": "Week 2",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 761854,
+     "title": "Read Noba: Why Science & History of Psychology in Cognition for Designers",
+     "type": "Assignment",
+     "content_id": 206075,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761854",
+     "indent": 0,
+     "content_details": {
+      "points_possible": 0.0
+     }
+    },
+    {
+     "id": 761855,
+     "title": "Read Rethinking HCI Education 2026.pdf",
+     "type": "File",
+     "content_id": 3012432,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761855",
+     "indent": 0
+    },
+    {
+     "id": 855853,
+     "title": "IAT201.2_Fall2026.key.pdf",
+     "type": "File",
+     "content_id": 3287315,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/855853",
+     "indent": 1
+    },
+    {
+     "id": 855846,
+     "title": "IAT201.2_Fall2026.mp4",
+     "type": "File",
+     "content_id": 3305246,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/855846",
+     "indent": 1
+    },
+    {
+     "id": 761856,
+     "title": "Muddy Points lecture 2",
+     "type": "Discussion",
+     "content_id": 254639,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761856",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 1.0
+     }
+    }
+   ]
+  },
+  {
+   "id": 107731,
+   "name": "Designing for the Brain ",
+   "position": 4,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 761868,
+     "title": "Week 3",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 857694,
+     "title": "IAT201.3_Fall2026.key.pdf",
+     "type": "File",
+     "content_id": 3336103,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/857694",
+     "indent": 0
+    },
+    {
+     "id": 761862,
+     "title": "Opinion _ Let Your Phone Go Gray - The New York Times.pdf",
+     "type": "File",
+     "content_id": 3012448,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761862",
+     "indent": 0
+    },
+    {
+     "id": 855844,
+     "title": "Read Noba Sensation & Perception and Vision in Cognition for Designers",
+     "type": "Assignment",
+     "content_id": 232730,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/855844",
+     "indent": 1
+    },
+    {
+     "id": 761860,
+     "title": "Read Designing With the Mind in Mind Ch 1-3",
+     "type": "Assignment",
+     "content_id": 206074,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761860",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 0.0
+     }
+    },
+    {
+     "id": 761872,
+     "title": "Muddy Points lecture 3",
+     "type": "Discussion",
+     "content_id": 254640,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761872",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 1.0
+     }
+    },
+    {
+     "id": 761861,
+     "title": "DDA1: Brain. A Grey Day \u2013 Usability and the Lack of Colour",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761861",
+     "indent": 0
+    },
+    {
+     "id": 761863,
+     "title": "DDA1: Submission Requirements and Grading",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761863",
+     "indent": 0
+    },
+    {
+     "id": 761864,
+     "title": "DDA1: Workflow Overview",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761864",
+     "indent": 0
+    },
+    {
+     "id": 761865,
+     "title": "DDA1: Resources",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761865",
+     "indent": 0
+    },
+    {
+     "id": 761867,
+     "title": "DDA1: Workflow Week 1",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761867",
+     "indent": 0
+    },
+    {
+     "id": 761866,
+     "title": "DDA1: Scenario",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761866",
+     "indent": 0
+    },
+    {
+     "id": 761873,
+     "title": "Week 4",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 855860,
+     "title": "Read Noba Attention & Failures of Awareness in Cognition for Designers",
+     "type": "Assignment",
+     "content_id": 232735,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/855860",
+     "indent": 1
+    },
+    {
+     "id": 761875,
+     "title": "Muddy Points lecture 4",
+     "type": "Discussion",
+     "content_id": 254641,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761875",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 1.0
+     }
+    },
+    {
+     "id": 761869,
+     "title": "DDA1: Workflow Week2",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761869",
+     "indent": 1
+    },
+    {
+     "id": 761878,
+     "title": "Week 5",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 761879,
+     "title": "Read Noba Thinking and Intelligence  in Cognition for Designers",
+     "type": "Assignment",
+     "content_id": 206064,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761879",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 0.0
+     }
+    },
+    {
+     "id": 761883,
+     "title": "Muddy Points lecture 5",
+     "type": "Discussion",
+     "content_id": 254642,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761883",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 1.0
+     }
+    }
+   ]
+  },
+  {
+   "id": 107732,
+   "name": "3) Designing for the Mind",
+   "position": 5,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 761884,
+     "title": " Week 6",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 761887,
+     "title": "Read Noba Thinking and Intelligence  in Cognition for Designers",
+     "type": "Assignment",
+     "content_id": 206064,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761887",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 0.0
+     }
+    },
+    {
+     "id": 761885,
+     "title": "Brain Quiz in sections",
+     "type": "Assignment",
+     "content_id": 206062,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761885",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 15.0
+     }
+    },
+    {
+     "id": 761886,
+     "title": " HCI Broker Lesson 2 - Visual Language",
+     "type": "Assignment",
+     "content_id": 206061,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761886",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 10.0
+     }
+    },
+    {
+     "id": 855826,
+     "title": "DDA_2.7_Appendix_A_Worksheet.docx",
+     "type": "File",
+     "content_id": 3012457,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/855826",
+     "indent": 2
+    },
+    {
+     "id": 855827,
+     "title": "DDA_2.7-Appendix_B_Reflection-Assessment.docx",
+     "type": "File",
+     "content_id": 3012460,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/855827",
+     "indent": 2
+    },
+    {
+     "id": 761889,
+     "title": "Week 7",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 855863,
+     "title": "Read Designing with Mind in Mind chapter 13 \"Hand eye coordination\" & 14 \"We have time requirements\"",
+     "type": "Assignment",
+     "content_id": 232736,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/855863",
+     "indent": 0
+    },
+    {
+     "id": 761893,
+     "title": "Muddy Points lecture 6",
+     "type": "Discussion",
+     "content_id": 254643,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761893",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 1.0
+     }
+    },
+    {
+     "id": 761894,
+     "title": "Week 8",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 855864,
+     "title": "Read Noba Psychology of groups & Cognition & Theory of Mind in Cognition for Designers",
+     "type": "Assignment",
+     "content_id": 232737,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/855864",
+     "indent": 1
+    },
+    {
+     "id": 761897,
+     "title": "Muddy Points lecture 7",
+     "type": "Discussion",
+     "content_id": 254644,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761897",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 1.0
+     }
+    }
+   ]
+  },
+  {
+   "id": 107733,
+   "name": "4) Designing for Distributed Cognition",
+   "position": 6,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 761899,
+     "title": "Week 9",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 761900,
+     "title": "Mind Quiz ",
+     "type": "Assignment",
+     "content_id": 206071,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761900",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 15.0
+     }
+    },
+    {
+     "id": 761902,
+     "title": "Muddy Points lecture 8",
+     "type": "Discussion",
+     "content_id": 254646,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761902",
+     "indent": 0,
+     "content_details": {
+      "points_possible": 1.0
+     }
+    },
+    {
+     "id": 761904,
+     "title": "Working Section",
+     "type": "SubHeader",
+     "indent": 2
+    },
+    {
+     "id": 761905,
+     "title": "Week 10",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 761907,
+     "title": "Muddy Points lecture 9",
+     "type": "Discussion",
+     "content_id": 254647,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761907",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 1.0
+     }
+    },
+    {
+     "id": 761909,
+     "title": "HCI Broker Lesson 2 due",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 761910,
+     "title": "Week 11",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 761912,
+     "title": "Muddy Point lecture 10",
+     "type": "Discussion",
+     "content_id": 254648,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761912",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 1.0
+     }
+    },
+    {
+     "id": 761914,
+     "title": "Week 12",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 761917,
+     "title": "Muddy Point lecture 11",
+     "type": "Discussion",
+     "content_id": 254649,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761917",
+     "indent": 1
+    },
+    {
+     "id": 761918,
+     "title": "Week 13",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 761919,
+     "title": "HCI Broker Lesson 3A - Thinking Games ",
+     "type": "Assignment",
+     "content_id": 206069,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761919",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 10.0
+     }
+    },
+    {
+     "id": 761920,
+     "title": "HCI Broker Lesson 3B - Portfolio & Design Reflection",
+     "type": "Assignment",
+     "content_id": 206070,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761920",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 10.0
+     }
+    },
+    {
+     "id": 761921,
+     "title": "Distributed Cognition/Environment Quiz",
+     "type": "Assignment",
+     "content_id": 206066,
+     "html_url": "https://canvas.sfu.ca/courses/17051/modules/items/761921",
+     "indent": 1,
+     "content_details": {
+      "points_possible": 15.0
+     }
+    }
+   ]
+  }
+ ],
+ "PHIL110": [
+  {
+   "id": 109163,
+   "name": "Crowdmark",
+   "position": 1,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 772202,
+     "title": "Crowdmark",
+     "type": "ExternalTool",
+     "content_id": 309,
+     "html_url": "https://canvas.sfu.ca/courses/17316/modules/items/772202",
+     "external_url": "https://app.crowdmark.com/",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 109062,
+   "name": "Slides",
+   "position": 2,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 849253,
+     "title": "Week 1 - What is logic.pdf",
+     "type": "File",
+     "content_id": 3287710,
+     "html_url": "https://canvas.sfu.ca/courses/17316/modules/items/849253",
+     "indent": 0
+    },
+    {
+     "id": 857663,
+     "title": "Week 2 - Atomic sentences and the Boolean connectives.pdf",
+     "type": "File",
+     "content_id": 3335971,
+     "html_url": "https://canvas.sfu.ca/courses/17316/modules/items/857663",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 109063,
+   "name": "Answer keys",
+   "position": 3,
+   "unlock_at": null,
+   "state": "completed",
+   "items": []
+  }
+ ],
+ "PSYC300W": [
+  {
+   "id": 117415,
+   "name": "Course Information",
+   "position": 1,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 831860,
+     "title": "Welcome to PSYC 300W!",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/831860",
+     "indent": 0
+    },
+    {
+     "id": 831863,
+     "title": "Dr. Leavitt's email is peter_leavitt@sfu.ca and his office is RCB 6153",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 831857,
+     "title": "How to find Dr. Leavitt's office in RCB",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/831857",
+     "indent": 0
+    },
+    {
+     "id": 831859,
+     "title": "Teaching Assistant Information",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/831859",
+     "indent": 0
+    },
+    {
+     "id": 858122,
+     "title": "Syllabus_PSYC300W_D100_Fall2026.pdf",
+     "type": "File",
+     "content_id": 3250629,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/858122",
+     "indent": 0
+    },
+    {
+     "id": 831858,
+     "title": "How to Use Turnitin to Submit Assignments",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/831858",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 117817,
+   "name": "Week 1: Introduction",
+   "position": 2,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 833556,
+     "title": "READINGS (do before Sep. 15 class)",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 833604,
+     "title": "Writing is thinking - Steven Mintz.pdf",
+     "type": "File",
+     "content_id": 3234517,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/833604",
+     "indent": 0
+    },
+    {
+     "id": 833616,
+     "title": "AAAS Communication Toolkit _ American Association for the Advancement of Science (AAAS).pdf",
+     "type": "File",
+     "content_id": 3234522,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/833616",
+     "indent": 0
+    },
+    {
+     "id": 833605,
+     "title": "5 tips from Zinsser On Writing Well.pdf",
+     "type": "File",
+     "content_id": 3234523,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/833605",
+     "indent": 0
+    },
+    {
+     "id": 833557,
+     "title": "ASSIGNMENTS",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 833558,
+     "title": "LECTURE SLIDES (will be posted after class)",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 852923,
+     "title": "PSYC 300W - Lecture 1 - Intro to class.pdf",
+     "type": "File",
+     "content_id": 3311420,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/852923",
+     "indent": 0
+    },
+    {
+     "id": 833559,
+     "title": "TUTORIAL ASSIGNMENTS",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 833606,
+     "title": "Attendance Diary 1",
+     "type": "Assignment",
+     "content_id": 226656,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/833606",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-10T06:59:59Z",
+      "points_possible": 3.0
+     }
+    }
+   ]
+  },
+  {
+   "id": 117828,
+   "name": "Week 2: Our Changing Relationship with the Written Word",
+   "position": 3,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 833600,
+     "title": "READINGS (do before Sep. 22 class)",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 833608,
+     "title": "Postman 1985 - Amusing Ourselves to Death - Ch. 2 - Media as Epistemology.pdf",
+     "type": "File",
+     "content_id": 3234539,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/833608",
+     "indent": 0
+    },
+    {
+     "id": 833607,
+     "title": "The End of Reading Is Here - The Atlantic.pdf",
+     "type": "File",
+     "content_id": 3239008,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/833607",
+     "indent": 0
+    },
+    {
+     "id": 833609,
+     "title": "Experimental History - I like em thick.pdf",
+     "type": "File",
+     "content_id": 3239007,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/833609",
+     "indent": 0
+    },
+    {
+     "id": 833601,
+     "title": "ASSIGNMENTS",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 833611,
+     "title": "In-Class Quiz 1",
+     "type": "Quiz",
+     "content_id": 79821,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/833611",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-22T19:40:00Z",
+      "points_possible": 10.0,
+      "unlock_at": "2026-09-22T19:30:09Z"
+     }
+    },
+    {
+     "id": 833602,
+     "title": "LECTURE SLIDES",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 858639,
+     "title": "PSYC 300W - Lecture 2 - The Written Word.pdf",
+     "type": "File",
+     "content_id": 3343653,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/858639",
+     "indent": 0
+    },
+    {
+     "id": 833603,
+     "title": "TUTORIAL ASSIGNMENTS",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 833613,
+     "title": "Writing Skill 1 - Create an Outline",
+     "type": "Assignment",
+     "content_id": 226541,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/833613",
+     "indent": 0,
+     "content_details": {
+      "points_possible": 20.0
+     }
+    }
+   ]
+  },
+  {
+   "id": 117818,
+   "name": "Week 3: Reading Day 1",
+   "position": 4,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 833560,
+     "title": "READINGS (will be reading/reviewing together during class on Sep. 29)",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 858545,
+     "title": "KSJ Handbook: Fact-Checking Science Journalism: How to Make Sure Your Stories Are True",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/858545",
+     "external_url": "https://ksjhandbook.org/fact-checking-science-journalism-how-to-make-sure-your-stories-are-true/",
+     "indent": 0
+    },
+    {
+     "id": 858546,
+     "title": "KSJ Handbook: The Three Models of Fact-Checking",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/858546",
+     "external_url": "https://ksjhandbook.org/fact-checking-science-journalism-how-to-make-sure-your-stories-are-true/the-three-models-of-fact-checking/",
+     "indent": 0
+    },
+    {
+     "id": 858550,
+     "title": "KSJ Handbook: The Fact-Checking Process",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/858550",
+     "external_url": "https://ksjhandbook.org/fact-checking-science-journalism-how-to-make-sure-your-stories-are-true/the-fact-checking-process/",
+     "indent": 0
+    },
+    {
+     "id": 833561,
+     "title": "ASSIGNMENTS",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 833562,
+     "title": "LECTURE SLIDES",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 833563,
+     "title": "TUTORIAL ASSIGNMENTS",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 858555,
+     "title": "Writing Skill 2 - Writing Good Paragraphs",
+     "type": "Assignment",
+     "content_id": 226542,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/858555",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-24T06:59:59Z",
+      "points_possible": 20.0
+     }
+    }
+   ]
+  },
+  {
+   "id": 117416,
+   "name": "Science Communication Writing Assignment and Resources",
+   "position": 14,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 848167,
+     "title": "Science Communication Writing Assignment Instructions",
+     "type": "File",
+     "content_id": 3283371,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/848167",
+     "indent": 0
+    },
+    {
+     "id": 831834,
+     "title": "Writing Skill 1 - Create an Outline",
+     "type": "Assignment",
+     "content_id": 226541,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/831834",
+     "indent": 0,
+     "content_details": {
+      "points_possible": 20.0
+     }
+    },
+    {
+     "id": 831835,
+     "title": "Writing Skill 2 - Writing Good Paragraphs",
+     "type": "Assignment",
+     "content_id": 226542,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/831835",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-24T06:59:59Z",
+      "points_possible": 20.0
+     }
+    }
+   ]
+  },
+  {
+   "id": 117417,
+   "name": "Writing and Reading Resources",
+   "position": 15,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 848169,
+     "title": "Science Communication Writing Assignment Instructions",
+     "type": "File",
+     "content_id": 3283371,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/848169",
+     "indent": 0
+    },
+    {
+     "id": 831840,
+     "title": "Literature Search Resources",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 831841,
+     "title": "How to download LibKey Browser Extension for quickly locating full-text articles",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/831841",
+     "external_url": "https://www.lib.sfu.ca/find/research-tools/libkey-nomad-browser-extension",
+     "indent": 0
+    },
+    {
+     "id": 837102,
+     "title": "PsycINFO and APA style library guide",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/837102",
+     "external_url": "https://www.lib.sfu.ca/help/research-assistance/subject/psychology/psychology-general-psycinfo",
+     "indent": 0
+    },
+    {
+     "id": 831842,
+     "title": "Writing Resources",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 831843,
+     "title": "Student Learning Commons Writing Resources",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/831843",
+     "external_url": "https://www.lib.sfu.ca/about/branches-depts/slc/writing",
+     "indent": 0
+    },
+    {
+     "id": 831844,
+     "title": "How To Outline",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/831844",
+     "external_url": "https://slc.berkeley.edu/writing-worksheets-and-other-writing-resources/how-outline",
+     "indent": 0
+    },
+    {
+     "id": 831845,
+     "title": "5 tips from Zinsser On Writing Well.pdf",
+     "type": "File",
+     "content_id": 3234523,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/831845",
+     "indent": 0
+    },
+    {
+     "id": 831846,
+     "title": "How_to_Write_Ch21_Reducing (Fowler).pdf",
+     "type": "File",
+     "content_id": 3234524,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/831846",
+     "indent": 0
+    },
+    {
+     "id": 831847,
+     "title": "Thread of writing advice from psychologists",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/831847",
+     "external_url": "https://bsky.app/profile/mwkraus.bsky.social/post/3lnixgp5enc2r",
+     "indent": 0
+    },
+    {
+     "id": 831848,
+     "title": "Reading Resources",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 831849,
+     "title": "Reading the journals: From new science to science news",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/831849",
+     "external_url": "https://www.nasw.org/article/reading-journals-new-science-science-news",
+     "indent": 0
+    },
+    {
+     "id": 831850,
+     "title": "How to Read a Journal Article (Jordan & Zanna, 1999)",
+     "type": "File",
+     "content_id": 3234526,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/831850",
+     "indent": 0
+    },
+    {
+     "id": 831851,
+     "title": "How to read a paper (Keshave, 2007)",
+     "type": "File",
+     "content_id": 3234533,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/831851",
+     "indent": 0
+    },
+    {
+     "id": 831852,
+     "title": "Think Like A Fact-Checker",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/831852",
+     "external_url": "https://www.psychologytoday.com/ca/blog/misguided/202505/think-like-a-fact-checker-the-skill-most-people-dont-use",
+     "indent": 0
+    },
+    {
+     "id": 831853,
+     "title": "Reference Management Resources",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 831854,
+     "title": "APA Style Citations and References",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/831854",
+     "external_url": "https://www.lib.sfu.ca/help/cite-write/citation-style-guides/apa",
+     "indent": 0
+    },
+    {
+     "id": 831855,
+     "title": "Zotero Basics - Reference Management",
+     "type": "ExternalUrl",
+     "html_url": "https://canvas.sfu.ca/api/v1/courses/17471/module_item_redirect/831855",
+     "external_url": "https://www.zotero.org/support/quick_start_guide",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 120808,
+   "name": "Lecture Slides",
+   "position": 16,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 852924,
+     "title": "PSYC 300W - Lecture 1 - Intro to class.pdf",
+     "type": "File",
+     "content_id": 3311420,
+     "html_url": "https://canvas.sfu.ca/courses/17471/modules/items/852924",
+     "indent": 0
+    }
+   ]
+  }
+ ],
+ "REM388": [
+  {
+   "id": 110860,
+   "name": "Academic Integrity Guidance on Artificial Intelligence for SFU Students",
+   "position": 1,
+   "unlock_at": null,
+   "state": "completed",
+   "items": []
+  },
+  {
+   "id": 110864,
+   "name": "Student Academic Integrity Canvas Tutorial 2026",
+   "position": 2,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783513,
+     "title": "Overview/ Introduction",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783513",
+     "indent": 0
+    },
+    {
+     "id": 783514,
+     "title": "What is Academic Integrity? Why Does it Matter?",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783514",
+     "indent": 0
+    },
+    {
+     "id": 783515,
+     "title": "What is Plagiarism?",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783515",
+     "indent": 0
+    },
+    {
+     "id": 783516,
+     "title": "How Can I Avoid Plagiarism?",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783516",
+     "indent": 0
+    },
+    {
+     "id": 783517,
+     "title": "What is Patchwriting?",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783517",
+     "indent": 0
+    },
+    {
+     "id": 783518,
+     "title": "Why Do I have to Cite My Sources?",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783518",
+     "indent": 0
+    },
+    {
+     "id": 783519,
+     "title": "Do I Have to Cite Everything?",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783519",
+     "indent": 0
+    },
+    {
+     "id": 783520,
+     "title": "Can I reuse a paper by submitting it to multiple courses?",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783520",
+     "indent": 0
+    },
+    {
+     "id": 783521,
+     "title": "I am Taking a Computer Science Course. Can I Share Computer Code?",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783521",
+     "indent": 0
+    },
+    {
+     "id": 783522,
+     "title": "Are there risks to using Artificial Intelligence?",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783522",
+     "indent": 0
+    },
+    {
+     "id": 783523,
+     "title": "Am I Allowed to Use Generative AI in my Coursework?",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783523",
+     "indent": 0
+    },
+    {
+     "id": 783524,
+     "title": "Resources to Cite Generative Artificial Intelligence",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783524",
+     "indent": 0
+    },
+    {
+     "id": 783525,
+     "title": "Misrepresenting your identity",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783525",
+     "indent": 0
+    },
+    {
+     "id": 783526,
+     "title": "Misrepresenting Your Circumstances to Request a Concession",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783526",
+     "indent": 0
+    },
+    {
+     "id": 783527,
+     "title": "Cheating on an exam",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783527",
+     "indent": 0
+    },
+    {
+     "id": 783528,
+     "title": "Altering an Exam Mark",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783528",
+     "indent": 0
+    },
+    {
+     "id": 783529,
+     "title": "Assisting Others to Cheat",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783529",
+     "indent": 0
+    },
+    {
+     "id": 783530,
+     "title": "Self - Check 01 ",
+     "type": "Quiz",
+     "content_id": 76265,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783530",
+     "indent": 1,
+     "completion_requirement": {
+      "type": "min_score",
+      "min_score": 10.0,
+      "completed": true
+     },
+     "content_details": {
+      "due_at": "2026-09-21T06:59:59Z",
+      "points_possible": 10.0,
+      "unlock_at": "2026-08-26T07:00:00Z"
+     }
+    },
+    {
+     "id": 783531,
+     "title": "What is Contract Cheating?",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783531",
+     "indent": 0
+    },
+    {
+     "id": 783532,
+     "title": "Sharing Instructional Material is Prohibited",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783532",
+     "indent": 0
+    },
+    {
+     "id": 783533,
+     "title": "Academic Disciplinary Process",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783533",
+     "indent": 0
+    },
+    {
+     "id": 783534,
+     "title": "Penalties",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783534",
+     "indent": 0
+    },
+    {
+     "id": 783535,
+     "title": "Appeals",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783535",
+     "indent": 0
+    },
+    {
+     "id": 783536,
+     "title": "Office Hours: An effective but underused resource",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783536",
+     "indent": 0
+    },
+    {
+     "id": 783537,
+     "title": "Library and Student Learning Commons ",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783537",
+     "indent": 0
+    },
+    {
+     "id": 783538,
+     "title": "Free tutoring and peer support through your department",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783538",
+     "indent": 0
+    },
+    {
+     "id": 783539,
+     "title": "Study Groups",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783539",
+     "indent": 0
+    },
+    {
+     "id": 783540,
+     "title": "Self - Check 02",
+     "type": "Quiz",
+     "content_id": 76266,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783540",
+     "indent": 1,
+     "completion_requirement": {
+      "type": "min_score",
+      "min_score": 8.0,
+      "completed": true
+     },
+     "content_details": {
+      "due_at": "2026-09-21T06:59:59Z",
+      "points_possible": 8.0,
+      "unlock_at": "2026-08-26T07:00:00Z"
+     }
+    },
+    {
+     "id": 783541,
+     "title": "Congratulations!",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783541",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110884,
+   "name": "Welcome Package",
+   "position": 3,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783741,
+     "title": "Code of Academic Integrity and Good Conduct.pdf",
+     "type": "File",
+     "content_id": 3108434,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783741",
+     "indent": 0,
+     "completion_requirement": {
+      "type": "must_view",
+      "completed": true
+     }
+    },
+    {
+     "id": 783742,
+     "title": "Conventions for Conduct.pdf",
+     "type": "File",
+     "content_id": 3108435,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783742",
+     "indent": 0,
+     "completion_requirement": {
+      "type": "must_view",
+      "completed": true
+     }
+    },
+    {
+     "id": 798753,
+     "title": "REM 388 - 2026 f  - Course outline.pdf",
+     "type": "File",
+     "content_id": 3151519,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/798753",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110885,
+   "name": "Course Assignments",
+   "position": 4,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783743,
+     "title": "Mayer 2010 - Phenology and citizen science.pdf",
+     "type": "File",
+     "content_id": 3108607,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783743",
+     "indent": 0
+    },
+    {
+     "id": 783744,
+     "title": "Miller 2005 - Biodiversity conservation and the extinction of experience.pdf",
+     "type": "File",
+     "content_id": 3108608,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783744",
+     "indent": 0
+    },
+    {
+     "id": 783745,
+     "title": "Assignment 01 - Finding a Site",
+     "type": "Assignment",
+     "content_id": 212960,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783745",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-28T21:30:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-10-01T06:59:59Z"
+     }
+    },
+    {
+     "id": 783746,
+     "title": "Assignment 02 \u2013 Seek \u2013 Species Identification",
+     "type": "Assignment",
+     "content_id": 212961,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783746",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-11-16T22:30:00Z",
+      "points_possible": 50.0,
+      "lock_at": "2026-11-19T07:59:59Z"
+     }
+    },
+    {
+     "id": 783747,
+     "title": "Assignment 03 \u2013 Sense of Your Place",
+     "type": "Assignment",
+     "content_id": 212962,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783747",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-12-07T22:30:00Z",
+      "points_possible": 100.0,
+      "lock_at": "2026-12-10T07:59:59Z"
+     }
+    },
+    {
+     "id": 783748,
+     "title": "Assignment 04 \u2013 Predator Awareness Training ",
+     "type": "Assignment",
+     "content_id": 212963,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783748",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-12-07T22:30:00Z",
+      "points_possible": 0.0,
+      "lock_at": "2026-12-10T07:59:59Z",
+      "unlock_at": "2026-11-02T16:00:00Z"
+     }
+    }
+   ]
+  },
+  {
+   "id": 110886,
+   "name": "Week 01 - No Lecture - No Tutorial",
+   "position": 5,
+   "unlock_at": null,
+   "state": "completed",
+   "items": []
+  },
+  {
+   "id": 110887,
+   "name": "Week 02",
+   "position": 6,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783749,
+     "title": "Discussion 01 - Welcome Introductions",
+     "type": "Discussion",
+     "content_id": 260380,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783749",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-14T06:59:59Z",
+      "points_possible": 3.0,
+      "lock_at": "2026-09-14T06:59:59Z"
+     }
+    },
+    {
+     "id": 783750,
+     "title": "Quiz 01 - Course Outline and DEMANDS",
+     "type": "Quiz",
+     "content_id": 76305,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783750",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-15T18:20:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-09-15T18:20:00Z",
+      "unlock_at": "2026-09-14T23:30:00Z"
+     }
+    },
+    {
+     "id": 783751,
+     "title": "Lecture 01 - HANDOUT - DEMANDS.pdf",
+     "type": "File",
+     "content_id": 3108418,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783751",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110888,
+   "name": "Week 03",
+   "position": 7,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783752,
+     "title": "Discussion 02 - Tree of Life",
+     "type": "Discussion",
+     "content_id": 260381,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783752",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-21T06:59:59Z",
+      "points_possible": 3.0,
+      "lock_at": "2026-09-21T06:59:59Z"
+     }
+    },
+    {
+     "id": 783753,
+     "title": "Quiz 02 - The Tree of Life",
+     "type": "Quiz",
+     "content_id": 76308,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783753",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-22T18:20:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-09-22T18:20:00Z",
+      "unlock_at": "2026-09-21T23:30:00Z"
+     }
+    },
+    {
+     "id": 783754,
+     "title": "Lecture 02 - HANDOUT - Tree of Life.pdf",
+     "type": "File",
+     "content_id": 3108618,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783754",
+     "indent": 0
+    },
+    {
+     "id": 783755,
+     "title": "Lecture 02 - HANDOUT - Marsupialia - Proboscidea.pdf",
+     "type": "File",
+     "content_id": 3108521,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783755",
+     "indent": 0
+    },
+    {
+     "id": 783756,
+     "title": "REM 388 Tut 02 Tree of Life Canvas.pdf",
+     "type": "File",
+     "content_id": 3108514,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783756",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110889,
+   "name": "Week 04",
+   "position": 8,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783757,
+     "title": "Discussion 03 - Evolution by Natural Selection",
+     "type": "Discussion",
+     "content_id": 260377,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783757",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-28T06:59:59Z",
+      "points_possible": 3.0,
+      "lock_at": "2026-09-28T06:59:59Z"
+     }
+    },
+    {
+     "id": 783758,
+     "title": "Quiz 03 - Evolution by Natural Selection",
+     "type": "Quiz",
+     "content_id": 76297,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783758",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-29T18:20:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-09-29T18:20:00Z",
+      "unlock_at": "2026-09-28T23:30:00Z"
+     }
+    },
+    {
+     "id": 783759,
+     "title": "Lecture 03 - HANDOUT - Evolution by Natural Selection.pdf",
+     "type": "File",
+     "content_id": 3108623,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783759",
+     "indent": 0
+    },
+    {
+     "id": 783760,
+     "title": "Lecture 03 - HANDOUT - Lagomorpha - Rodentia - Chiroptera.pdf",
+     "type": "File",
+     "content_id": 3108419,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783760",
+     "indent": 0
+    },
+    {
+     "id": 783761,
+     "title": "Lecture 03 - Video 01 - Genome - DNA and the Nucleotides-G-C-A-T.mp4",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783761",
+     "indent": 0
+    },
+    {
+     "id": 783762,
+     "title": "Lecture 03 - Video 02 - Evolution - Natures Clinical Trial.mp4",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783762",
+     "indent": 0
+    },
+    {
+     "id": 783763,
+     "title": "Lecture 03 - Video 03 - Evolution - Reading the Results.mp4",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783763",
+     "indent": 0
+    },
+    {
+     "id": 783764,
+     "title": "Lecture 03 - Video 04 - Introduction to Natural Selection and Evolution.mp4",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783764",
+     "indent": 0
+    },
+    {
+     "id": 783765,
+     "title": "REM 388 Tut 03 Evolution Canvas.pdf",
+     "type": "File",
+     "content_id": 3108429,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783765",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110890,
+   "name": "Week 05",
+   "position": 9,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783766,
+     "title": "Discussion 04 - Eight Key Challenges for Wildlife Conservation - Issues 1 to 4 ",
+     "type": "Discussion",
+     "content_id": 260382,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783766",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-10-05T06:59:59Z",
+      "points_possible": 3.0,
+      "lock_at": "2026-10-05T06:59:59Z"
+     }
+    },
+    {
+     "id": 783767,
+     "title": "Quiz 04 - Eight Key Challenges for Wildlife Conservation - Issues 1 to 4 ",
+     "type": "Quiz",
+     "content_id": 76294,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783767",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-10-06T18:20:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-10-06T18:20:00Z",
+      "unlock_at": "2026-10-05T23:30:00Z"
+     }
+    },
+    {
+     "id": 783768,
+     "title": "Lecture 04 - HANDOUT - Eight Key Challenges for Wildlife Conservation - Issues 1 to 4.pdf",
+     "type": "File",
+     "content_id": 3108619,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783768",
+     "indent": 0
+    },
+    {
+     "id": 783769,
+     "title": "Lecture 04 - HANDOUT - Primates.pdf",
+     "type": "File",
+     "content_id": 3108620,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783769",
+     "indent": 0
+    },
+    {
+     "id": 783770,
+     "title": "Lecture 04 - Video 01 - Story of Stuff.pptx",
+     "type": "File",
+     "content_id": 3108420,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783770",
+     "indent": 0
+    },
+    {
+     "id": 783771,
+     "title": "REM 388 Tut 04 Challenges for Wildlife Conservation Canvas.pdf",
+     "type": "File",
+     "content_id": 3108430,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783771",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110892,
+   "name": "Week 06 - No Lecture - No Tutorials",
+   "position": 10,
+   "unlock_at": null,
+   "state": "completed",
+   "items": []
+  },
+  {
+   "id": 110893,
+   "name": "Week 07 - Midterm - Monday, 19 Oct - 14:30 - 16:30",
+   "position": 11,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783777,
+     "title": "REM 388 - 2026 f - Midterm Exam - Part 01 ",
+     "type": "Quiz",
+     "content_id": 76307,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783777",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-10-19T21:47:00Z",
+      "points_possible": 40.0,
+      "lock_at": "2026-10-19T21:59:59Z",
+      "unlock_at": "2026-10-19T21:32:00Z"
+     }
+    },
+    {
+     "id": 783778,
+     "title": "REM 388 - 2026 f- Midterm Exam - Part 02",
+     "type": "Quiz",
+     "content_id": 76304,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783778",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-10-19T23:18:00Z",
+      "points_possible": 60.0,
+      "lock_at": "2026-10-19T23:18:00Z",
+      "unlock_at": "2026-10-19T21:48:00Z"
+     }
+    }
+   ]
+  },
+  {
+   "id": 110891,
+   "name": "Week 08",
+   "position": 12,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783772,
+     "title": "Discussion 05 - Eight Key Challenges for Wildlife Conservation - Issues 5 to 8",
+     "type": "Discussion",
+     "content_id": 260379,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783772",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-10-26T06:59:59Z",
+      "points_possible": 3.0,
+      "lock_at": "2026-10-26T06:59:59Z"
+     }
+    },
+    {
+     "id": 783773,
+     "title": "Quiz 05 - Eight Key Challenges for Wildlife Conservation - Issues 5 to 8  ",
+     "type": "Quiz",
+     "content_id": 76299,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783773",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-10-27T18:20:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-10-27T18:20:00Z",
+      "unlock_at": "2026-10-26T23:30:00Z"
+     }
+    },
+    {
+     "id": 783774,
+     "title": "Lecture 05 - HANDOUT - Eight Key Challenges for Wildlife Conservation - Issues 5 to 8.pdf",
+     "type": "File",
+     "content_id": 3108626,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783774",
+     "indent": 0
+    },
+    {
+     "id": 783775,
+     "title": "Lecture 05 - HANDOUT - Cetartiodactyla - Cetacea.pdf",
+     "type": "File",
+     "content_id": 3108520,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783775",
+     "indent": 0
+    },
+    {
+     "id": 783776,
+     "title": "REM 388 Tut 05 Challenges for Wildlife Conservation Cont. and Review Canvas.pdf",
+     "type": "File",
+     "content_id": 3108431,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783776",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110894,
+   "name": "Week 09",
+   "position": 13,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783779,
+     "title": "Discussion 06 - Industrial Challenges and Opportunities - Issues 1 to 3",
+     "type": "Discussion",
+     "content_id": 260383,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783779",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-11-02T07:59:59Z",
+      "points_possible": 3.0,
+      "lock_at": "2026-11-02T07:59:59Z"
+     }
+    },
+    {
+     "id": 783780,
+     "title": "Quiz 06 - Industrial Challenges and Opportunities - Issues 1 to 3",
+     "type": "Quiz",
+     "content_id": 76296,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783780",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-11-03T19:20:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-11-03T19:20:00Z",
+      "unlock_at": "2026-11-03T00:30:00Z"
+     }
+    },
+    {
+     "id": 783781,
+     "title": "Lecture 06 - HANDOUT - Industrial Challenges and Opportunities - Issues 1 to 3.pdf",
+     "type": "File",
+     "content_id": 3108421,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783781",
+     "indent": 0
+    },
+    {
+     "id": 783782,
+     "title": "Lecture 06 - HANDOUT - Perissodactyla - Cetartiodactyla.pdf",
+     "type": "File",
+     "content_id": 3108423,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783782",
+     "indent": 0
+    },
+    {
+     "id": 783783,
+     "title": "REM 388 Tut 06 Industrial Challenges and Opportunities Canvas.pdf",
+     "type": "File",
+     "content_id": 3108621,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783783",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110895,
+   "name": "Week 10",
+   "position": 14,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783784,
+     "title": "Discussion 07 - Industrial Challenges and Opportunities - Issues 4 to 7",
+     "type": "Discussion",
+     "content_id": 260378,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783784",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-11-09T07:59:59Z",
+      "points_possible": 3.0,
+      "lock_at": "2026-11-09T07:59:59Z"
+     }
+    },
+    {
+     "id": 783785,
+     "title": "Quiz 07 - Industrial Challenges and Opportunities - Issues 4  to 7",
+     "type": "Quiz",
+     "content_id": 76295,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783785",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-11-10T19:20:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-11-10T19:20:00Z",
+      "unlock_at": "2026-11-10T00:30:00Z"
+     }
+    },
+    {
+     "id": 783786,
+     "title": "Lecture 07 - HANDOUT - Industrial Challenges and Opportunities - Issues 4 to 7.pdf",
+     "type": "File",
+     "content_id": 3108424,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783786",
+     "indent": 0
+    },
+    {
+     "id": 783787,
+     "title": "Lecture 07 - HANDOUT - Cetartiodactyla \u2013 Bovidae - Cervidae.pdf",
+     "type": "File",
+     "content_id": 3108617,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783787",
+     "indent": 0
+    },
+    {
+     "id": 783788,
+     "title": "REM 388 Tut 07 Industrial Challenges and Opportunities Cont. Canvas.pdf",
+     "type": "File",
+     "content_id": 3108624,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783788",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110896,
+   "name": "Week 11",
+   "position": 15,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783789,
+     "title": "Discussion 08 - Indigenous People and Wildlife",
+     "type": "Discussion",
+     "content_id": 260384,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783789",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-11-16T07:59:59Z",
+      "points_possible": 3.0,
+      "lock_at": "2026-11-16T07:59:59Z"
+     }
+    },
+    {
+     "id": 783790,
+     "title": "Quiz 08 - Indigenous People and Wildlife",
+     "type": "Quiz",
+     "content_id": 76293,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783790",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-11-17T19:20:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-11-17T19:20:00Z",
+      "unlock_at": "2026-11-17T00:30:00Z"
+     }
+    },
+    {
+     "id": 783791,
+     "title": "Lecture 08 - HANDOUT - Indigenous People and Wildlife.pdf",
+     "type": "File",
+     "content_id": 3108425,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783791",
+     "indent": 0
+    },
+    {
+     "id": 783792,
+     "title": "Lecture 08 - HANDOUT - Carnivora - Canidae.pdf",
+     "type": "File",
+     "content_id": 3108625,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783792",
+     "indent": 0
+    },
+    {
+     "id": 783793,
+     "title": "REM 388 Tut 08 Indigenous People and Wildlife Canvas.pdf",
+     "type": "File",
+     "content_id": 3108432,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783793",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110897,
+   "name": "Week 12",
+   "position": 16,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783794,
+     "title": "Discussion 09 - Wildlife Awareness and Safety",
+     "type": "Discussion",
+     "content_id": 260387,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783794",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-11-23T07:59:59Z",
+      "points_possible": 3.0,
+      "lock_at": "2026-11-23T07:59:59Z"
+     }
+    },
+    {
+     "id": 783795,
+     "title": "Quiz 09 - Wildlife Awareness and Safety",
+     "type": "Quiz",
+     "content_id": 76311,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783795",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-11-24T19:20:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-11-24T19:20:00Z",
+      "unlock_at": "2026-11-24T00:30:00Z"
+     }
+    },
+    {
+     "id": 783796,
+     "title": "Lecture 09 - HANDOUT - Wildlife Awareness and Safety.pdf",
+     "type": "File",
+     "content_id": 3108523,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783796",
+     "indent": 0
+    },
+    {
+     "id": 783797,
+     "title": "Lecture 09 - HANDOUT - Carnivora - Ursidae.pdf",
+     "type": "File",
+     "content_id": 3108627,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783797",
+     "indent": 0
+    },
+    {
+     "id": 783798,
+     "title": "REM 388 Tut 09 Wildlife Awareness and Safety Canvas.pdf",
+     "type": "File",
+     "content_id": 3108622,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783798",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110898,
+   "name": "Week 13",
+   "position": 17,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783799,
+     "title": "Discussion 10 - Managing Predator-Prey and Resource Use - Wolf \u2013 Caribou \u2013 Moose \u2013 Logging",
+     "type": "Discussion",
+     "content_id": 260385,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783799",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-11-30T07:59:59Z",
+      "points_possible": 3.0,
+      "lock_at": "2026-11-30T07:59:59Z"
+     }
+    },
+    {
+     "id": 783800,
+     "title": "Quiz 10 - Managing Predator-Prey and Resource Use - Wolf \u2013 Caribou \u2013 Moose \u2013 Logging",
+     "type": "Quiz",
+     "content_id": 76301,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783800",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-12-01T19:20:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-12-01T19:20:00Z",
+      "unlock_at": "2026-12-01T00:30:00Z"
+     }
+    },
+    {
+     "id": 783801,
+     "title": "Lecture 10 - HANDOUT - Managing Predator-Prey and Resource Use - Wolf \u2013 Caribou \u2013 Moose \u2013 Logging.pdf",
+     "type": "File",
+     "content_id": 3108426,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783801",
+     "indent": 0
+    },
+    {
+     "id": 783802,
+     "title": "Lecture 10 - HANDOUT - Carnivora- Felidae.pdf",
+     "type": "File",
+     "content_id": 3108628,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783802",
+     "indent": 0
+    },
+    {
+     "id": 783803,
+     "title": "REM 388 Tut 10 Predator Prey Dynamics and Resource Use Canvas.pdf",
+     "type": "File",
+     "content_id": 3108422,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783803",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110899,
+   "name": "Week 14",
+   "position": 18,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 783804,
+     "title": "Discussion 11 - Studying Predator-Prey systems on the Serengeti in Tanzania ",
+     "type": "Discussion",
+     "content_id": 260386,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783804",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-12-07T07:29:00Z",
+      "points_possible": 3.0,
+      "lock_at": "2026-12-07T07:59:59Z"
+     }
+    },
+    {
+     "id": 783805,
+     "title": "Quiz 11 - Studying Predator-Prey systems on the Serengeti in Tanzania ",
+     "type": "Quiz",
+     "content_id": 76306,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783805",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-12-08T19:20:00Z",
+      "points_possible": 20.0,
+      "lock_at": "2026-12-08T19:20:00Z",
+      "unlock_at": "2026-12-08T00:30:00Z"
+     }
+    },
+    {
+     "id": 783806,
+     "title": "Lecture 11 - HANDOUT - Studying Predator-Prey systems on the Serengeti in Tanzania.pdf",
+     "type": "File",
+     "content_id": 3108629,
+     "html_url": "https://canvas.sfu.ca/courses/15792/modules/items/783806",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110900,
+   "name": "Final Exam - see GoSFU website",
+   "position": 19,
+   "unlock_at": null,
+   "state": "completed",
+   "items": []
+  }
+ ],
+ "SD381": [
+  {
+   "id": 108587,
+   "name": "MODULE 1, WEEK 1: SUBJECT  INTRODUCTION AND DEFINING SUSTAINABLE COMMUNITIES",
+   "position": 1,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 768627,
+     "title": "MODULE 1: Overview and Preparation Work (Week 1)",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/768627",
+     "indent": 0
+    },
+    {
+     "id": 839708,
+     "title": "MODULE 1, Week 1, Introduce Yourself",
+     "type": "Discussion",
+     "content_id": 260153,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/839708",
+     "indent": 0,
+     "content_details": {
+      "points_possible": 1.0,
+      "lock_at": "2026-10-02T06:59:59Z",
+      "unlock_at": "2026-09-09T07:01:00Z"
+     }
+    },
+    {
+     "id": 768628,
+     "title": "Week 1 Readings Quiz",
+     "type": "Quiz",
+     "content_id": 74863,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/768628",
+     "indent": 1,
+     "content_details": {
+      "due_at": "2026-09-14T06:59:59Z",
+      "points_possible": 10.0,
+      "lock_at": "2027-01-02T07:59:59Z",
+      "unlock_at": "2026-09-09T07:01:00Z"
+     }
+    },
+    {
+     "id": 768629,
+     "title": "MODULE 1: Virtual Lecture Material and/ or Activity",
+     "type": "SubHeader",
+     "indent": 1
+    },
+    {
+     "id": 768630,
+     "title": "MODULE 1, WEEK 1- Virtual Lecture Material and/or Activity",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/768630",
+     "indent": 0
+    },
+    {
+     "id": 768631,
+     "title": "MODULE 1, WEEK 1- Virtual Lecture Material and/or Activity (Continued)",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/768631",
+     "indent": 0
+    },
+    {
+     "id": 768632,
+     "title": "MODULE 1, Week 1, Part 2 Activity/ Second Discussion activity- writing good paragraphs",
+     "type": "Discussion",
+     "content_id": 256464,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/768632",
+     "indent": 1,
+     "content_details": {
+      "due_at": "2026-09-14T06:59:59Z",
+      "points_possible": 2.0,
+      "lock_at": "2027-01-01T07:59:59Z"
+     }
+    },
+    {
+     "id": 789778,
+     "title": "MODULE 1, Week 1, Part 3a Activity: Applying Empathy in Design Thinking",
+     "type": "Assignment",
+     "content_id": 207956,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/789778",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-21T06:59:59Z",
+      "points_possible": 7.0,
+      "unlock_at": "2026-09-09T07:00:00Z"
+     }
+    },
+    {
+     "id": 768635,
+     "title": "MODULE 1, Week 1, Part 3b Activity- share your results for the \"Applying Empathy in Design Thinking\" assignment with other students",
+     "type": "Discussion",
+     "content_id": 256463,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/768635",
+     "indent": 1,
+     "content_details": {
+      "due_at": "2026-09-22T06:59:59Z",
+      "points_possible": 3.0,
+      "lock_at": "2027-01-01T07:59:59Z"
+     }
+    },
+    {
+     "id": 786883,
+     "title": "Meaningful citations_Fall 2026_Sept.pdf",
+     "type": "File",
+     "content_id": 3115709,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/786883",
+     "indent": 0
+    },
+    {
+     "id": 768637,
+     "title": "MODULE 1, WEEK 1: Summary",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/768637",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 110757,
+   "name": "MODULE 1, WEEK 2",
+   "position": 2,
+   "unlock_at": null,
+   "state": "completed",
+   "items": [
+    {
+     "id": 782513,
+     "title": "MODULE 1, WEEK 2: Overview and Preparation Work",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/782513",
+     "indent": 0
+    },
+    {
+     "id": 782514,
+     "title": "MODULE 1, WEEK 2- Virtual Lecture Material and/or Activity- Part 1",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/782514",
+     "indent": 0
+    },
+    {
+     "id": 782515,
+     "title": "MODULE 1, Week 2, short discussion on adulting",
+     "type": "Discussion",
+     "content_id": 260283,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/782515",
+     "indent": 1,
+     "content_details": {
+      "due_at": "2026-09-17T06:59:00Z",
+      "points_possible": 5.0,
+      "lock_at": "2027-01-01T07:59:59Z",
+      "unlock_at": "2026-09-14T06:30:00Z"
+     }
+    },
+    {
+     "id": 782517,
+     "title": "MODULE 1, WEEK 2, Part 2 Activity- Video and Embedded quiz",
+     "type": "Assignment",
+     "content_id": 212707,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/782517",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-21T06:59:59Z",
+      "points_possible": 1.0
+     }
+    },
+    {
+     "id": 782516,
+     "title": "MODULE 1, WEEK 2, Part 3 Activity: Video and Embedded quiz",
+     "type": "Assignment",
+     "content_id": 212706,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/782516",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-21T06:59:59Z",
+      "points_possible": 1.0
+     }
+    },
+    {
+     "id": 782518,
+     "title": "MODULE 1, WEEK 2- Virtual Lecture Material and/or Activity- Part 4",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/782518",
+     "indent": 0
+    },
+    {
+     "id": 782519,
+     "title": "MODULE 1, Week 2, Part 4 Activity- Discussion Analysis and Reporting Activity",
+     "type": "Discussion",
+     "content_id": 260282,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/782519",
+     "indent": 1,
+     "content_details": {
+      "due_at": "2026-09-21T06:59:00Z",
+      "points_possible": 3.0,
+      "lock_at": "2027-01-01T07:59:59Z"
+     }
+    },
+    {
+     "id": 794618,
+     "title": "MODULE 1, WEEK 2- Virtual Lecture Material and/or Activity- Part 5",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/794618",
+     "indent": 0
+    },
+    {
+     "id": 782521,
+     "title": " End of Week 2 Synthesis: Bringing the Ideas on Conceptualization Together",
+     "type": "Assignment",
+     "content_id": 212704,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/782521",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-23T06:59:59Z",
+      "points_possible": 12.0
+     }
+    },
+    {
+     "id": 811231,
+     "title": "Learn about an upcoming video assignment due Oct. 4th",
+     "type": "SubHeader",
+     "indent": 0
+    },
+    {
+     "id": 811234,
+     "title": "Video Assignment- What You Have Learned from Eco-Districts, and What Could Work From These Examples in Burnaby",
+     "type": "Assignment",
+     "content_id": 212972,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/811234",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-10-05T06:59:59Z",
+      "points_possible": 8.0,
+      "lock_at": "2027-01-01T07:59:59Z",
+      "unlock_at": "2026-09-09T07:00:00Z"
+     }
+    },
+    {
+     "id": 782522,
+     "title": "MODULE 1, WEEK 2: Summary ",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/782522",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "id": 111571,
+   "name": "MODULE 1, WEEK 3",
+   "position": 3,
+   "unlock_at": null,
+   "state": "unlocked",
+   "items": [
+    {
+     "id": 789040,
+     "title": "MODULE 1, WEEK 3: Overview and Preparation Work ",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/789040",
+     "indent": 0,
+     "completion_requirement": {
+      "type": "must_view",
+      "completed": false
+     }
+    },
+    {
+     "id": 789041,
+     "title": "MODULE 1, WEEK 3- Virtual Lecture Material and/or Activity- Part 1",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/789041",
+     "indent": 0
+    },
+    {
+     "id": 789043,
+     "title": "MODULE 1, WEEK 3- Virtual Lecture Material and/or Activity- Parts 2 and 3",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/789043",
+     "indent": 0
+    },
+    {
+     "id": 798755,
+     "title": "Module 1, Week 3, Parts 2 and 3 activity (notes on videos)",
+     "type": "Assignment",
+     "content_id": 216363,
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/798755",
+     "indent": 0,
+     "content_details": {
+      "due_at": "2026-09-28T06:59:59Z",
+      "points_possible": 5.0
+     }
+    },
+    {
+     "id": 789046,
+     "title": "MODULE 1, WEEK 3: Summary ",
+     "type": "Page",
+     "html_url": "https://canvas.sfu.ca/courses/17576/modules/items/789046",
+     "indent": 0
+    }
+   ]
+  }
+ ]
+}
