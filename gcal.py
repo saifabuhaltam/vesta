@@ -82,6 +82,29 @@ def _when(date_iso, time_hhmm, minutes=30, tz=TZ):
             {"dateTime": end.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": tz})
 
 
+def patch_body(body):
+    """An event body made safe to send as a PATCH.
+
+    PATCH merges into the event Google already has. An assignment with only a due date
+    is an all-day event, whose start is `{"date": ...}`; give it a time and Vesta sends
+    `{"dateTime": ..., "timeZone": ...}`, the merge keeps the old `date` beside it, and
+    Google refuses the result with "Invalid start time." It surfaced when the Canvas
+    review filled due times into assignments a syllabus had given only dates, and would
+    equally have followed typing a time into one by hand, or clearing it. So the form
+    not in use is sent explicitly as null, which is how a PATCH removes a field.
+    """
+    out = dict(body)
+    for key in ("start", "end"):
+        part = dict(out.get(key) or {})
+        if "dateTime" in part:
+            part["date"] = None
+        elif "date" in part:
+            part["dateTime"] = None
+            part["timeZone"] = None
+        out[key] = part
+    return out
+
+
 def should_push(item):
     """Deadlines and exams only.
 

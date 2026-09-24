@@ -651,25 +651,48 @@ def run_sync(conn, acct, client, cal_id, register_channels=True, address=None):
                  json.dumps({"source": "google", "events": review}, default=str), "review", now()))
 
         pushed = gsync.plan_push(conn, acct["id"])
+        failed = []
         for p in pushed:
-            if p["action"] == "create":
-                made = client.insert(cal_id, p["body"])
-                gsync.record(conn, acct["id"], "item", p["localId"], made.get("id"),
-                             p["localHash"], gcal.remote_hash(made), made.get("etag", ""))
-            elif p["action"] == "update":
-                made = client.patch(cal_id, p["externalId"], p["body"])
-                gsync.record(conn, acct["id"], "item", p["localId"], p["externalId"],
-                             p["localHash"], gcal.remote_hash(made), made.get("etag", ""))
-            elif p["action"] == "remove":
+            if p["action"] == "remove":
                 try:
                     client.delete(cal_id, p["externalId"])
                 except gcal.GoogleError:
                     pass                      # already gone on Google's side is fine
                 gsync.forget(conn, acct["id"], "item", p["localId"])
+                continue
+            if p["action"] not in ("create", "update"):
+                continue
+            try:
+                if p["action"] == "create":
+                    made = client.insert(cal_id, p["body"])
+                    external = made.get("id")
+                else:
+                    made = client.patch(cal_id, p["externalId"], gcal.patch_body(p["body"]))
+                    external = p["externalId"]
+            except gcal.GoogleError as e:
+                # One event Google will not take must not stop every one after it: the
+                # first "Invalid start time." used to end the sync there, and nothing
+                # further in the queue reached Google. A refusal of the whole account
+                # (a dead token, no access, a stale sync token) still stops it.
+                if e.status in (401, 403) or e.resync:
+                    raise
+                failed.append({"title": p.get("title") or "An assignment", "error": e.message})
+                continue
+            gsync.record(conn, acct["id"], "item", p["localId"], external,
+                         p["localHash"], gcal.remote_hash(made), made.get("etag", ""))
 
+        # Name what did not go, so the Google card says which assignment to look at
+        # rather than repeating Google's words about an event nobody can find.
+        problem = None
+        if failed:
+            names = "; ".join("%s (%s)" % (f["title"], f["error"].replace("Google Calendar said no: ", ""))
+                              for f in failed[:3])
+            more = " and %d more" % (len(failed) - 3) if len(failed) > 3 else ""
+            problem = ("%d assignment%s could not be sent to Google: %s%s. Everything else synced."
+                       % (len(failed), "" if len(failed) == 1 else "s", names, more))
         conn.execute("UPDATE calendar_accounts SET sync_token=?, calendar_id=?, last_sync=?,"
-                     " last_error=NULL WHERE id=?",
-                     (next_token, cal_id, now(), acct["id"]))
+                     " last_error=? WHERE id=?",
+                     (next_token, cal_id, now(), problem, acct["id"]))
         conn.commit()
         # Registering happens after a good sync, so a channel is only ever asked for
         # on an account that is actually working.
@@ -679,4 +702,4 @@ def run_sync(conn, acct, client, cal_id, register_channels=True, address=None):
     counts = gsync.summarise(pushed)
     counts.update({"fromGoogle": gsync.summarise(pulled), "absorbed": absorbed})
     return {"ok": True, "counts": counts, "needsReview": len(review),
-            "absorbed": absorbed, "push": channels}
+            "absorbed": absorbed, "push": channels, "failed": failed}
