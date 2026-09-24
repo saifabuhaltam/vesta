@@ -32,6 +32,11 @@ CALENDAR_NAME = "Vesta"
 # calendar stays a record of the term and not only a list of what is left.
 DONE_MARK = "✓"
 
+# The last line of every event Vesta writes. It is how Vesta knows one of its own events
+# when it has lost the link to it (see gsync.made_by_vesta), which a sync that fails part
+# way through used to cause.
+VESTA_MARK = "Added by Vesta"
+
 
 class GoogleError(Exception):
     """A failure worth showing the student, with Google's own words where we have them."""
@@ -139,7 +144,7 @@ def item_body(item, cls=None, tz=TZ):
         bits.append(item["type"].title())
     if item.get("notes"):
         bits.append(item["notes"])
-    bits.append("Added by Vesta")
+    bits.append(VESTA_MARK)
     body["description"] = "\n\n".join(bits)
     if item.get("location"):
         body["location"] = item["location"]

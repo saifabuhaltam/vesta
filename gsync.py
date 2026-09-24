@@ -121,6 +121,14 @@ def plan_pull(conn, account_id, events, tz=gcal.TZ):
                         "reason": "no start date Vesta could read"})
             continue
         link = links.get(ev["externalId"])
+        if link is None and not ev["cancelled"] and made_by_vesta(ev):
+            # Vesta's own event, whose link was lost. Offering it for review as though
+            # somebody else had made it is what put "5 event(s) from Google Calendar" on
+            # the Classes page after the Invalid start time failures: each failed sync
+            # had created events and then thrown away the record of creating them.
+            out.append({"action": "orphan", "externalId": ev["externalId"],
+                        "title": ev["title"], "event": ev})
+            continue
         if ev["cancelled"]:
             out.append({"action": "deleted_remotely" if link else "ignore",
                         "externalId": ev["externalId"], "title": ev["title"],
@@ -157,6 +165,65 @@ def current_local_hash(conn, local_id, tz=gcal.TZ):
 # ---------------------------------------------------------------------------
 # Recording what happened
 # ---------------------------------------------------------------------------
+def made_by_vesta(ev):
+    """Whether an event (as `gcal.from_google` returns it) is one Vesta wrote."""
+    return (ev.get("notes") or "").rstrip().endswith(gcal.VESTA_MARK)
+
+
+def _plain_summary(s):
+    s = (s or "").strip()
+    return s[len(gcal.DONE_MARK):].strip() if s.startswith(gcal.DONE_MARK) else s
+
+
+def adopt(conn, account_id, ev, tz=gcal.TZ):
+    """Reconnect one of Vesta's lost events to the assignment it was made for.
+
+    Only an assignment with no event of its own is a candidate, matched on the date and
+    the summary Vesta would write for it now (ignoring the done tick, which may have
+    changed since). Returns the assignment's id, or None when every candidate already
+    has its event, in which case this one is a duplicate. The link is stored with an
+    empty local hash, so the push that follows brings the event up to date.
+    """
+    linked = {r["local_id"] for r in conn.execute(
+        "SELECT local_id FROM sync_links WHERE account_id=? AND local_kind='item'", (account_id,))}
+    classes = {c["id"]: dict(c) for c in conn.execute("SELECT * FROM classes")}
+    for r in conn.execute("SELECT * FROM items WHERE due_date=?", (ev["date"],)).fetchall():
+        if r["id"] in linked:
+            continue
+        body = gcal.item_body(item_dict(r), classes.get(r["class_id"]), tz)
+        if _plain_summary(body.get("summary")) == _plain_summary(ev["title"]):
+            record(conn, account_id, "item", r["id"], ev["externalId"], "", ev["hash"],
+                   ev.get("etag") or "")
+            return r["id"]
+    return None
+
+
+def prune_reviews(conn):
+    """Take Vesta's own events out of any Google batch waiting for review.
+
+    A batch made before Vesta could recognise its own events may hold nothing else, and
+    one that ends up empty is removed, so its banner goes with it.
+    """
+    import json
+    for row in conn.execute("SELECT id, draft FROM calendar_imports"
+                            " WHERE source='google' AND status='review'").fetchall():
+        try:
+            draft = json.loads(row["draft"] or "{}")
+        except ValueError:
+            continue
+        events = draft.get("events") or []
+        keep = [e for e in events if not made_by_vesta(e)]
+        if len(keep) == len(events):
+            continue
+        if not keep:
+            conn.execute("DELETE FROM calendar_imports WHERE id=?", (row["id"],))
+        else:
+            draft["events"] = keep
+            conn.execute("UPDATE calendar_imports SET draft=?, label=? WHERE id=?",
+                         (json.dumps(draft, default=str),
+                          "%d event(s) from Google Calendar" % len(keep), row["id"]))
+
+
 def record(conn, account_id, kind, local_id, external_id, local_hash, remote_hash,
            etag="", state="clean", remote_updated=""):
     """Upsert the link, which is what makes the next sync able to tell what moved."""

@@ -5451,8 +5451,64 @@
   }
 
   /** A timetable pulled from SFU but not applied. Same banner, same two choices. */
+  /**
+   * Events found in Vesta's own Google calendar that Vesta did not make. The choice is
+   * which of them to show on Vesta's calendar; the rest stay in Google, untouched.
+   */
+  function openGoogleBatchReview(id){
+    apiGet('/api/calendar/imports/'+id).then(function(d){
+      var events = (d.events || []).slice().sort(function(a, b){
+        return String(a.date+(a.start||'')).localeCompare(String(b.date+(b.start||'')));
+      });
+      var rows = events.map(function(ev){
+        var when = fmtDateShort(ev.date) + (ev.allDay || !ev.start ? ', all day'
+          : ', '+fmtTime(ev.start)+(ev.end ? ' to '+fmtTime(ev.end) : ''));
+        return '<label class="srcl-row">'
+          + '<input type="checkbox" data-gcal-pick value="'+escapeHtml(ev.externalId)+'" checked>'
+          + '<span class="srcl-main"><span class="srcl-name">'+escapeHtml(ev.title||'(no title)')+'</span>'
+          + '<span class="srcl-meta">'+escapeHtml(when)+'</span></span></label>';
+      }).join('');
+      document.getElementById('modal-root').innerHTML =
+        '<div class="overlay" data-action="modal-backdrop"><div class="modal" data-action="modal-stop" style="max-width:560px;">'
+        + '<div class="modal-head"><h2>Events from your Vesta calendar</h2>'
+        + '<div class="hint" style="margin-top:6px;">These are in the calendar Vesta keeps on Google, but '
+        + 'Vesta did not put them there. Tick the ones to show on Vesta’s calendar too. The rest stay '
+        + 'in Google as they are.</div></div>'
+        + '<div class="modal-body">'
+        + (rows ? '<div class="srcl-list">'+rows+'</div>' : '<div class="hint">Nothing left to review.</div>')
+        + '</div>'
+        + '<div class="modal-foot"><span></span><div class="right">'
+        + '<button class="btn" data-action="modal-close">Close</button>'
+        + '<button class="btn primary" data-action="gcal-add" data-id="'+escapeHtml(id)+'">'
+        + 'Add ticked to Vesta</button></div></div></div></div>';
+    }).catch(reportError);
+  }
+
+  function applyGoogleBatch(id){
+    var ids = Array.prototype.map.call(
+      document.querySelectorAll('#modal-root [data-gcal-pick]:checked'), function(el){ return el.value; });
+    apiPost('/api/calendar/imports/'+id+'/apply', { externalIds: ids }).then(function(r){
+      closeModal();
+      return loadState().then(function(){
+        notify('Done', r.added ? (r.added === 1 ? '1 event is' : r.added+' events are')
+          + ' on Vesta’s calendar now.' : 'Nothing added. They stay in Google.');
+      });
+    }).catch(reportError);
+  }
+
   function pendingCalImportsHtml(){
     return pendingCalImports.map(function(p){
+      // Two kinds of batch wait here. A Google one is events found in Vesta's calendar
+      // on Google that Vesta did not make, and it has its own screen: sending it to SFU's
+      // timetable review is what crashed with "d.meetings is undefined".
+      if(p.source === 'google'){
+        return '<div class="si-banner" style="margin-bottom:12px;"><span>'
+          + escapeHtml((p.label||'Some events').replace(/ from Google Calendar$/, ''))
+          + ' in your Vesta calendar on Google were not made by Vesta.</span>'
+          + '<span style="display:flex;gap:8px;">'
+          + '<button type="button" class="btn ghost" data-action="cal-discard-pending" data-id="'+p.id+'">Leave them in Google</button>'
+          + '<button type="button" class="btn primary" data-action="gcal-review" data-id="'+p.id+'">Review</button></span></div>';
+      }
       return '<div class="si-banner" style="margin-bottom:12px;"><span>SFU’s timetable for '
         + escapeHtml(p.label||'a course')+' is waiting for you to check it.</span>'
         + '<span style="display:flex;gap:8px;">'
@@ -17506,6 +17562,8 @@
     if(action==='cal-apply'){ calApply(); return; }
     if(action==='cal-discard'){ calDiscard(); return; }
     if(action==='cal-resume'){ calResume(t.dataset.id); return; }
+    if(action==='gcal-review'){ openGoogleBatchReview(t.dataset.id); return; }
+    if(action==='gcal-add'){ applyGoogleBatch(t.dataset.id); return; }
     if(action==='cal-discard-pending'){
       apiDelete('/api/calendar/imports/'+t.dataset.id).then(loadState).catch(reportError);
       return;

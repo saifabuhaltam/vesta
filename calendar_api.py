@@ -105,6 +105,40 @@ def one_import(iid):
 # ---------------------------------------------------------------------------
 # 3. Apply: exactly what was reviewed, in one transaction
 # ---------------------------------------------------------------------------
+def _apply_google_batch(conn, row, body):
+    """Events found in Vesta's own Google calendar that Vesta did not make.
+
+    The Classes page offered these with SFU's timetable screen, which expects class
+    meetings, so opening one crashed ("d.meetings is undefined"). They are events, and
+    the choice is simply which of them to show on Vesta's calendar. The ones not chosen
+    stay in Google, untouched. Either way the batch is finished.
+    """
+    wanted = set(body.get("externalIds") or [])
+    try:
+        events = (json.loads(row["draft"] or "{}").get("events") or [])
+    except ValueError:
+        events = []
+    sid = active_semester_id(conn)
+    added = 0
+    for ev in events:
+        if ev.get("externalId") not in wanted or not ev.get("date"):
+            continue
+        conn.execute(
+            "INSERT INTO events (id, semester_id, class_id, title, kind, date, start, \"end\","
+            " all_day, location, notes, created_at, source, external_id, read_only, updated_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (str(uuid.uuid4()), sid, None, ev.get("title") or "(no title)", "external",
+             ev["date"], ev.get("start") or "", ev.get("end") or "",
+             1 if ev.get("allDay") else 0, ev.get("location") or "", ev.get("notes") or "",
+             now(), "google", ev.get("externalId"), 0, now()))
+        added += 1
+    conn.execute("UPDATE calendar_imports SET status='imported', imported_at=? WHERE id=?",
+                 (now(), row["id"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "added": added})
+
+
 @bp.route("/api/calendar/imports/<iid>/apply", methods=["POST"])
 def apply_import(iid):
     body = request.get_json(force=True) or {}
@@ -117,6 +151,8 @@ def apply_import(iid):
     if row["status"] == "imported":
         conn.close()
         return jsonify({"error": "This schedule has already been imported."}), 409
+    if row["source"] == "google":
+        return _apply_google_batch(conn, row, body)
 
     class_id = draft.get("classId") or body.get("classId")
     if not class_id:
@@ -634,6 +670,23 @@ def run_sync(conn, acct, client, cal_id, register_channels=True, address=None):
 
         pulled = gsync.plan_pull(conn, acct["id"], raw)
         review = []
+        tidied = {"reconnected": 0, "duplicatesRemoved": 0}
+        for p in pulled:
+            if p["action"] != "orphan":
+                continue
+            # One of Vesta's own events it had lost track of: back to its assignment if
+            # that has no event, otherwise a duplicate, and removed from Vesta's calendar.
+            if gsync.adopt(conn, acct["id"], p["event"]):
+                tidied["reconnected"] += 1
+            else:
+                try:
+                    client.delete(cal_id, p["externalId"])
+                    tidied["duplicatesRemoved"] += 1
+                except gcal.GoogleError as e:
+                    if e.status in (401, 403):
+                        raise
+        gsync.prune_reviews(conn)
+        conn.commit()
         for p in pulled:
             if p["action"] in ("conflict", "remote_ahead"):
                 gsync.mark(conn, acct["id"], p["externalId"], p["action"])
@@ -680,6 +733,10 @@ def run_sync(conn, acct, client, cal_id, register_channels=True, address=None):
                 continue
             gsync.record(conn, acct["id"], "item", p["localId"], external,
                          p["localHash"], gcal.remote_hash(made), made.get("etag", ""))
+            # Kept at once. Committed only at the end, a sync that stopped part way
+            # rolled these back while the events stayed in Google, and the next sync,
+            # not knowing them, made each one again.
+            conn.commit()
 
         # Name what did not go, so the Google card says which assignment to look at
         # rather than repeating Google's words about an event nobody can find.
@@ -700,6 +757,6 @@ def run_sync(conn, acct, client, cal_id, register_channels=True, address=None):
     except gcal.GoogleError:
         raise
     counts = gsync.summarise(pushed)
-    counts.update({"fromGoogle": gsync.summarise(pulled), "absorbed": absorbed})
+    counts.update({"fromGoogle": gsync.summarise(pulled), "absorbed": absorbed, "tidied": tidied})
     return {"ok": True, "counts": counts, "needsReview": len(review),
             "absorbed": absorbed, "push": channels, "failed": failed}
