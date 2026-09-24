@@ -534,6 +534,10 @@ def plan_course(course, groups, tz=None):
                 # Kept for later: a rubric on the assignment is the same thing the
                 # rubric parser currently spends an AI call extracting from a PDF.
                 "rubric": a.get("rubric") or None,
+                # A module lists a quiz or a discussion by its own id, not the
+                # assignment's. These let This Week find the assignment behind one.
+                "quizId": a.get("quiz_id") or None,
+                "discussionId": (a.get("discussion_topic") or {}).get("id") or None,
             })
     return {"categories": cats, "items": items, "weightsFromCanvas": weighted}
 
@@ -780,12 +784,14 @@ class Client:
             raise
 
     def modules(self, course_id):
-        return self._paged("/courses/%s/modules" % course_id, {"include[]": "items"})
+        # content_details brings each item's due date, which This Week places it by.
+        return self._paged("/courses/%s/modules" % course_id,
+                           {"include[]": ["items", "content_details"]})
 
     def file(self, file_id):
         return self._get(self.base + "/files/%s" % file_id).json()
 
-    def course_files(self, course_id, known=None):
+    def course_files(self, course_id, known=None, modules=None):
         """Every file in a course, however the course is arranged.
 
         `/files` first. A 403 there does not mean there are no files: it means the
@@ -803,6 +809,9 @@ class Client:
         not noticed, and passing `known=None` is the slow pass that notices it: "Check
         for updates". The `/files` path lists sizes for every file in one request, so
         it always notices and ignores `known` entirely.
+
+        `modules`, when the caller has already read them for This Week, saves reading
+        them a second time.
         """
         known = set(known or ())
         try:
@@ -817,7 +826,9 @@ class Client:
             return [dict(f, _module=None) for f in files]
 
         out = []
-        for ref in files_from_modules(self.modules(course_id)):
+        if modules is None:
+            modules = self.modules(course_id)
+        for ref in files_from_modules(modules):
             if ref["fileId"] in known:
                 out.append({"id": ref["fileId"], "display_name": ref["title"],
                             "size": None, "_module": ref["module"], "_stub": True})

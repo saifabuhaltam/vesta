@@ -374,6 +374,34 @@ CREATE TABLE IF NOT EXISTS term_settings (
     start_date TEXT,
     end_date TEXT
 );
+
+-- This Week's ticks (week.py). Its rows are computed from Canvas snapshots on every
+-- request, so the tick is all that is stored, keyed by where the row came from:
+-- `canvas:<course>:mi:<module item>` or `cue:<item id>`. `as_task` is set only when he
+-- switched a row between checkbox and link. An assignment's tick is its own status
+-- and is never stored here.
+CREATE TABLE IF NOT EXISTS week_marks (
+    key TEXT PRIMARY KEY,
+    class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
+    done INTEGER DEFAULT 0,
+    as_task INTEGER,
+    updated_at TEXT
+);
+
+-- A course's own week-by-week plan, read from a document by AI and approved row by
+-- row (week_plan.py). A class with rows here takes its This Week to-dos from them
+-- rather than from its Canvas modules. `day` is the ISO date the row belongs to.
+CREATE TABLE IF NOT EXISTS week_plan_items (
+    id TEXT PRIMARY KEY,
+    class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    day TEXT NOT NULL,
+    kind TEXT,
+    title TEXT,
+    detail TEXT,
+    source TEXT,
+    sort_order INTEGER DEFAULT 0,
+    created_at TEXT
+);
 """
 
 

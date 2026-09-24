@@ -31,6 +31,7 @@ Two cases the assignment side gets right only because it is asked to:
 import re
 
 import canvas
+import week
 
 # What a file's identity is built from when Canvas has not told us it is ours. Two
 # files in one class with the same name and the same byte count are the same file.
@@ -859,7 +860,15 @@ def check_course(conn, client, course_id, class_id, full=False, tz=None, tz_name
     groups = client.assignment_groups(course_id)
     plan = canvas.plan_course(course, groups, tz)
     known = None if full else _known_file_ids(conn, class_id)
-    files = client.course_files(course_id, known=known)
+    try:
+        modules = client.modules(course_id)
+    except canvas.CanvasError as e:
+        # A course with its Modules tab off has no weeks to show, and that is not a
+        # failed check. A dead token or a throttle still is.
+        if e.needs_token or e.rate_limited or e.status not in (403, 404):
+            raise
+        modules = None
+    files = client.course_files(course_id, known=known, modules=modules)
     snapshot = {
         "courseId": course_id,
         "fetchedAt": _now(),
@@ -869,6 +878,7 @@ def check_course(conn, client, course_id, class_id, full=False, tz=None, tz_name
                    ("id", "name", "course_code", "apply_assignment_group_weights")},
         "plan": plan,
         "files": [{k: f.get(k) for k in SNAPSHOT_FILE_FIELDS if k in f} for f in files],
+        "modules": week.reduce_modules(modules),
     }
     save_snapshot(conn, course_id, snapshot)
     return snapshot
@@ -981,6 +991,16 @@ def check_account(user_id, full=False, course_id=None, reason=""):
             save_state(conn, fresh)
         finally:
             conn.close()
+        if report.get("checked"):
+            # Inside the lock, so "checking" stays true until This Week has what the
+            # check found: the page reloads the week when checking ends. A schedule is
+            # read only when it is new or changed, so after the first check of a term
+            # this costs one metadata call per candidate file.
+            try:
+                import week_plan
+                report["plans"] = week_plan.auto_plan(user_id)
+            except Exception as e:
+                report["plans"] = {"failed": str(e)}
     finally:
         lock.release()
     if report.get("checked"):
