@@ -46,7 +46,7 @@ uploads go through `secure_filename` and a 25 MB cap; no CORS headers are sent; 
 is off under gunicorn; there are no admin routes (invites and the AI cap are Railway
 variables); the AI spend has a global $5/day ceiling.
 
-- [x] **Fixed 2026-09-25, not yet deployed:** the six items below, with
+- [x] **Fixed and deployed 2026-09-25 (ce52cea):** the six items below, with
       `tests/test_security.py` (12 tests) covering them. Both suites pass (436 and 48),
       and a browser run against a local copy confirmed an SVG's script no longer runs,
       images and PDFs still preview (PDF checked in real Chrome), and an old
