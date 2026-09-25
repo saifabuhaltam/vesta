@@ -47,6 +47,16 @@ DEFAULTS = {
     # are still reached from search, the dashboard and Start Focus Session.
     "sidebarShowGrades": True,
     "sidebarShowFocus": True,
+    "sidebarShowWeek": True,
+    # Home screen: which sections it shows. One switch each, in Settings; the home
+    # screen itself carries no controls for this, so it stays uncluttered.
+    "homeShowTiles": True,
+    "homeShowStudy": True,
+    "homeShowWeek": True,
+    "homeShowFocus": True,
+    "homeShowClasses": True,
+    "homeShowFiles": True,
+    "homeShowNotes": True,
     # Calendar
     "calendarDefaultView": "month",
     "calendarDetail": "detailed",

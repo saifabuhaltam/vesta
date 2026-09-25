@@ -3099,6 +3099,12 @@
     .dash-row, .folder-grid, .file-grid, .cp-grid, .nt-card-grid,
     .set-modes, .th-start-items{ grid-template-columns:minmax(0,1fr) !important; }
     .tiles{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
+    /* Three tiles in two columns leaves one alone on a row; three narrow ones read better. */
+    .tiles.tiles-3{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .tiles-3 .tile{ padding:12px; }
+    .tiles-3 .tile-icon{ display:none; }
+    .tiles-3 .tile .l{ white-space:normal; font-size:12px; }
+    .wk-dash-card .wk-dash{ order:3; flex-basis:100%; margin:4px 0 0; }
     .tiles .tile{ padding:12px; }
     .tiles.icon-tiles .tile{ gap:10px; }
     .tile .n{ font-size:22px; }
@@ -3208,7 +3214,27 @@
   .wp-source-main span{ font-size:11.5px; color:var(--text-muted); }
   .wp-pill{ font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:var(--r-pill); background:var(--success-soft); color:var(--success); flex:none; }
   .wp-error{ font-size:12.5px; padding:9px 12px; border-radius:var(--r-md); background:var(--danger-soft); color:var(--danger); }
-  .wk-dash{ display:flex; align-items:center; gap:14px; }
+  .wk-dash{ display:flex; align-items:center; gap:14px; flex:1; min-width:0; margin:0 16px; }
+  .wk-dash-card .card-head{ gap:10px; flex-wrap:wrap; }
+  .wk-dash-card{ margin-bottom:20px; }
+  .wk-dash-more{ display:inline-block; margin:8px 6px 0; font-size:12.5px; font-weight:600; color:var(--accent); text-decoration:none; }
+  .wk-meta-class{ color:var(--c); font-weight:700; }
+  .tiles.tiles-3{ grid-template-columns:repeat(3,1fr); }
+  .dash-row.single{ grid-template-columns:1fr; }
+  /* A grid item's minimum is its content's, so one long unbroken title could widen a
+     column past the page. Zero lets the ellipsis do its job instead. */
+  .dash-row > *{ min-width:0; }
+  .dcl-list{ display:flex; flex-direction:column; }
+  .dcl-row{ display:flex; align-items:center; gap:12px; padding:10px 6px; border-radius:var(--r-md); cursor:pointer; }
+  .dcl-row + .dcl-row{ border-top:1px solid var(--border); }
+  .dcl-row:hover{ background:var(--surface-2); }
+  .dcl-main{ flex:1; min-width:0; }
+  .dcl-code{ font-size:13.5px; font-weight:700; }
+  .dcl-name{ font-size:12px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dcl-next{ text-align:right; max-width:52%; min-width:0; }
+  .dcl-next-title{ font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dcl-next-date{ font-size:11.5px; color:var(--text-muted); }
+  .dcl-none{ font-size:12px; color:var(--text-faint); }
   .wk-dash .wk-bar{ max-width:240px; }
   @media (max-width:700px){
     .wk-grid{ grid-template-columns:1fr; }
@@ -3242,9 +3268,9 @@
     <nav class="tabs" id="tabs">
       <!-- grouped by purpose: where you are, your coursework, your material, study tools -->
       <button class="tab-btn" data-action="switch-tab" data-tab="dashboard"><span class="ic" data-icon="home"></span><span class="lbl">Dashboard</span></button>
-      <button class="tab-btn" data-action="switch-tab" data-tab="week"><span class="ic" data-icon="week"></span><span class="lbl">This Week</span></button>
       <button class="tab-btn" data-action="switch-tab" data-tab="calendar"><span class="ic" data-icon="calendar"></span><span class="lbl">Calendar</span></button>
       <div class="side-divider" role="separator"></div>
+      <button class="tab-btn" data-action="switch-tab" data-tab="week"><span class="ic" data-icon="week"></span><span class="lbl">This Week</span></button>
       <button class="tab-btn" data-action="switch-tab" data-tab="classes"><span class="ic" data-icon="classes"></span><span class="lbl">Classes</span></button>
       <button class="tab-btn" data-action="switch-tab" data-tab="assignments"><span class="ic" data-icon="assignments"></span><span class="lbl">Assignments</span></button>
       <button class="tab-btn" data-action="switch-tab" data-tab="grades"><span class="ic" data-icon="grades"></span><span class="lbl">Grades</span></button>
@@ -4700,12 +4726,14 @@
     }
     applyEditorPrefs();
     applySidebarPages();
+    // The home screen's sections follow their switches the moment they change.
+    if(activeTab === 'dashboard' && document.getElementById('view')){ renderView(); paintIcons(); }
   }
 
   // Grades and Focus can come off the sidebar to keep it short. Only the nav button
   // goes: the pages still work, and are reached from search (⌘K), the dashboard's
   // Current Average tile, and Start Focus Session.
-  var OPTIONAL_SIDEBAR_PAGES = { grades:'sidebarShowGrades', focus:'sidebarShowFocus' };
+  var OPTIONAL_SIDEBAR_PAGES = { week:'sidebarShowWeek', grades:'sidebarShowGrades', focus:'sidebarShowFocus' };
   function applySidebarPages(){
     Object.keys(OPTIONAL_SIDEBAR_PAGES).forEach(function(tab){
       var btn = document.querySelector('#tabs .tab-btn[data-tab="'+tab+'"]');
@@ -5379,7 +5407,10 @@
    * An assignment's tick is the assignment itself (toggleItemDone), so ticking it here
    * and on the Assignments page are the same act. Everything else is a mark.
    */
-  var WK = { data:null, start:null, loading:false, error:null, shifting:null, sawChecking:false };
+  var WK = { data:null, start:null, loading:false, error:null, shifting:null, sawChecking:false,
+             // ticked on the home screen since the last load: kept in view, crossed out,
+             // so a misclick can be taken back where it was made
+             justDone:{} };
   var WK_KIND = {
     reading:['book','Reading'], watch:['play','Watch'], quiz:['help','Quiz'],
     exam:['alert','Exam'], discussion:['chat','Discussion'],
@@ -5407,7 +5438,7 @@
     var want = WK.start;
     return apiGet('/api/week?start='+want+'&today='+todayIso()).then(function(d){
       if(want !== WK.start) return;          // stepped to another week meanwhile
-      WK.data = d; WK.loading = false;
+      WK.data = d; WK.loading = false; WK.justDone = {};
       wkRepaint();
       wkWatchPlanning();
     }).catch(function(err){
@@ -5586,9 +5617,10 @@
     return ((h % 12) || 12) + ':' + m + (h < 12 ? 'am' : 'pm');
   }
 
-  function wkRowHtml(r, c, carried){
+  function wkRowHtml(r, c, carried, withClass){
     var k = WK_KIND[r.kind] || WK_KIND.other;
     var meta = [k[1]];
+    if(withClass) meta.unshift('<b class="wk-meta-class" style="--c:'+(c.color||'var(--none)')+'">'+escapeHtml(c.code || c.name)+'</b>');
     if(carried && r.dueDate == null) meta.push('Week '+r.week);
     var when = wkWhen(r);
     if(when) meta.push(when);
@@ -5688,6 +5720,7 @@
     var key = el.dataset.key, itemId = el.dataset.item;
     var hit = wkFind(key); if(!hit) return;
     var now = !hit.row.done;
+    if(now) WK.justDone[key] = true;
     wkSetDone(key, now);
     wkRepaint();
     var p = itemId
@@ -5811,52 +5844,101 @@
     }
   }
 
-  /** The Dashboard's line about this week, filled in once the week has loaded. */
+  /** The home screen's This week: progress, and the next few to-dos, tickable there. */
+  var WK_DASH_ROWS = 5;
   function wkDashHtml(){
     var d = WK.data;
+    var head = function(extra){
+      return '<div class="card-head"><h2>This week</h2>'+(extra||'')
+        + '<a class="see-all" href="#" data-action="switch-tab" data-tab="week">Open This Week \u2192</a></div>';
+    };
     if(!d || !wkIsThisWeek()){
-      if(!WK.loading && (!d || !wkIsThisWeek())) wkLoad(wkMonday(todayIso()));
-      return '<div class="card study-nudge" id="wk-dash"><div class="card-head"><h2>This week</h2>'
-        + '<a class="see-all" href="#" data-action="switch-tab" data-tab="week">Open This Week →</a></div>'
-        + '<div class="wk-empty-line">Working out your week…</div></div>';
+      if(!WK.loading) wkLoad(wkMonday(todayIso()));
+      return '<div class="card wk-dash-card" id="wk-dash">'+head()+'<div class="wk-empty-line">Working out your week\u2026</div></div>';
     }
-    var tasks = wkAllTasks(d);
-    var done = tasks.filter(function(t){ return t.done; }).length;
-    var carried = 0;
-    d.classes.forEach(function(c){ carried += (c.carried || []).length; });
-    var pct = tasks.length ? Math.round(done / tasks.length * 100) : 0;
-    return '<div class="card study-nudge" id="wk-dash"><div class="card-head"><h2>This week</h2>'
-      + '<a class="see-all" href="#" data-action="switch-tab" data-tab="week">Open This Week →</a></div>'
-      + '<div class="wk-dash"><div class="wk-count"><b>'+done+'</b> of '+tasks.length+' done</div>'
-      + '<div class="wk-bar"><span style="width:'+pct+'%"></span></div>'
-      + (carried ? '<span class="wk-topic">'+carried+' still open from earlier weeks</span>' : '')
-      + '</div></div>';
+    var order = { start:0, exam:1, quiz:2, assignment:3, discussion:4, reading:5, watch:6, work:7 };
+    var all = [], carried = 0;
+    d.classes.forEach(function(c){
+      carried += (c.carried || []).length;
+      c.tasks.forEach(function(r){ all.push({ r:r, c:c }); });
+    });
+    var done = all.filter(function(x){ return x.r.done; }).length;
+    var open = all.filter(function(x){ return !x.r.done || WK.justDone[x.r.key]; }).sort(function(a, b){
+      var ad = a.r.dueDate || '9999', bd = b.r.dueDate || '9999';
+      return ad.localeCompare(bd) || (order[a.r.kind]||8) - (order[b.r.kind]||8);
+    });
+    var pct = all.length ? Math.round(done / all.length * 100) : 0;
+    var progress = '<div class="wk-dash"><div class="wk-count"><b>'+done+'</b> of '+all.length+' done</div>'
+      + '<div class="wk-bar"><span style="width:'+pct+'%"></span></div></div>';
+    var body = open.length
+      ? open.slice(0, WK_DASH_ROWS).map(function(x){ return wkRowHtml(x.r, x.c, false, true); }).join('')
+      : '<div class="wk-empty-line">'+(all.length ? 'All done for this week.' : 'Nothing on your list this week.')+'</div>';
+    var more = [];
+    if(open.length > WK_DASH_ROWS) more.push((open.length - WK_DASH_ROWS)+' more this week');
+    if(carried) more.push(carried+' still open from earlier weeks');
+    return '<div class="card wk-dash-card" id="wk-dash">'+head(progress)+body
+      + (more.length ? '<a class="wk-dash-more" href="#" data-action="switch-tab" data-tab="week">'+more.join(' \u00b7 ')+'</a>' : '')
+      + '</div>';
   }
+
 
   // ---------------- Dashboard ----------------
   function viewDashboard(){
-    var totalAssignments = items.length;
+    var on = function(key){ return !PREFS || PREFS[key] !== false; };
     var overdue = items.filter(function(it){ return statusOf(it)==='overdue'; }).length;
-    var week = items.filter(function(it){ var s=statusOf(it); return s==='today'||s==='week'; }).length;
-    var completedTotal = items.filter(function(it){ return it.status==='done'; }).length;
     var graded = classes.map(function(c){ return classGradeStats(c.id).currentGrade; }).filter(function(g){ return g!=null; });
     var avg = graded.length ? (graded.reduce(function(s,g){ return s+g; },0)/graded.length) : null;
-
     var cardsDue = studyDueTotal();
 
-    var html = '<div class="tiles icon-tiles">'
-      + iconTile('assignments', 'var(--accent-soft)', 'var(--accent)', totalAssignments, 'Total Assignments')
-      + iconTile('calendar', 'var(--accent-soft)', 'var(--accent)', week, 'Due This Week')
-      + iconTile('cards', 'var(--success-soft)', 'var(--success)', cardsDue, 'Cards To Review', 'study')
-      + iconTile('chart', '#EFE9FE', '#7C5BD8', avg!=null?avg.toFixed(0)+'%':'—', 'Current Average', 'grades')
-      + '</div>';
-
-    html += studyNudgeHtml();
-    html += wkDashHtml();
-    html += '<div class="dash-row">' + focusHighlightHtml() + upcomingWeekCardHtml() + '</div>';
-    html += classesPreviewCardHtml();
-    html += '<div class="dash-row">' + recentFilesCardHtml() + recentNotesCardHtml() + '</div>';
+    // One place answers "what is this week": the This week section. The Due This Week
+    // tile, the Upcoming This Week card and Total Assignments said the same thing three
+    // more times, which is most of why this screen felt busy (Saif, 2026-09-24).
+    var html = '';
+    if(on('homeShowTiles')){
+      html += '<div class="tiles icon-tiles tiles-3">'
+        + iconTile('alert', 'var(--danger-soft)', 'var(--danger)', overdue, 'Overdue', 'assignments')
+        + iconTile('cards', 'var(--success-soft)', 'var(--success)', cardsDue, 'Cards To Review', 'study')
+        + iconTile('chart', '#EFE9FE', '#7C5BD8', avg!=null?avg.toFixed(0)+'%':'\u2014', 'Current Average', 'grades')
+        + '</div>';
+    }
+    if(on('homeShowStudy')) html += studyNudgeHtml();
+    if(on('homeShowWeek')) html += wkDashHtml();
+    html += dashPair([on('homeShowFocus') && focusHighlightHtml(), on('homeShowClasses') && classesCompactHtml()]);
+    html += dashPair([on('homeShowFiles') && recentFilesCardHtml(), on('homeShowNotes') && recentNotesCardHtml()]);
+    if(!html){
+      html = '<div class="empty">Every section of your home screen is switched off.'
+        + '<div><button type="button" class="btn" data-action="open-settings" data-section="prefs">Choose what it shows</button></div></div>';
+    }
     return html;
+  }
+
+  /** Two cards side by side, or one across the whole width when the other is off. */
+  function dashPair(cards){
+    cards = cards.filter(Boolean);
+    if(!cards.length) return '';
+    return '<div class="dash-row'+(cards.length === 1 ? ' single' : '')+'">'+cards.join('')+'</div>';
+  }
+
+  /** Each class on one line, with what is due next: the class grid was four tall cards
+   *  mostly saying "No fixed meeting time". The Classes page keeps the full cards. */
+  function classesCompactHtml(){
+    if(!classes.length) return '';
+    var today = todayIso();
+    var rows = classes.map(function(c){
+      var next = items.filter(function(it){ return it.classId===c.id && it.status!=='done' && it.dueDate && it.dueDate >= today; })
+        .sort(function(a,b){ return a.dueDate.localeCompare(b.dueDate); })[0];
+      return '<div class="dcl-row" data-action="open-class-detail" data-id="'+c.id+'">'
+        + '<span class="dot" style="--c:'+(c.color||'var(--none)')+'"></span>'
+        + '<div class="dcl-main"><div class="dcl-code">'+escapeHtml(c.code||c.name||'Untitled class')+'</div>'
+        + (c.name && c.code ? '<div class="dcl-name">'+escapeHtml(c.name)+'</div>' : '') + '</div>'
+        + (next ? '<div class="dcl-next"><div class="dcl-next-title">'+escapeHtml(next.title)+'</div>'
+                  + '<div class="dcl-next-date">'+fmtDateShort(next.dueDate)+'</div></div>'
+                : '<div class="dcl-next dcl-none">Nothing due</div>')
+        + '</div>';
+    }).join('');
+    return '<div class="card"><div class="card-head"><h2>Your classes</h2>'
+      + '<a class="see-all" href="#" data-action="switch-tab" data-tab="classes">View all \u2192</a></div>'
+      + '<div class="dcl-list">'+rows+'</div></div>';
   }
 
   /**
@@ -5951,30 +6033,11 @@
       + '</div></div></div>';
   }
 
-  function upcomingWeekCardHtml(){
-    var upcoming = items.filter(function(it){ return it.status!=='done' && it.dueDate && diffDaysFromToday(it.dueDate) >= 0 && diffDaysFromToday(it.dueDate) <= 7; })
-      .sort(function(a,b){ return a.dueDate.localeCompare(b.dueDate); }).slice(0,5);
-    var body = upcoming.length ? upcoming.map(upcomingRowHtml).join('') : '<div class="empty">Nothing due in the next week.</div>';
-    return '<div class="card"><div class="card-head"><h2>Upcoming This Week</h2><a class="see-all" href="#" data-action="switch-tab" data-tab="assignments">See all →</a></div>'+body+'</div>';
-  }
 
-  function upcomingRowHtml(it){
-    var cls = classById(it.classId);
-    var col = cls ? cls.color : 'var(--none)';
-    return '<div class="upcoming-row" data-action="open-item-detail" data-id="'+it.id+'" style="cursor:pointer;">'
-      + '<span class="bar" style="--c:'+col+'"></span>'
-      + '<span class="u-ic">'+(TYPE_ICON[it.type]||'▤')+'</span>'
-      + '<div style="flex:1;min-width:0;"><div class="u-title">'+escapeHtml(it.title)+'</div><div class="u-meta">'+(cls?escapeHtml(cls.code):'General')+'</div></div>'
-      + '<span class="u-date mono">'+fmtDateShort(it.dueDate)+'</span>'
-      + '</div>';
-  }
 
-  function classesPreviewCardHtml(){
-    if(classes.length===0) return '';
-    var shown = classes.slice(0,4);
-    return '<section class="block"><div class="card-head"><h2>Your Classes</h2><a class="see-all" href="#" data-action="switch-tab" data-tab="classes">View all →</a></div>'
-      + '<div class="class-grid">' + shown.map(classCardHtml).join('') + '</div></section>';
-  }
+
+
+
 
   function fileTypeInitials(name){
     var ext = (name||'').split('.').pop().toUpperCase();
@@ -14043,8 +14106,17 @@
     return secHead('Preferences', 'How Vesta looks and behaves on every device you sign in on.')
       + setCard('Theme', null, '<div class="set-themes">'
           + themeTile('light', 'Light') + themeTile('dark', 'Dark') + '</div>')
+      + setCard('Home screen', 'Which sections your home screen shows.',
+          setRow('Stat tiles', 'Overdue, cards to review and your average.', prefCheck('homeShowTiles'))
+          + setRow('Studying reminders', 'Shown only when cards are due or an exam is close.', prefCheck('homeShowStudy'))
+          + setRow('This week', 'Your progress and the next things to do.', prefCheck('homeShowWeek'))
+          + setRow('What to work on', 'The most pressing assignment.', prefCheck('homeShowFocus'))
+          + setRow('Your classes', 'Each class and what is due next.', prefCheck('homeShowClasses'))
+          + setRow('Recent files', null, prefCheck('homeShowFiles'))
+          + setRow('Recent notes', null, prefCheck('homeShowNotes')))
       + setCard('Sidebar', 'Hidden pages still work. Find them with search (\u2318K).',
-          setRow('Show Grades', 'Also opens from Current Average on the dashboard.', prefCheck('sidebarShowGrades'))
+          setRow('Show This Week', 'Also opens from This week on the home screen.', prefCheck('sidebarShowWeek'))
+          + setRow('Show Grades', 'Also opens from Current Average on the dashboard.', prefCheck('sidebarShowGrades'))
           + setRow('Show Focus', 'Also opens when you start a focus session.', prefCheck('sidebarShowFocus')))
       + setCard('Note editor', null,
           setRow('Text size', 'Applies to the note editor only.',
@@ -18871,7 +18943,7 @@
     }
     if(action==='open-settings'){
       termList = null; accountMsg = null; accountBusy = false;
-      openSettingsModal(settingsSection);
+      openSettingsModal(t.dataset.section || settingsSection);
       loadGoogleStatus(); loadTermList();
       return;
     }
