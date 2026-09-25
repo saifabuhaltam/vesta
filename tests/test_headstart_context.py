@@ -153,3 +153,21 @@ def test_a_thread_says_it_reads_the_assignment(client, conn):
     tid = r.get_json()["id"]
     got = client.get("/api/threads/%s" % tid).get_json()
     assert got["sources"][0]["type"] == "assignment"
+
+
+def test_a_chat_not_yet_written_can_preview_what_it_will_read(client, conn):
+    mid = add_file(conn, "Moore et al 2019.pdf", "Chapter text.")
+    r = client.post("/api/threads/preview", json={"classId": conn.cid, "itemId": conn.iid,
+                                                  "selection": {"materialIds": [mid]}})
+    body = r.get_json()
+    assert [s["type"] for s in body["sources"]] == ["assignment", "file"]
+    assert body["pinned"] == [{"type": "file", "id": mid, "title": "Moore et al 2019.pdf",
+                               "readable": True}]
+
+
+def test_a_new_chat_keeps_what_was_attached_before_its_first_message(client, conn):
+    mid = add_file(conn, "Moore et al 2019.pdf", "Chapter text.")
+    tid = client.post("/api/threads", json={"classId": conn.cid, "itemId": conn.iid, "title": "x",
+                                            "selection": {"materialIds": [mid]}}).get_json()["id"]
+    got = client.get("/api/threads/%s" % tid).get_json()
+    assert got["selection"]["materialIds"] == [mid]

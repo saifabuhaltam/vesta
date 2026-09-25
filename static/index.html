@@ -2403,33 +2403,11 @@
      turns are accent-tinted and sit right, Vesta's are a plain surface and sit left. */
   .th-modal{ max-width:760px; }
   .th-body{ max-height:70vh; display:flex; flex-direction:column; gap:0; padding-bottom:0; }
-  .th-srcbar{ display:flex; flex-direction:column; gap:8px; padding:8px 12px;
-    background:var(--surface-2); border-radius:var(--r-md); margin-bottom:12px; font-size:12px; }
-  .th-srchead{ display:flex; align-items:center; gap:9px; }
   /* The list of sources is reference material, not the conversation, so it stays one
      line until asked for. Hover opens it; click pins it open, which is what makes it
      reachable on a touchscreen and from the keyboard. */
-  .th-srcbar .th-srcfull{ display:none; }
-  .th-srcbar:hover .th-srcfull,
-  .th-srcbar:focus-within .th-srcfull,
-  .th-srcbar.th-open .th-srcfull{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-  .th-srcsummary{ flex:1; min-width:0; color:var(--text-faint); overflow:hidden;
-    text-overflow:ellipsis; white-space:nowrap; }
   /* The summary is what collapses, not the row: hiding it would let the buttons slide
      left the moment the list opens, which is the same problem in the other direction. */
-  .th-srcbar:hover .th-srcsummary,
-  .th-srcbar:focus-within .th-srcsummary,
-  .th-srcbar.th-open .th-srcsummary{ visibility:hidden; }
-  .th-srctoggle{ border:none; background:transparent; color:var(--text-faint); cursor:pointer;
-    font:inherit; font-size:11px; padding:2px 6px; border-radius:6px; }
-  .th-srctoggle:hover{ color:var(--text); background:var(--surface); }
-  .th-srclabel{ font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-faint); }
-  .th-srclist{ display:flex; gap:6px; flex-wrap:wrap; flex:1; min-width:0; }
-  .th-srclist.th-none{ color:var(--text-faint); }
-  .th-src{ background:var(--surface); border:1px solid var(--border); border-radius:var(--r-pill);
-    padding:3px 9px; font-size:11.5px; }
-  .th-src-dim{ opacity:.5; text-decoration:line-through; }
-  .th-srcwarn{ width:100%; font-size:11.5px; color:var(--text-faint); }
   .th-scroll{ flex:1; overflow:auto; display:flex; flex-direction:column; gap:14px;
     padding:4px 2px 14px; min-height:220px; }
   /* Cap the measure. The pane grows with the window; a line of prose should not.
@@ -2457,6 +2435,40 @@
   .th-empty{ color:var(--text-faint); font-size:13px; text-align:center; padding:18px 0 6px; }
   .th-starters{ display:flex; flex-wrap:wrap; gap:7px; padding-top:6px; }
   .th-starters .hs-group-label{ width:100%; }
+  .th-composer-wrap{ padding-top:8px; }
+  .th-main .th-composer-wrap{ max-width:760px; width:100%; margin-left:auto; margin-right:auto; }
+  .th-chips{ display:flex; flex-wrap:wrap; gap:6px; padding:0 2px 2px; }
+  .th-chip{ display:inline-flex; align-items:center; gap:6px; max-width:100%; min-width:0; padding:5px 6px 5px 10px;
+    border-radius:var(--r-pill); background:var(--surface); border:1px solid var(--border); font-size:12px; font-weight:600;
+    color:var(--text); box-shadow:var(--shadow-card); }
+  .th-chip svg{ width:13px; height:13px; flex:none; color:var(--text-muted); }
+  .th-chip > span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .th-chip-brief{ background:var(--accent-soft); border-color:transparent; color:var(--accent-ink); padding-right:10px; }
+  .th-chip-brief svg{ color:var(--accent); }
+  .th-chip-auto{ background:transparent; box-shadow:none; border-style:dashed; color:var(--text-muted); font-weight:500; padding-right:8px; }
+  .th-chip-auto em{ font-style:normal; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    padding:1px 6px; border-radius:var(--r-pill); background:var(--surface-2); color:var(--text-faint); flex:none; }
+  .th-chip-dim{ opacity:.55; }
+  .th-chip-x{ border:0; background:transparent; color:var(--text-faint); cursor:pointer; font-size:15px; line-height:1;
+    width:20px; height:20px; border-radius:50%; display:grid; place-items:center; flex:none; padding:0; }
+  .th-chip-x:hover{ background:var(--surface-2); color:var(--text); }
+  .th-attach{ width:42px; height:42px; flex:none; border-radius:50%; border:1px solid var(--border); background:var(--surface);
+    color:var(--text-muted); cursor:pointer; display:grid; place-items:center; box-shadow:var(--shadow-card); padding:0; }
+  .th-attach:hover{ color:var(--accent); border-color:var(--accent); }
+  .th-attach svg{ width:18px; height:18px; }
+  .th-attach-overlay{ z-index:260; }
+  .th-attach-win{ max-width:620px; }
+  .th-attach-sub{ font-size:12.5px; color:var(--text-muted); margin-top:4px; line-height:1.5; }
+  .th-upload-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-bottom:6px; border-bottom:1px dashed var(--border); }
+  .th-upload{ cursor:pointer; }
+  .th-upload.is-busy{ opacity:.6; pointer-events:none; }
+  .th-upload-hint{ font-size:12px; color:var(--text-muted); }
+  @media (max-width:520px){
+    /* Four controls on one row left the box three words wide on a phone. */
+    .th-composer{ gap:6px; }
+    .th-composer .th-fast span{ display:none; }
+    .th-attach{ width:38px; height:38px; }
+  }
   .th-composer{ display:flex; gap:8px; align-items:flex-end; padding:12px 0 16px;
     border-top:1px solid var(--border); background:var(--surface); position:sticky; bottom:0; }
   .th-composer textarea{ flex:1; resize:none; min-height:42px; max-height:150px; }
@@ -15936,7 +15948,7 @@
     // setting up the thread before it would wipe the thread we are opening.
     closeModal();            // a thread may have been reached from a modal; leave it behind
     TH = { id: tid, loading: true, data: null, draft: '', busy: false, confirm: null,
-           picking: false, ctx: null, srcOpen: false };
+           picking: false, ctx: null };
     hsScreen = { kind: 'thread', id: tid };
     // A thread can be opened from an assignment, which lives on another tab. Opening
     // one is navigation, so it moves you to Headstart rather than rendering nothing.
@@ -15989,55 +16001,39 @@
       + '</div>';
   }
 
-  function threadSourcesHtml(){
-    // `pinned` is everything attached; `sources` is only what had readable text in it.
-    // Showing the second alone means ticking three files and seeing one, with nothing
-    // saying why the others went missing.
-    var pinned = (TH.data && TH.data.pinned) || [];
-    var unreadable = pinned.filter(function(s){ return !s.readable; }).length;
-    // With nothing pinned the chat still reads something: the assignment itself, and
-    // the files Vesta picks for it. "Nothing pinned yet" read as "reads nothing".
-    var read = (TH.data && TH.data.sources) || [];
-    var hasBrief = read.some(function(s){ return s.type === 'assignment'; });
-    var autoFiles = read.filter(function(s){ return s.type !== 'assignment'; }).length;
-    var summary = pinned.length
-      ? (hasBrief ? 'The assignment + ' : '') + pinned.length + ' source' + (pinned.length===1?'':'s')
-        + (unreadable ? ' · ' + unreadable + ' unreadable' : '')
-      : read.length
-        ? 'Chosen automatically: ' + [hasBrief ? 'the assignment' : '',
-            autoFiles ? autoFiles + ' file' + (autoFiles===1?'':'s') + ' from the class' : ''].filter(Boolean).join(' and ')
-        : 'Nothing pinned yet';
-    return '<div class="th-srcbar'+(TH.srcOpen?' th-open':'')+'">'
-      + '<div class="th-srchead">'
-      + '<span class="th-srclabel">Reads</span>'
-      + '<span class="th-srcsummary">'+escapeHtml(summary)+'</span>'
-      + '<button type="button" class="th-srctoggle" data-action="th-src-open">'
-      + (TH.srcOpen ? 'Hide' : 'Show') + '</button>'
-      + '<button type="button" class="btn ghost" data-action="th-pick">Change</button>'
-      + '</div>'
-      + '<span class="th-srcfull">'
-      + (pinned.length
-          ? pinned.map(function(s){
-              return '<span class="th-src'+(s.readable?'':' th-src-dim')+'"'
-                + (s.readable ? '' : ' title="No text could be read out of this one, so it is not sent."')
-                + '>'+escapeHtml(s.title||'Source')+'</span>';
-            }).join('')
-          : (read.length
-              ? read.map(function(s){
-                  return '<span class="th-src">'+escapeHtml(s.type === 'assignment' ? 'The assignment and its week' : (s.title||'Source'))+'</span>';
-                }).join('')
-                + '<span class="th-none">Nothing pinned, so Vesta chose these: the assignment, its files, the files posted for the week it is due, then the class\u2019s newest. Pin something to choose for yourself.</span>'
-              : '<span class="th-none">Nothing pinned. Pin something to choose for yourself.</span>'))
-      + (unreadable
-          ? '<span class="th-srcwarn">'
-            + (unreadable===1
-                ? 'One of these has no text Vesta can read, so it is not being sent.'
-                : unreadable+' of these have no text Vesta can read, so they are not being sent.')
-            + ' Scanned PDFs and images have no text layer.</span>'
-          : '')
-      + '</span>'
-      + '</div>';
+  /** What the chat reads, as chips above the message box.
+   *
+   * It used to be a grey bar across the top of the chat that named a count and showed
+   * the files only on hover; Saif did not like it being a bar at all. The assignment
+   * is always there, what he attached can be removed with its x, and with nothing
+   * attached the files Vesta picked are shown too, lighter, marked "auto".
+   */
+  function threadChipsHtml(){
+    var d = TH.data || {};
+    var read = d.sources || [], pinned = d.pinned || [];
+    var chips = [];
+    var brief = read.filter(function(s){ return s.type === 'assignment'; })[0];
+    if(brief){
+      chips.push('<span class="th-chip th-chip-brief" title="Its title, due date and instructions, and what the course has that week">'
+        + iconSvg('assignments')+'<span>The assignment and its week</span></span>');
+    }
+    if(pinned.length){
+      pinned.forEach(function(p){
+        chips.push('<span class="th-chip'+(p.readable ? '' : ' th-chip-dim')+'"'
+          + (p.readable ? '' : ' title="No text could be read out of this one, so it is not sent."')+'>'
+          + iconSvg(p.type === 'note' ? 'notes' : 'files')+'<span>'+escapeHtml(p.title||'Source')+'</span>'
+          + '<button type="button" class="th-chip-x" data-action="th-unpin" data-kind="'+p.type+'" data-id="'+p.id+'"'
+          + ' aria-label="Stop reading '+escapeHtml(p.title||'this')+'">\u00d7</button></span>');
+      });
+    } else {
+      read.filter(function(s){ return s.type !== 'assignment'; }).forEach(function(s){
+        chips.push('<span class="th-chip th-chip-auto" title="Picked automatically: the assignment\u2019s files, then that week\u2019s, then the class\u2019s newest. Attach something to choose for yourself.">'
+          + iconSvg(s.type === 'note' ? 'notes' : 'files')+'<span>'+escapeHtml(s.title||'Source')+'</span><em>auto</em></span>');
+      });
+    }
+    return chips.length ? '<div class="th-chips">'+chips.join('')+'</div>' : '';
   }
+
 
   function renderThread(){
     if(!TH) return;
@@ -16057,18 +16053,16 @@
     var body;
     if(TH.loading){
       body = '<div class="hs-thinking"><i></i>Opening the chat…</div>';
-    } else if(TH.picking){
-      body = threadPickerHtml();
     } else {
       var msgs = (d.messages||[]).map(threadBubbleHtml).join('');
-      body = threadSourcesHtml()
-        + '<div class="th-scroll" id="th-scroll">'
+      body = '<div class="th-scroll" id="th-scroll">'
         + (msgs || (TH.stream ? '' : '<div class="th-empty">Nothing here yet. Ask for anything, or start with one of these.</div>'))
         + threadLiveOrBusyHtml()
         + ((d.messages||[]).length || TH.stream ? '' : threadStartersHtml())
         + '</div>'
         + (TH.confirm ? threadConfirmHtml() : '')
-        + threadComposerHtml();
+        + threadComposerHtml()
+        + (TH.picking ? threadPickerHtml() : '');
     }
     document.getElementById('modal-root').innerHTML =
       '<div class="overlay" data-action="modal-backdrop"><div class="modal modal-wide th-modal" data-action="modal-stop">'
@@ -16253,21 +16247,82 @@
   /** Same picker as the one-shot workspace, writing to the thread instead of a run. */
   function threadPickerHtml(){
     var ctx = TH.ctx;
-    if(!ctx) return '<div class="hs-thinking"><i></i>Loading what this class has…</div>';
-    var sel = TH.data.selection || { materialIds:[], noteIds:[] };
-    var files = srcFilesHtml('th', ctx.files, function(id){
-      return (sel.materialIds||[]).indexOf(id) >= 0;
-    }, 'th-src-toggle', 'material');
-    var notes = srcNotesHtml(ctx.notes, function(id){
-      return (sel.noteIds||[]).indexOf(id) >= 0;
-    }, 'th-src-toggle', 'note');
-    return '<div class="th-picker">'
-      + '<div class="hs-group-label">Files</div>'+files
-      + '<div class="hs-group-label" style="margin-top:14px;">Notes</div>'+notes
-      + '<div class="hs-actions" style="margin-top:14px;">'
-      + '<button type="button" class="btn primary" data-action="th-pick-done">Done</button></div>'
-      + '</div>';
+    var body;
+    if(!ctx){
+      body = '<div class="hs-thinking"><i></i>Loading what this class has\u2026</div>';
+    } else {
+      var sel = TH.data.selection || { materialIds:[], noteIds:[] };
+      var extra = TH.justUploaded || {};
+      var files = srcFilesHtml('th', ctx.files, function(id){
+        return (sel.materialIds||[]).indexOf(id) >= 0 || !!extra[id];
+      }, 'th-src-toggle', 'material');
+      var notes = srcNotesHtml(ctx.notes, function(id){
+        return (sel.noteIds||[]).indexOf(id) >= 0;
+      }, 'th-src-toggle', 'note');
+      body = '<div class="th-upload-row">'
+        + '<label class="btn th-upload'+(TH.uploading?' is-busy':'')+'">'+iconSvg('upload')
+        + '<span>'+(TH.uploading ? 'Uploading\u2026' : 'Upload from computer')+'</span>'
+        + '<input type="file" id="th-upload-input" multiple hidden'+(TH.uploading?' disabled':'')+'></label>'
+        + '<span class="th-upload-hint">Saved to this class\u2019s Files'+(TH.data.itemId ? ' and to the assignment' : '')+', and attached here.</span></div>'
+        + '<div class="hs-group-label">Files</div>'+files
+        + '<div class="hs-group-label" style="margin-top:14px;">Notes</div>'+notes;
+    }
+    return '<div class="overlay th-attach-overlay" data-action="th-pick-cancel"><div class="modal th-attach-win" data-action="modal-stop">'
+      + '<div class="modal-head"><h2>Attach to this chat</h2>'
+      + '<div class="th-attach-sub">What you tick is what the chat reads, beside the assignment itself. With nothing ticked, Vesta picks for you.</div></div>'
+      + '<div class="modal-body">'+body+'</div>'
+      + '<div class="modal-foot"><span></span><div class="right">'
+      + '<button type="button" class="btn" data-action="th-pick-cancel">Cancel</button>'
+      + '<button type="button" class="btn primary" data-action="th-pick-done"'+(ctx && !TH.uploading ? '' : ' disabled')+'>Attach</button>'
+      + '</div></div></div></div>';
   }
+
+  /** Save what the chat reads, and show it. A chat not yet written keeps it until its
+   *  first message saves both, so attaching first and asking second works. */
+  function threadSetSelection(sel){
+    if(!TH) return Promise.resolve();
+    TH.data.selection = sel;
+    var done = function(d){
+      if(!TH) return;
+      TH.data.sources = d.sources; TH.data.pinned = d.pinned;
+      if(d.selection) TH.data.selection = d.selection;
+      TH.picking = false; TH.justUploaded = null; renderThread();
+    };
+    if(!TH.id){
+      return apiPost('/api/threads/preview', { classId: TH.data.classId, itemId: TH.data.itemId, selection: sel })
+        .then(done);
+    }
+    return apiPut('/api/threads/'+TH.id, { selection: sel }).then(function(){
+      return apiGet('/api/threads/'+TH.id);
+    }).then(function(d){ if(TH){ TH.data = d; } done(d); });
+  }
+
+  function threadUpload(fileList){
+    if(!TH || !fileList || !fileList.length) return;
+    var classId = TH.data.classId, itemId = TH.data.itemId;
+    TH.uploading = true; renderThread();
+    var ids = [];
+    var chain = Array.prototype.reduce.call(fileList, function(p, file){
+      return p.then(function(){
+        var fd = new FormData();
+        fd.append('file', file);
+        fd.append('category', 'other');
+        if(itemId) fd.append('itemId', itemId);
+        return fetch('/api/classes/'+classId+'/materials', { method:'POST', body: fd })
+          .then(checkOk).then(function(r){ if(r && r.id) ids.push(r.id); });
+      });
+    }, Promise.resolve());
+    chain.then(function(){
+      return Promise.all([apiGet('/api/ai/context/'+classId), loadState()]);
+    }).then(function(res){
+      if(!TH) return;
+      TH.ctx = res[0];
+      TH.justUploaded = TH.justUploaded || {};
+      ids.forEach(function(id){ TH.justUploaded[id] = true; });
+      TH.uploading = false; renderThread();
+    }).catch(function(err){ if(TH){ TH.uploading = false; renderThread(); } reportError(err); });
+  }
+
 
   /** Open the thread about an assignment, making it the first time round.
    *
@@ -16292,13 +16347,16 @@
   function openDraftThread(seed, tool){
     closeModal();
     TH = { id: null, draftThread: seed, loading: false, busy: false, confirm: null,
-           picking: false, ctx: null, srcOpen: false, draft: '',
+           picking: false, ctx: null, draft: '',
            data: { id: null, title: seed.title || 'New chat', classId: seed.classId,
                    itemId: seed.itemId,
                    messages: [], pinned: [], sources: [], selection: null } };
     hsScreen = { kind: 'thread', id: null };
     if(activeTab !== 'headstart'){ activeTab = 'headstart'; render(); }
     renderThread();
+    apiPost('/api/threads/preview', { classId: seed.classId, itemId: seed.itemId, selection: null })
+      .then(function(d){ if(TH && !TH.id){ TH.data.sources = d.sources; TH.data.pinned = d.pinned; renderThread(); } })
+      .catch(function(){});
     // Arriving with a tool already chosen still goes through the usual confirmation,
     // so nothing is spent on a single click from the plan card.
     if(tool) threadSend(tool, false);
@@ -16330,7 +16388,6 @@
 
     var msgs = (d.messages||[]).map(threadBubbleHtml).join('');
     var main = '<div class="th-main">'
-      + threadSourcesHtml()
       + '<div class="th-scroll" id="th-scroll">'
       + (msgs || (TH.stream ? '' : threadEmptyHtml()))
       + threadLiveOrBusyHtml()
@@ -16360,8 +16417,8 @@
           : '<span class="th-draft-note">Saved when you send the first message</span>')
       + '</div>'
       + '</div>'
-      + (TH.picking ? '<div class="th-body-wrap">'+threadPickerHtml()+'</div>'
-                    : '<div class="th-body-wrap">'+rail+main+'</div>')
+      + '<div class="th-body-wrap">'+rail+main+'</div>'
+      + (TH.picking ? threadPickerHtml() : '')
       + '</div>';
   }
 
@@ -16369,7 +16426,7 @@
   function threadEmptyHtml(){
     return '<div class="th-start">'
       + '<h3>What do you want to get done?</h3>'
-      + '<p>Attach the readings and notes this is about, then ask. Vesta works from your '
+      + '<p>Vesta already has the assignment. Attach readings and notes with + beside the message box, then ask. Vesta works from your '
       + 'material, and remembers this conversation, so you can keep going without '
       + 'setting it all up again.</p>'
       + '<div class="th-start-tools">'
@@ -16463,7 +16520,8 @@
       if(!toolKey && !(TH.draft||'').trim()) return;
       TH.busy = true; renderThread();
       apiPost('/api/threads', { classId: seed.classId, itemId: seed.itemId,
-                                title: seed.title || threadTitleFrom(toolKey, TH.draft) })
+                                title: seed.title || threadTitleFrom(toolKey, TH.draft),
+                                selection: TH.data.selection || null })
         .then(function(th){
           if(!TH) return;
           TH.id = th.id;
@@ -16562,7 +16620,8 @@
 
   function threadComposerHtml(){
     var fast = threadFastOn();
-    return '<div class="th-composer">'
+    return '<div class="th-composer-wrap">' + threadChipsHtml() + '<div class="th-composer">'
+      + '<button type="button" class="th-attach" data-action="th-pick" title="Attach files or notes" aria-label="Attach files or notes">'+iconSvg('plus')+'</button>'
       // left usable while a reply streams, so the next question can be written meanwhile
       + '<textarea id="th-draft" data-action="th-draft" rows="2" placeholder="Ask for anything, or say what to change…">'
       + escapeHtml(TH.draft||'')+'</textarea>'
@@ -16571,7 +16630,7 @@
       + (TH.stream
           ? '<button type="button" class="btn th-stop" data-action="th-stop">'+iconSvg('stop')+'Stop</button>'
           : '<button type="button" class="btn primary" data-action="th-send"'+(TH.busy?' disabled':'')+'>Send</button>')
-      + '</div>';
+      + '</div></div>';
   }
 
   function threadLiveOrBusyHtml(){
@@ -19236,17 +19295,23 @@
     }
     if(action==='th-tool'){ threadSend(t.dataset.tool, false); return; }
     if(action==='th-dismiss'){ TH.confirm = null; renderThread(); return; }
-    if(action==='th-src-open'){ TH.srcOpen = !TH.srcOpen; renderThread(); return; }
-    if(action==='th-pick'){ TH.picking = true; renderThread(); return; }
+    if(action==='th-pick'){
+      TH.picking = true; renderThread();
+      if(!TH.ctx && TH.data && TH.data.classId){
+        apiGet('/api/ai/context/'+TH.data.classId).then(function(ctx){ if(TH){ TH.ctx = ctx; renderThread(); } }).catch(reportError);
+      }
+      return;
+    }
+    if(action==='th-pick-cancel'){ TH.picking = false; TH.justUploaded = null; renderThread(); return; }
     if(action==='th-pick-done'){
-      var sel = threadSelectionFromChecks();
-      TH.picking = true;
-      apiPut('/api/threads/'+TH.id, { selection: sel }).then(function(){
-        return apiGet('/api/threads/'+TH.id);
-      }).then(function(d){
-        if(!TH) return;
-        TH.data = d; TH.picking = false; renderThread();
-      }).catch(function(err){ if(TH){ TH.picking = false; renderThread(); } reportError(err); });
+      threadSetSelection(threadSelectionFromChecks()).catch(function(err){ if(TH){ TH.picking = false; renderThread(); } reportError(err); });
+      return;
+    }
+    if(action==='th-unpin'){
+      var cur = Object.assign({ materialIds:[], noteIds:[], folderIds:[], syllabusIds:[] }, TH.data.selection || {});
+      var listKey = { file:'materialIds', note:'noteIds', folder:'folderIds', topic:'syllabusIds' }[t.dataset.kind];
+      if(listKey) cur[listKey] = (cur[listKey] || []).filter(function(id){ return id !== t.dataset.id; });
+      threadSetSelection(cur).catch(reportError);
       return;
     }
     if(action==='th-copy'){
@@ -19657,6 +19722,7 @@
   document.addEventListener('change', function(e){
     var t = e.target;
     if(t.id === 'hz-file'){ hzUpload(t.files && t.files[0]); return; }
+    if(t.id === 'th-upload-input'){ threadUpload(t.files); return; }
     if(t.matches('[data-action="hz-use-voice"]')){ HZ.useVoice = t.checked; hzPaintMeter(); return; }
     if(t.id === 'item-file-input'){
       if(itemFilePickerId && t.files && t.files.length) uploadFilesToItem(itemFilePickerId, t.files);

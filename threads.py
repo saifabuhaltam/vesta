@@ -174,6 +174,24 @@ def threads_collection():
         conn.close()
 
 
+@bp.route("/api/threads/preview", methods=["POST"])
+def preview_sources():
+    """What a chat not yet written would read. Takes {classId, itemId, selection}.
+
+    A chat is saved only when its first message is sent, but its attachments show
+    above the message box from the start, so what it would read is asked for here.
+    """
+    data = request.get_json(force=True) or {}
+    selection = data.get("selection") or {}
+    conn = get_db()
+    try:
+        _, used = collect_sources(conn, selection, data.get("classId"), data.get("itemId"),
+                                  with_brief=True)
+        return jsonify({"sources": used, "pinned": pinned_list(conn, None, selection)})
+    finally:
+        conn.close()
+
+
 @bp.route("/api/threads/<tid>", methods=["GET", "PUT", "DELETE"])
 def one_thread(tid):
     conn = get_db()
