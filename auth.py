@@ -21,10 +21,12 @@ request. Asking would be a round trip per request for a value that cannot change
 mid-token, and the shared secret makes local verification exact.
 """
 import base64
+import functools
 import hashlib
 import hmac
 import json
 import os
+import threading
 import time
 import urllib.parse
 
@@ -186,6 +188,59 @@ def ensure_account_row(user_id, email):
 
 
 # ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+# Every sign-in is Flask calling Supabase, so Supabase's own per-address limit sees
+# one address, Railway's, for everybody. Without a limit here, one person hammering
+# the login form would use up the allowance and lock out every account at once. Ten
+# tries in five minutes is far more than anyone typing a password needs.
+#
+# In memory, which is right for one gunicorn worker: it resets on a deploy, and a
+# second worker would need a shared store. The address comes from Cloudflare's header
+# because every request arrives through Cloudflare. A request sent straight to
+# Railway could forge it and so get around this limit, which leaves things no worse
+# than before it existed.
+AUTH_WINDOW_SECONDS = 5 * 60
+AUTH_MAX_TRIES = 10
+_tries = {}
+_tries_lock = threading.Lock()
+
+
+def client_address():
+    return (request.headers.get("CF-Connecting-IP")
+            or (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+            or request.remote_addr or "")
+
+
+def _wait_seconds(key):
+    """0 if this attempt may go ahead (and count it), else seconds until one may."""
+    now = time.time()
+    with _tries_lock:
+        recent = [t for t in _tries.get(key, ()) if t > now - AUTH_WINDOW_SECONDS]
+        if len(recent) >= AUTH_MAX_TRIES:
+            _tries[key] = recent
+            return int(recent[0] + AUTH_WINDOW_SECONDS - now) + 1
+        recent.append(now)
+        _tries[key] = recent
+        if len(_tries) > 10000:           # forget addresses that have gone quiet
+            for k in [k for k, v in _tries.items() if v[-1] <= now - AUTH_WINDOW_SECONDS]:
+                del _tries[k]
+    return 0
+
+
+def rate_limited(view):
+    @functools.wraps(view)
+    def wrapper(*args, **kwargs):
+        wait = _wait_seconds(client_address())
+        if wait:
+            minutes = max(1, round(wait / 60))
+            return jsonify({"error": f"Too many attempts. Try again in {minutes} "
+                                     f"minute{'s' if minutes != 1 else ''}."}), 429
+        return view(*args, **kwargs)
+    return wrapper
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 def identify(access_token):
@@ -244,6 +299,7 @@ def _session_from_token(access_token):
 
 
 @bp.route("/api/auth/login", methods=["POST"])
+@rate_limited
 def login():
     if not enabled():
         return jsonify({"error": "This copy of Vesta has no accounts."}), 400
@@ -261,6 +317,7 @@ def login():
 
 
 @bp.route("/api/auth/signup", methods=["POST"])
+@rate_limited
 def signup():
     """Create an account, if that email has been invited."""
     if not enabled():
@@ -293,6 +350,7 @@ def signup():
 
 
 @bp.route("/api/auth/reset", methods=["POST"])
+@rate_limited
 def reset():
     if not enabled():
         return jsonify({"error": "This copy of Vesta has no accounts."}), 400
@@ -335,6 +393,7 @@ def google_start():
 
 
 @bp.route("/api/auth/session", methods=["POST"])
+@rate_limited
 def session_from_browser():
     """Turn a token the browser was handed into a Vesta session.
 
@@ -378,6 +437,7 @@ def _supabase_update_user(access_token, payload):
 
 
 @bp.route("/api/auth/password", methods=["POST"])
+@rate_limited
 def change_password():
     """Set a new password, authorised one of two ways.
 

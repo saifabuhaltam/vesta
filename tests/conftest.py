@@ -26,3 +26,17 @@ os.environ.setdefault("HTTPS_ONLY", "0")
 # No daily Canvas check thread. It would wait ten minutes before doing anything, but a
 # test run has no business starting it at all.
 os.environ.setdefault("VESTA_NO_BACKGROUND", "1")
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _fresh_sign_in_limit():
+    """Every test starts with an empty sign-in rate limit.
+
+    The whole suite signs in from 127.0.0.1, so without this the eleventh sign-in of
+    the run would be refused. `test_security.py` exercises the limit on purpose.
+    """
+    import auth
+    auth._tries.clear()
+    yield

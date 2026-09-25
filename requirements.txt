@@ -1,6 +1,6 @@
-Flask==3.0.3
+Flask==3.1.3
 gunicorn==22.0.0
-pypdf==4.3.1
+pypdf==6.19.0
 python-docx==1.1.2
 anthropic
 # Postgres, for the deployed app. db.py falls back to SQLite without DATABASE_URL,

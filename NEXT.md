@@ -3,7 +3,7 @@
 A running list so nothing is lost between sessions. **needs Saif** means it cannot be
 done from a terminal: a dashboard login, an email click, or a decision that is his.
 
-_Last updated: 2026-09-24. Rewritten on 2026-09-21 from scratch: the old file had grown to 1,228
+_Last updated: 2026-09-25. Rewritten on 2026-09-21 from scratch: the old file had grown to 1,228
 lines, most of it a record of work already finished, and 72 open boxes of which about
 ten were stale. What follows is what is actually open, and the history worth keeping._
 
@@ -33,6 +33,67 @@ channels are alive.
       before the editor change, so it is not the editor. Not investigated; it may be
       the test's data (the Assignments list filtering out an undated item) rather
       than a regression.
+
+### Security check (2026-09-25)
+
+Checked against a 20-point "vibe-coded app" security list. Already sound, no action:
+every `/api` route is behind the session gate; the session is an HttpOnly, Secure,
+SameSite=Lax cookie and no token is ever in localStorage; RLS is forced on every
+table; Supabase handles password hashing; secret keys stay on the server; `.env` is
+ignored and no secret appears in the tracked files or anywhere in git history; every
+SQL value is a bound parameter and every dynamic column name comes from a fixed list;
+uploads go through `secure_filename` and a 25 MB cap; no CORS headers are sent; debug
+is off under gunicorn; there are no admin routes (invites and the AI cap are Railway
+variables); the AI spend has a global $5/day ceiling.
+
+- [x] **Fixed 2026-09-25, not yet deployed:** the six items below, with
+      `tests/test_security.py` (12 tests) covering them. Both suites pass (436 and 48),
+      and a browser run against a local copy confirmed an SVG's script no longer runs,
+      images and PDFs still preview (PDF checked in real Chrome), and an old
+      `javascript:` link already in the database renders as an empty link.
+  - Uploaded SVGs were served inline from vesta.study, so a script inside one ran as
+    the signed-in student (Canvas files take the same path). Every stored file except
+    PDFs is now sent with `Content-Security-Policy: sandbox`. PDFs are left out
+    because Chrome's viewer will not render inside a sandbox.
+  - No security headers. An `after_request` hook in `app.py` now sends nosniff,
+    `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`, and HSTS over HTTPS (180 days,
+    no includeSubDomains). No CSP on the page itself: it is one file of inline script.
+  - pypdf 4.3.1 (about 80 advisories, mostly crafted PDFs hanging extraction) is now
+    6.19.0. Text extraction checked on the three syllabi in `test-syllabi/`.
+  - Flask 3.0.3 is now 3.1.3.
+  - Links: `web_url` in `app.py` refuses anything but http(s) on save and gives a bare
+    `example.com` https; `week.web_link` drops non-web Canvas "External URL" items;
+    the page's `safeUrl` guards every href, iframe, img and `window.open` that takes
+    a stored link, which covers links saved before this.
+  - Sign-in rate limit: 10 tries per address per 5 minutes on login, signup, reset,
+    session and password (`auth.rate_limited`), in memory. Supabase only ever sees
+    Railway's address, so before this one person could exhaust its limit for all.
+- [ ] **needs Saif**: Confirm "Confirm email" is on in Supabase (Authentication,
+      Providers, Email). If it is off, someone who knows an invited friend's address
+      could sign up as that friend before they do.
+- [ ] **Sessions cannot be revoked.** Removing an email from `INVITE_EMAILS` does not
+      sign that person out; the signed cookie works until its 30 days run out. Only
+      rotating `SECRET_KEY` (which signs everyone out) ends it. Fine at three users.
+- [ ] Low: the note preview modal (`openNotePreviewModal`) inserts `n.text` without
+      sanitising. Notes are only written by their owner, so this is self-only today;
+      it becomes real if notes are ever shared or imported.
+- [ ] Low: the Google Calendar webhook trusts the channel id alone. It is a random
+      UUID, so this is safe in practice; setting a channel `token` on `watch` and
+      checking `X-Goog-Channel-Token` would make it airtight.
+
+### Speed check (2026-09-25, paused)
+
+Measured from Vancouver against the live site. Brotli/gzip and a CDN (Cloudflare) are
+already in place; the page shell is ~260 KB over the wire, `editor.js` ~160 KB.
+`/health` (fresh DB connection plus one query) is only ~40 ms slower than `/privacy`
+(no database), so per-request connections are not the bottleneck. Every request costs
+about 250 ms from here no matter what it does, which is mostly the hop to Railway.
+
+- [ ] Not measured yet: a signed-in `/api/state` and the browser's own work (the page
+      is ~830 KB of inline script plus 216 KB of CSS, parsed on every load). A
+      Lighthouse run needs Node, which is not installed. Pick up here once it is known
+      what actually feels slow.
+- [ ] `vesta-mark.png` is 146 KB for a logo; a resized PNG or WebP would be ~10 KB.
 
 ### Before friends lean on it
 

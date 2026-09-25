@@ -3508,6 +3508,15 @@
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
     });
   }
+  // A stored link as something safe to put in href or window.open: http(s), or a path
+  // on Vesta itself (an uploaded file's url is its /api/materials/.../download).
+  // Escaping stops a URL breaking out of the attribute but not `javascript:` running
+  // on a click, and links saved before the server started refusing those are still out
+  // there.
+  function safeUrl(u){
+    u = String(u==null?'':u).trim();
+    return /^(https?:\/\/|\/)/i.test(u) ? u : '';
+  }
   function inlineMd(s){
     return s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*(?!\*)(.+?)\*(?!\*)/g,'$1<em>$2</em>');
   }
@@ -5747,7 +5756,7 @@
     var r = hit.row;
     if(r.itemId){ openItemDetailModal(r.itemId); return; }
     if(r.materialId){ openFilePreviewModal(r.materialId); return; }
-    if(r.url) window.open(r.url, '_blank', 'noopener');
+    if(safeUrl(r.url)) window.open(safeUrl(r.url), '_blank', 'noopener');
   }
 
   function wkAs(el){
@@ -12300,7 +12309,7 @@
   }
   // The file route previews inline by default; ?download=1 forces a save.
   function materialDownloadUrl(m){
-    return m.kind==='file' ? m.url+'?download=1' : m.url;
+    return m.kind==='file' ? m.url+'?download=1' : safeUrl(m.url);
   }
   var OFFICE_EXTS = ['doc','docx','odt','rtf','ppt','pptx','odp','xls','xlsx','ods'];
   function isOfficeMaterial(m){
@@ -12317,9 +12326,9 @@
     if(m.kind==='file' && m.missing){
       body = '<div class="preview-fallback">This file is no longer stored on the server, so there is nothing to preview.<div style="margin-top:12px;">Upload it again to restore the preview.</div></div>';
     } else if(isPdfMaterial(m)){
-      body = '<iframe src="'+escapeHtml(m.url)+'#view=FitH" title="'+escapeHtml(name)+'"></iframe>';
+      body = '<iframe src="'+escapeHtml(safeUrl(m.url))+'#view=FitH" title="'+escapeHtml(name)+'"></iframe>';
     } else if(isImageMaterial(m)){
-      body = '<img src="'+escapeHtml(m.url)+'" alt="'+escapeHtml(name)+'">';
+      body = '<img src="'+escapeHtml(safeUrl(m.url))+'" alt="'+escapeHtml(name)+'">';
     } else if(m.previewUrl){
       // A Word, PowerPoint or Excel file converted to PDF on upload. The original is
       // still what Download hands back; this is only what the browser can render.
@@ -12329,7 +12338,7 @@
         + '<div style="margin-top:12px;" class="hint">It takes a few seconds. '
         + '<button type="button" class="link-btn" data-action="preview-refresh" data-id="'+m.id+'">Check again</button></div></div>';
     } else if(m.kind!=='file'){
-      body = '<div class="preview-fallback">This is a link, not an uploaded file.<div style="margin-top:12px;"><a class="btn primary" href="'+escapeHtml(m.url)+'" target="_blank" rel="noopener noreferrer">Open link →</a></div></div>';
+      body = '<div class="preview-fallback">This is a link, not an uploaded file.<div style="margin-top:12px;"><a class="btn primary" href="'+escapeHtml(safeUrl(m.url))+'" target="_blank" rel="noopener noreferrer">Open link →</a></div></div>';
     } else {
       var why = (isOfficeMaterial(m) && m.previewStatus === 'failed')
         ? 'This one could not be converted for preview.'
@@ -12357,7 +12366,7 @@
       + '<div class="preview-body">'+body+'</div>'
       + '<div class="modal-foot"><span></span><div class="right">'
       + (m.kind==='file' ? '<a class="btn" href="'+escapeHtml(materialDownloadUrl(m))+'">Download</a>' : '')
-      + '<a class="btn" href="'+escapeHtml(m.url)+'" target="_blank" rel="noopener noreferrer">Open in new tab</a>'
+      + '<a class="btn" href="'+escapeHtml(safeUrl(m.url))+'" target="_blank" rel="noopener noreferrer">Open in new tab</a>'
       + '<button class="btn primary" data-action="modal-close">Close</button></div></div>'
       + '</div></div>';
     document.getElementById('modal-root').innerHTML = html;
@@ -13433,7 +13442,7 @@
         + '<div class="hint" style="margin-top:6px;">From Canvas'+(m.size!=null ? ' · '+humanSize(m.size) : '')+'</div></div>'
         + '<div class="preview-body">'+body+'</div>'
         + '<div class="modal-foot"><span></span><div class="right">'
-        + (m.url ? '<a class="btn" href="'+escapeHtml(m.url)+'" target="_blank" rel="noopener noreferrer">Open on Canvas</a>' : '')
+        + (safeUrl(m.url) ? '<a class="btn" href="'+escapeHtml(safeUrl(m.url))+'" target="_blank" rel="noopener noreferrer">Open on Canvas</a>' : '')
         + '<button class="btn primary" data-action="modal-close">Close</button></div></div></div></div>';
     };
     var slow = m.size != null && m.size > 5*1024*1024;

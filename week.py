@@ -26,6 +26,15 @@ ITEM_FIELDS = ("id", "title", "type", "content_id", "html_url", "external_url",
 DETAIL_FIELDS = ("due_at", "points_possible")
 
 
+def web_link(url):
+    """The item's link if it is a web address, else None.
+
+    An "External URL" module item is whatever the instructor typed, and the page opens
+    it on a click, so a `javascript:` one would run inside Vesta.
+    """
+    return url if url and re.match(r"^https?://", url, re.I) else None
+
+
 def reduce_modules(modules):
     """Only what the week needs, so a course's snapshot row stays small."""
     out = []
@@ -383,7 +392,7 @@ def course_entries(course_id, modules, term_start, tz=None, shift=None):
                 "task": task,
                 "canvasType": it.get("type"),
                 "contentId": it.get("content_id"),
-                "url": it.get("html_url") or it.get("external_url"),
+                "url": web_link(it.get("html_url") or it.get("external_url")),
                 "dueDate": due_date,
                 "dueTime": due_time,
                 "section": it.get("section") or "",

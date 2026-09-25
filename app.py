@@ -770,6 +770,27 @@ def index():
     return send_from_directory(app.static_folder, "index.html")
 
 
+@app.after_request
+def _security_headers(resp):
+    """The four headers every response should carry.
+
+    nosniff stops a browser second-guessing a stored file's type into something it will
+    run. Framing is limited to Vesta itself, which still lets the file preview put a PDF
+    in an iframe. HSTS is sent only over HTTPS, and without includeSubDomains, so
+    nothing else on the domain is committed to it by accident.
+
+    No Content-Security-Policy for the page itself: it is one file of inline script,
+    so any policy it could pass would allow inline script and protect nothing.
+    """
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    proto = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip()
+    if request.is_secure or proto == "https":
+        resp.headers.setdefault("Strict-Transport-Security", "max-age=15552000")
+    return resp
+
+
 # ---------------- semesters ----------------
 
 # Unlocking an archived term is deliberately per browser session rather than a stored
@@ -1910,6 +1931,22 @@ def add_unfiled_material():
     return add_material(None)
 
 
+def web_url(raw):
+    """A saved link as a web address, or None if it is some other kind of URL.
+
+    A `javascript:` or `data:` link is kept by the browser as a link and runs when
+    clicked, so only http and https are accepted. A bare `example.com` is what people
+    type, so it gets https rather than a refusal. A host with a port (`localhost:3000`)
+    looks like a scheme to a naive check, hence the digit test.
+    """
+    url = (raw or "").strip()
+    if re.match(r"^https?://", url, re.I):
+        return url
+    if re.match(r"^[a-z][a-z0-9+.-]*:(?!\d)", url, re.I):
+        return None
+    return "https://" + url
+
+
 @app.route("/api/classes/<cid>/materials", methods=["POST"])
 def add_material(cid):
     conn = get_db()
@@ -1963,6 +2000,10 @@ def add_material(cid):
         if not url:
             conn.close()
             return jsonify({"error": "url or file required"}), 400
+        url = web_url(url)
+        if not url:
+            conn.close()
+            return jsonify({"error": "Links have to be web addresses (http or https)."}), 400
         title = data.get("title") or url
         category = data.get("category", "other")
         folder = asked_folder or default_folder_for_upload(conn, cid, category)
@@ -2112,13 +2153,21 @@ def download_material(mid):
     mt = material_mimetype(m)
     forced = request.args.get("download") in ("1", "true", "yes")
     inline = not forced and mt in INLINE_MIMETYPES
-    return send_from_directory(
+    resp = send_from_directory(
         UPLOAD_DIR,
         m["stored_name"],
         mimetype=mt,
         as_attachment=not inline,
         download_name=m["filename"],
     )
+    # An uploaded file is someone else's content served from Vesta's own origin. An SVG
+    # can carry a script, and the stored type is whatever the uploading browser (or
+    # Canvas) claimed, so opened directly it would run as the signed-in student. The
+    # sandbox gives it an origin of its own with scripts off. Not on PDFs: Chrome's
+    # viewer refuses to render one in a sandbox, and its scripts never reach the page.
+    if mt != "application/pdf":
+        resp.headers["Content-Security-Policy"] = "sandbox"
+    return resp
 
 
 # One lock per material, so two clicks on the same unfetched Canvas file download it
