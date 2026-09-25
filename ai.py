@@ -509,12 +509,18 @@ def strip_html(html):
     return re.sub(r"\s+", " ", text).strip()
 
 
-def collect_sources(conn, selection, class_id=None, item_id=None):
+def collect_sources(conn, selection, class_id=None, item_id=None, with_brief=False):
     """Turn a selection into readable text plus a record of where it came from.
 
     `selection` may name materials, notes, note folders and syllabus topics. When
-    it is empty, fall back to what looks relevant for the class: extracted file
-    text, then notes, newest first.
+    it is empty, fall back to what looks relevant: the assignment's own files and
+    notes, the files posted for the week it is due, then the class's newest.
+
+    `with_brief` puts the assignment itself first: its title, course, due date,
+    weight, Canvas's instructions and the course's week around it. A Headstart chat
+    needs this and was never given it, so a draft asked for in a chat did not know
+    what the assignment was (Saif, 2026-09-24). The one-shot tools add the brief to
+    their prompt themselves and leave this off.
     """
     selection = selection or {}
     chosen_materials = selection.get("materialIds") or []
@@ -557,8 +563,14 @@ def collect_sources(conn, selection, class_id=None, item_id=None):
         used.append({"type": kind, "id": ref_id, "title": title, "chars": len(chunk)})
         budget -= len(chunk)
 
-    # Working on an assignment, its own files and the notes about it come first; the
-    # rest of the class only fills whatever room is left.
+    if with_brief and item_id:
+        brief, it, _ = assignment_brief(conn, item_id)
+        if brief:
+            add("assignment", item_id, (it["title"] if it else None) or "The assignment", brief)
+
+    # Working on an assignment, its own files and the notes about it come first, then
+    # the files posted for the week it is due; the rest of the class only fills
+    # whatever room is left.
     if auto and item_id:
         for m in conn.execute(
                 "SELECT m.id, m.title, m.filename, m.extracted_text FROM item_files f "
@@ -569,6 +581,8 @@ def collect_sources(conn, selection, class_id=None, item_id=None):
                 "(linked_item_id=? OR id IN (SELECT note_id FROM note_links WHERE item_id=?))",
                 (item_id, item_id)).fetchall():
             add("note", n["id"], n["title"] or "Untitled note", strip_html(n["text"]))
+        for m in week_materials(conn, item_id):
+            add("file", m["id"], m["title"] or m["filename"] or "File", m["extracted_text"])
 
     if auto and class_id:
         for m in conn.execute(
@@ -617,6 +631,34 @@ def collect_sources(conn, selection, class_id=None, item_id=None):
     return "\n\n".join(parts), used
 
 
+def week_materials(conn, item_id):
+    """The class's files that Canvas lists for the week the assignment is due."""
+    it = conn.execute("SELECT class_id, due_date FROM items WHERE id=?", (item_id,)).fetchone()
+    if not it or not it["due_date"] or not it["class_id"]:
+        return []
+    try:
+        import week
+        wk = week.week_context(conn, it["class_id"], it["due_date"])
+    except Exception:
+        return []
+    if not wk:
+        return []
+    keys = set("canvas:file:%s" % fid for fid in wk.get("canvasFileIds") or [])
+    readings = [r.get("title") or "" for r in wk.get("readings") or []]
+    out = []
+    # Canvas's files for that week by id, and anything uploaded whose name matches one
+    # of the week's readings: SD 381's Moore et al. chapter is a library link, so the
+    # only way its text reaches Vesta is a PDF he uploads himself.
+    for m in conn.execute(
+            "SELECT id, title, filename, import_key, extracted_text FROM materials WHERE class_id=?"
+            " AND extracted_text IS NOT NULL AND extracted_text != ''", (it["class_id"],)).fetchall():
+        name = m["title"] or m["filename"] or ""
+        if m["import_key"] in keys or any(
+                week.file_matches_reading(name, r) for r in readings if r):
+            out.append(m)
+    return out
+
+
 def assignment_brief(conn, item_id):
     if not item_id:
         return "", None, None
@@ -632,11 +674,61 @@ def assignment_brief(conn, item_id):
     if it["weight"] is not None:
         bits.append(f"Worth: {it['weight']}% of the course grade")
     if it["notes"]:
-        bits.append("What the student recorded about it:\n" + it["notes"])
+        # Canvas's own instructions land here on import, beside anything he typed.
+        bits.append("The assignment's description and the student's notes:\n" + it["notes"])
+    else:
+        bits.append("No instructions for this assignment are recorded in Vesta yet (the "
+                    "course may not have posted them). Work from the course schedule below, "
+                    "and say plainly what is being assumed.")
     state = assignment_state(conn, it)
     if state:
         bits.append("Where the student is with it: " + state)
+    around = week_brief(conn, it)
+    if around:
+        bits.append(around)
     return "\n".join(bits), it, cls
+
+
+def week_brief(conn, it):
+    """The course's week around the assignment's due date, from its schedule and its
+    Canvas modules: the readings it is most likely about, and what else is due."""
+    if not it["due_date"] or not it["class_id"]:
+        return ""
+    try:
+        import week
+        wk = week.week_context(conn, it["class_id"], it["due_date"])
+    except Exception:
+        return ""
+    if not wk:
+        return ""
+
+    def line(r):
+        text = "- " + (r.get("title") or "")
+        if r.get("detail"):
+            text += " (" + r["detail"] + ")"
+        if r.get("dueDate"):
+            text += ", due " + r["dueDate"]
+        return text
+
+    out = ["The course that week (week %s, %s to %s), from its schedule and Canvas:"
+           % (wk["week"], wk["start"], wk["end"])]
+    if wk["topic"]:
+        out.append("Topic: " + wk["topic"])
+    for n in wk["notes"]:
+        out.append("Notice: " + n)
+    if wk["readings"]:
+        out.append("Readings and lectures that week:")
+        out += [line(r) for r in wk["readings"]]
+    # The assignment itself, however the schedule spells it ("450 words/3 paragraphs"
+    # against "450 words / 3 paragraphs"), is not "other work".
+    others = [r for r in wk["work"]
+              if week.title_match(r.get("title") or "", it["title"] or "") < week.MATCH_AT]
+    if others:
+        out.append("Other work that week:")
+        out += [line(r) for r in others[:12]]
+    if wk["links"]:
+        out.append("Materials posted for that week: " + "; ".join(r["title"] for r in wk["links"][:12]))
+    return "\n".join(out) if len(out) > 1 else ""
 
 
 def assignment_state(conn, it):

@@ -487,6 +487,27 @@ def title_match(a, b):
 MATCH_AT = 0.6
 
 
+def file_matches_reading(filename, reading):
+    """Whether an uploaded file is one of a week's readings, going by their words.
+
+    Not `title_match`: its rule that disagreeing numbers mean different things is right
+    for "Quiz 1" and "Quiz 2", and wrong here, where a file named "Moore 2019 ..." is
+    the reading listed as "Moore et al. ... Ch. 3". Numbers are ignored; two shared
+    words, and at least half of the file's, make a match.
+    """
+    name = re.sub(r"\.[a-z0-9]{2,4}$", "", filename or "", flags=re.I)
+    fw = {w for w in _words(name) if not w.isdigit() and len(w) > 2}
+    rw = {w for w in _words(reading) if not w.isdigit() and len(w) > 2}
+    shared = fw & rw
+    if len(shared) >= 2 and len(shared) >= len(fw) / 2.0:
+        return True
+    # "Moore et al 2019.pdf": named by its author alone. Every word of the name is in
+    # the reading, and one of them is the author, the reading's first word after "Read".
+    order = [w for w in canvas_norm(re.sub(r"^\s*read\s+", "", reading or "", flags=re.I)).split()
+             if not w.isdigit() and len(w) > 2 and w not in _MATCH_STOP]
+    return bool(fw) and fw <= rw and bool(order) and order[0] in fw
+
+
 def assemble_class(cls, term_start, week_no, today_week, *, course=None, plan=None,
                    items=(), categories=(), materials=None, marks=None, plan_items=None):
     """One class's rows for calendar week `week_no`. Pure: everything is passed in.
@@ -858,3 +879,60 @@ def post_shift():
         return jsonify({"error": "That class is not connected to a Canvas course."}), 404
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# one class's week, for Headstart
+# ---------------------------------------------------------------------------
+
+def week_context(conn, class_id, day):
+    """What the course has in the week holding `day`: its topic, notices, readings,
+    other work, and the Canvas files listed for it. None when that cannot be worked
+    out (no term dates, no such class).
+
+    Headstart asks this about an assignment's due date, so a chat about SD 381's
+    "Assignment on reading" knows the reading is Moore et al. (2019) from the schedule,
+    instead of guessing from whichever files were uploaded last.
+    """
+    import db
+    import canvas_sync
+    import ics
+    import week_plan
+
+    day = parse_iso(day)
+    cls = conn.execute("SELECT id, code, name, color, semester_id FROM classes WHERE id=?",
+                       (class_id,)).fetchone() if class_id else None
+    if not day or not cls:
+        return None
+    sem = conn.execute("SELECT start_date FROM semesters WHERE id=?",
+                       (cls["semester_id"],)).fetchone()
+    term_start = parse_iso(sem["start_date"]) if sem else None
+    if not term_start:
+        return None
+    week_no = week_number(day, term_start)
+    items = [_row(r) for r in conn.execute(
+        "SELECT id, class_id, title, type, due_date, due_time, status, weight, category_id,"
+        " import_key FROM items WHERE class_id=?", (class_id,)).fetchall()]
+    state = canvas_sync.load_state(conn)
+    cid = next((k for k, e in (state.get("courses") or {}).items()
+                if e.get("classId") == class_id), None)
+    snap = canvas_sync.load_snapshot(conn, cid) if cid else None
+    course = plan = None
+    if snap and snap.get("modules") is not None:
+        tz = ics.zone(snap.get("timeZone")) if snap.get("timeZone") else None
+        shift = ((state.get("courses") or {}).get(cid) or {}).get("weekShift")
+        course = course_entries(cid, snap["modules"], term_start, tz, shift=shift)
+        plan = snap.get("plan")
+    out = assemble_class(_row(cls), term_start, week_no, None, course=course, plan=plan,
+                         items=items, plan_items=week_plan.plan_rows(conn, [class_id]).get(class_id))
+    rows = out["tasks"] + out["links"]
+    ws = week_start(week_no, term_start)
+    return {
+        "week": week_no, "start": ws.isoformat(), "end": (ws + timedelta(days=6)).isoformat(),
+        "topic": out["topic"], "notes": out["notes"],
+        "readings": [r for r in out["tasks"] if r["kind"] in ("reading", "watch")],
+        "work": [r for r in out["tasks"] if r["kind"] not in ("reading", "watch")],
+        "links": out["links"],
+        "canvasFileIds": [r.get("contentId") for r in rows
+                          if r.get("canvasType") == "File" and r.get("contentId") is not None],
+    }

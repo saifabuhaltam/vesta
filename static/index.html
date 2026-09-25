@@ -15995,10 +15995,18 @@
     // saying why the others went missing.
     var pinned = (TH.data && TH.data.pinned) || [];
     var unreadable = pinned.filter(function(s){ return !s.readable; }).length;
+    // With nothing pinned the chat still reads something: the assignment itself, and
+    // the files Vesta picks for it. "Nothing pinned yet" read as "reads nothing".
+    var read = (TH.data && TH.data.sources) || [];
+    var hasBrief = read.some(function(s){ return s.type === 'assignment'; });
+    var autoFiles = read.filter(function(s){ return s.type !== 'assignment'; }).length;
     var summary = pinned.length
-      ? pinned.length + ' source' + (pinned.length===1?'':'s')
+      ? (hasBrief ? 'The assignment + ' : '') + pinned.length + ' source' + (pinned.length===1?'':'s')
         + (unreadable ? ' · ' + unreadable + ' unreadable' : '')
-      : 'Nothing pinned yet';
+      : read.length
+        ? 'Chosen automatically: ' + [hasBrief ? 'the assignment' : '',
+            autoFiles ? autoFiles + ' file' + (autoFiles===1?'':'s') + ' from the class' : ''].filter(Boolean).join(' and ')
+        : 'Nothing pinned yet';
     return '<div class="th-srcbar'+(TH.srcOpen?' th-open':'')+'">'
       + '<div class="th-srchead">'
       + '<span class="th-srclabel">Reads</span>'
@@ -16014,8 +16022,12 @@
                 + (s.readable ? '' : ' title="No text could be read out of this one, so it is not sent."')
                 + '>'+escapeHtml(s.title||'Source')+'</span>';
             }).join('')
-          : '<span class="th-none">Nothing pinned, so it reads this class\u2019s five '
-            + 'newest files and notes. Pin something to choose for yourself.</span>')
+          : (read.length
+              ? read.map(function(s){
+                  return '<span class="th-src">'+escapeHtml(s.type === 'assignment' ? 'The assignment and its week' : (s.title||'Source'))+'</span>';
+                }).join('')
+                + '<span class="th-none">Nothing pinned, so Vesta chose these: the assignment, its files, the files posted for the week it is due, then the class\u2019s newest. Pin something to choose for yourself.</span>'
+              : '<span class="th-none">Nothing pinned. Pin something to choose for yourself.</span>'))
       + (unreadable
           ? '<span class="th-srcwarn">'
             + (unreadable===1

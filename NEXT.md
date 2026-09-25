@@ -64,6 +64,25 @@ channels are alive.
       `/health` reports `calendarPush.channels`, and change something in Google to see
       whether it lands without pressing Sync.
 
+### Headstart and what it can read (found 2026-09-24)
+
+Chats now get the assignment (title, due date, weight, Canvas's instructions) and the
+course's week around its due date, and pick that week's files first. What they still
+cannot see:
+
+- [ ] **Canvas Pages are never imported.** SD 381 is an online course whose lectures
+      are Pages ("Virtual Lecture Material and/or Activity"); their text never reaches
+      Vesta, so Headstart cannot use them. Fetching the page bodies for an assignment's
+      week (one call each, text only) would close this.
+- [ ] **Library readings are links, not files.** SD 381's Moore et al. chapter is an
+      SFU Library link. Uploading the PDF to the class is the only way its text arrives;
+      a file named after the reading ("Moore et al 2019.pdf") is now picked for that
+      week automatically. Worth a hint in the chat when a week's reading has no file.
+- [ ] **An assignment the course has not posted yet has no instructions.** The chat now
+      says so and works from the schedule; when Canvas posts it, the next check's review
+      offers its description, but only if the Canvas title matches the syllabus title
+      closely enough to be recognised as the same assignment.
+
 ### Left open from the study rework
 
 - [ ] **The day boundary is still UTC on the server.** `today_str()` decides what

@@ -206,7 +206,7 @@ def one_thread(tid):
         selection = thread_selection(conn, tid)
         # What the pinned sources actually amount to, so the thread can say what it reads
         # without the caller having to work it out from four lists of ids.
-        _, used = collect_sources(conn, selection, row["class_id"], row["item_id"])
+        _, used = collect_sources(conn, selection, row["class_id"], row["item_id"], with_brief=True)
         n, last = thread_counts(conn, tid)
         out = serialize_thread(row, n, last)
         out["messages"] = [serialize_message(m) for m in messages]
@@ -254,7 +254,8 @@ def send_message(tid):
             return jsonify({"error": "No such thread."}), 404
 
         selection = thread_selection(conn, tid)
-        context, used = collect_sources(conn, selection, row["class_id"], row["item_id"])
+        context, used = collect_sources(conn, selection, row["class_id"], row["item_id"],
+                                        with_brief=True)
 
         prior = conn.execute(
             "SELECT id, role, content FROM thread_messages WHERE thread_id=? ORDER BY created_at",
