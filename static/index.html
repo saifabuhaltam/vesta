@@ -18080,6 +18080,11 @@
     // happened to land on something.
     if(!t){ if(!e.target.closest('.cp-menu')) closeNoteMenus(); return; }
     var action = t.dataset.action;
+    // An <a href="#"> control would go on to navigate to "#" after its action ran. The
+    // action has already pushed "#/classes" or wherever it went, and that bare "#"
+    // lands on top of it, fires popstate, and the router reads it as the dashboard, so
+    // every "View all" put you straight back where you started.
+    if(t.tagName === 'A' && t.getAttribute('href') === '#') e.preventDefault();
 
     // A row drawn a moment ago still carries the temporary id it was painted under,
     // for as long as its own create is in flight. A second write against that id
