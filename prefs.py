@@ -80,12 +80,17 @@ DEFAULTS = {
     # thinking; off, the model takes its time. On by default, because a blank wait is
     # what made threads feel slow.
     "threadFast": True,
+    # The model a chat answers with: picked per chat in its message box, and the last
+    # pick is what a new chat starts with. threadModels maps a chat's id to its pick.
+    "threadModel": "sonnet",
+    "threadModels": {},
     # Full screen for a thread: "auto" is on for a phone and off otherwise, until the
     # student picks for themselves with the button or the shortcut.
     "threadFullscreen": "auto",
 }
 
 _CHOICES = {
+    "threadModel": ("sonnet", "opus", "haiku"),
     "theme": ("light", "dark"),
     "calendarDefaultView": ("month", "week", "list"),
     "calendarDetail": ("simple", "detailed"),
@@ -139,6 +144,11 @@ def clean(patch, base=None):
                 out[key] = value
         elif key == "notifyDueSoonHours":
             out[key] = _num(value, 1, 168, DEFAULTS[key])
+        elif key == "threadModels":
+            if isinstance(value, dict):
+                picks = {str(k)[:64]: v for k, v in value.items() if v in _CHOICES["threadModel"]}
+                # the newest few hundred chats; an old chat that falls off starts on the default
+                out[key] = dict(list(picks.items())[-300:])
         elif key == "defaultGradeScale":
             out[key] = _clean_scale(value)
         elif key == "focus":

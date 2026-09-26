@@ -250,7 +250,8 @@ def send_message(tid):
     writing the same question into the thread a second time.
 
     With `stream`, the answer comes back as server-sent events while it is written;
-    `fast` picks low effort over taking time to think. A refusal is still an ordinary
+    `fast` picks low effort over taking time to think, and `model` (sonnet, opus or
+    haiku) which model answers; the price checks use that model's rates. A refusal is still an ordinary
     JSON answer, decided before the stream opens.
     """
     data = request.get_json(force=True) or {}
@@ -297,7 +298,8 @@ def send_message(tid):
             conn.commit()
 
         try:
-            cfg, _ = chat_guard(conn, context, history, CHAT_MAX_TOKENS, bool(data.get("confirmed")))
+            cfg, _ = chat_guard(conn, context, history, CHAT_MAX_TOKENS, bool(data.get("confirmed")),
+                                data.get("model"))
         except AiRefused as e:
             # The turn stays in the thread; the caller is told why nothing came back.
             payload = dict(e.payload)
@@ -310,7 +312,8 @@ def send_message(tid):
                                 fast=data.get("fast", True) is not False)
 
         try:
-            result = call_claude_chat(conn, "thread", context, history, CHAT_MAX_TOKENS, True)
+            result = call_claude_chat(conn, "thread", context, history, CHAT_MAX_TOKENS, True,
+                                      data.get("model"))
         except AiRefused as e:
             payload = dict(e.payload)
             payload["userMessageId"] = user_id

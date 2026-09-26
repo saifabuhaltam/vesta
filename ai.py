@@ -108,6 +108,31 @@ MODEL_PRICES = {
 }
 
 
+# The models a chat can be switched to, by the short name the page sends. Headstart's
+# other tools keep using the model in settings.
+CHAT_MODELS = {
+    "sonnet": "claude-sonnet-5",
+    "opus": "claude-opus-5",
+    "haiku": "claude-haiku-4-5",
+}
+
+
+def chat_cfg(cfg, model_key):
+    """Settings with the chat's chosen model, priced as that model."""
+    model = CHAT_MODELS.get(model_key or "")
+    if not model or model == cfg["model"]:
+        return cfg
+    out = dict(cfg)
+    out["model"] = model
+    out["input_per_m"], out["output_per_m"] = MODEL_PRICES[model]
+    return out
+
+
+def takes_effort(model):
+    """Haiku 4.5 rejects the effort setting and adaptive thinking; the others take both."""
+    return not model.startswith("claude-haiku")
+
+
 def price_for(cfg, model=None):
     model = model or cfg["model"]
     if model == cfg["model"]:
@@ -312,13 +337,13 @@ def chat_system(context, voice=""):
     return system
 
 
-def chat_guard(conn, context, history, max_tokens, confirmed):
+def chat_guard(conn, context, history, max_tokens, confirmed, model_key=None):
     """Refuse a thread turn before it costs anything: the caps, then the ask-first amount.
 
     Separate from the call so a streamed reply can be refused with an ordinary JSON
     answer before the stream opens, rather than halfway into one.
     """
-    cfg = settings(conn)
+    cfg = chat_cfg(settings(conn), model_key)
     prompt_chars = (len(CHAT_SYSTEM) + len(context or "") + len(chat_voice(conn))
                     + sum(len(m["content"]) for m in history))
     in_tokens = estimate_tokens("x" * prompt_chars)
@@ -341,7 +366,7 @@ def chat_guard(conn, context, history, max_tokens, confirmed):
     return cfg, in_tokens
 
 
-def call_claude_chat(conn, kind, context, history, max_tokens=4000, confirmed=False):
+def call_claude_chat(conn, kind, context, history, max_tokens=4000, confirmed=False, model_key=None):
     """One turn of a thread: the pinned material, then the conversation so far.
 
     The material goes in `system` with a cache breakpoint after it. Render order is
@@ -352,7 +377,7 @@ def call_claude_chat(conn, kind, context, history, max_tokens=4000, confirmed=Fa
 
     `history` is the full conversation including the new user turn, oldest first.
     """
-    cfg, in_tokens = chat_guard(conn, context, history, max_tokens, confirmed)
+    cfg, in_tokens = chat_guard(conn, context, history, max_tokens, confirmed, model_key)
     try:
         client = anthropic.Anthropic()
         response = client.messages.create(
@@ -402,7 +427,9 @@ def stream_claude_chat(conn, cfg, kind, context, history, fast=True, max_tokens=
     request = dict(model=cfg["model"], max_tokens=max_tokens,
                    system=chat_system(context, chat_voice(conn)),
                    messages=[{"role": m["role"], "content": m["content"]} for m in history])
-    if fast:
+    if not takes_effort(cfg["model"]):
+        pass                    # always quick, and would 400 on either setting
+    elif fast:
         request["output_config"] = {"effort": "low"}
     else:
         request["max_tokens"] = max(max_tokens, THOROUGH_MAX_TOKENS)

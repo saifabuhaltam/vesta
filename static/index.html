@@ -2514,6 +2514,25 @@
     min-height:26px; max-height:220px; padding:4px 2px; font-size:15px; line-height:1.5; }
   .th-composer-bar{ display:flex; align-items:center; gap:6px; margin-left:-6px; }
   .th-bar-gap{ flex:1; }
+  /* The model picker: a quiet label that opens upward, as ChatGPT's does. */
+  .th-model{ position:relative; }
+  .th-model-btn{ display:flex; align-items:center; gap:3px; height:34px; padding:0 8px 0 12px; border:0;
+    background:transparent; border-radius:var(--r-pill); font:inherit; font-size:13px; font-weight:600;
+    color:var(--text-muted); cursor:pointer; }
+  .th-model-btn:hover, .th-model.open .th-model-btn{ background:var(--surface-2); color:var(--text); }
+  .th-model-btn svg{ width:15px; height:15px; }
+  .th-model-menu{ display:none; position:absolute; right:0; bottom:calc(100% + 8px); z-index:30; width:280px;
+    background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:6px;
+    box-shadow:0 12px 32px rgba(15,23,42,.14); }
+  .th-model.open .th-model-menu{ display:block; }
+  .th-model-opt{ position:relative; display:flex; flex-direction:column; gap:2px; width:100%; text-align:left;
+    border:0; background:transparent; border-radius:10px; padding:9px 34px 9px 12px; cursor:pointer; font:inherit; }
+  .th-model-opt:hover{ background:var(--surface-2); }
+  .th-model-name{ font-size:13.5px; font-weight:650; color:var(--text); display:flex; align-items:center; gap:8px; }
+  .th-model-name em{ font-style:normal; font-size:11px; font-weight:700; color:var(--text-faint); }
+  .th-model-blurb{ font-size:12px; color:var(--text-muted); line-height:1.4; }
+  .th-model-check{ position:absolute; right:10px; top:50%; transform:translateY(-50%); color:var(--accent); display:grid; }
+  .th-model-check svg{ width:16px; height:16px; stroke-width:2.2; }
   .th-send{ width:36px; height:36px; flex:none; border-radius:50%; border:0; cursor:pointer; padding:0;
     display:grid; place-items:center; background:var(--text); color:var(--surface); transition:opacity .12s; }
   .th-send svg{ width:18px; height:18px; stroke-width:2.2; }
@@ -16702,8 +16721,9 @@
     TH.scrollToEnd = true;
     renderThread();
     var payload = retry
-      ? { retryOf: retry, confirmed: true, stream: true, fast: fast }
-      : { text: toolKey ? '' : text, tool: toolKey || null, confirmed: !!confirmed, stream: true, fast: fast };
+      ? { retryOf: retry, confirmed: true, stream: true, fast: fast, model: threadModelKey() }
+      : { text: toolKey ? '' : text, tool: toolKey || null, confirmed: !!confirmed, stream: true, fast: fast,
+          model: threadModelKey() };
     fetch('/api/threads/'+TH.id+'/messages', { method:'POST', headers:{'Content-Type':'application/json'},
                                                 body: JSON.stringify(payload), signal: ctrl ? ctrl.signal : undefined })
       .then(function(r){
@@ -16761,6 +16781,45 @@
     renderThread();
   }
 
+  /**
+   * Which model answers this chat. Picked per chat from the message box, like ChatGPT;
+   * a new chat starts on whatever was picked last. Stored in prefs, so it follows the
+   * account across devices without a column on threads.
+   */
+  var THREAD_MODELS = [
+    { key:'sonnet', label:'Sonnet', blurb:'Good at most things. The default.', cost:'$' },
+    { key:'opus',   label:'Opus',   blurb:'Best answers for big drafts. About 2.5\u00d7 the cost.', cost:'$$$' },
+    { key:'haiku',  label:'Haiku',  blurb:'Quickest and cheapest, for lists and small questions.', cost:'\u00a2' }
+  ];
+  function threadModelKey(){
+    var per = (PREFS && PREFS.threadModels) || {};
+    var k = (TH && TH.id && per[TH.id]) || (PREFS && PREFS.threadModel) || 'sonnet';
+    return THREAD_MODELS.some(function(m){ return m.key === k; }) ? k : 'sonnet';
+  }
+  function threadModelPickerHtml(){
+    var cur = threadModelKey();
+    var label = THREAD_MODELS.filter(function(m){ return m.key === cur; })[0].label;
+    return '<div class="th-model">'
+      + '<button type="button" class="th-model-btn" data-action="th-model-menu" aria-haspopup="true" aria-expanded="false"'
+      + ' title="Which model answers">'+escapeHtml(label)+iconSvg('chevron_down')+'</button>'
+      + '<div class="th-model-menu" role="menu">'
+      + THREAD_MODELS.map(function(m){
+          return '<button type="button" class="th-model-opt'+(m.key===cur?' on':'')+'" role="menuitemradio"'
+            + ' aria-checked="'+(m.key===cur)+'" data-action="th-model-pick" data-model="'+m.key+'">'
+            + '<span class="th-model-name">'+escapeHtml(m.label)+'<em>'+m.cost+'</em></span>'
+            + '<span class="th-model-blurb">'+escapeHtml(m.blurb)+'</span>'
+            + (m.key===cur ? '<span class="th-model-check">'+iconSvg('check')+'</span>' : '')
+            + '</button>';
+        }).join('')
+      + '</div></div>';
+  }
+  function closeThreadModelMenus(){
+    document.querySelectorAll('.th-model.open').forEach(function(el){
+      el.classList.remove('open');
+      var b = el.querySelector('.th-model-btn'); if(b) b.setAttribute('aria-expanded', 'false');
+    });
+  }
+
   function threadFastOn(){ return !(PREFS && PREFS.threadFast === false); }
   function threadFastTitle(on){
     return on ? 'Fast replies are on: it starts writing straight away. Click to let it think first.'
@@ -16778,8 +16837,11 @@
       + '<div class="th-composer-bar">'
       + '<button type="button" class="th-attach" data-action="th-pick" title="Attach files or notes" aria-label="Attach files or notes">'+iconSvg('plus')+'</button>'
       + '<span class="th-bar-gap"></span>'
-      + '<button type="button" class="th-fast'+(fast?' on':'')+'" data-action="th-fast" aria-pressed="'+fast+'"'
-      + ' title="'+escapeHtml(threadFastTitle(fast))+'">'+iconSvg('zap')+'<span>Fast</span></button>'
+      + threadModelPickerHtml()
+      + (threadModelKey() === 'haiku'
+          ? ''
+          : '<button type="button" class="th-fast'+(fast?' on':'')+'" data-action="th-fast" aria-pressed="'+fast+'"'
+            + ' title="'+escapeHtml(threadFastTitle(fast))+'">'+iconSvg('zap')+'<span>Fast</span></button>')
       + (TH.stream
           ? '<button type="button" class="th-send th-stop" data-action="th-stop" title="Stop" aria-label="Stop">'+iconSvg('stop')+'</button>'
           : '<button type="button" class="th-send'+(empty?' is-empty':'')+'" data-action="th-send" title="Send (Enter)" aria-label="Send"'
@@ -18233,6 +18295,7 @@
     // Clicking bare page, with no control under it, has to dismiss an open menu too.
     // This used to sit below the guard, so a menu only closed on the next click that
     // happened to land on something.
+    if(!e.target.closest('.th-model')) closeThreadModelMenus();
     if(!t){ if(!e.target.closest('.cp-menu')) closeNoteMenus(); return; }
     var action = t.dataset.action;
     // An <a href="#"> control would go on to navigate to "#" after its action ran. The
@@ -19249,6 +19312,43 @@
     }
     if(action==='set-ai-confirm'){
       setAiConfirm(Number(t.dataset.value), function(){ openSettingsModal(); });
+      return;
+    }
+    if(action==='th-model-menu'){
+      var wrap = t.closest('.th-model');
+      var opening = !wrap.classList.contains('open');
+      closeThreadModelMenus();
+      if(opening){ wrap.classList.add('open'); t.setAttribute('aria-expanded', 'true'); }
+      return;
+    }
+    if(action==='th-model-pick'){
+      var pick = t.dataset.model;
+      var patchM = { threadModel: pick };
+      if(TH && TH.id){
+        var per = Object.assign({}, (PREFS && PREFS.threadModels) || {});
+        delete per[TH.id];                 // re-added last, so it counts as recent
+        per[TH.id] = pick;
+        patchM.threadModels = per;
+      }
+      // painted now rather than after the save, and without a full repaint, so a
+      // half-written question keeps its caret
+      if(PREFS){ PREFS.threadModel = pick; if(patchM.threadModels) PREFS.threadModels = patchM.threadModels; }
+      savePrefs(patchM);
+      var bar = t.closest('.th-composer-bar');
+      if(bar){
+        var tmp = document.createElement('div');
+        tmp.innerHTML = threadModelPickerHtml();
+        bar.querySelector('.th-model').replaceWith(tmp.firstChild);
+        var fastBtn = bar.querySelector('.th-fast');
+        if(pick === 'haiku' && fastBtn) fastBtn.remove();
+        if(pick !== 'haiku' && !fastBtn){
+          var f = threadFastOn(), fb = document.createElement('button');
+          fb.type = 'button'; fb.className = 'th-fast'+(f?' on':''); fb.dataset.action = 'th-fast';
+          fb.setAttribute('aria-pressed', String(f)); fb.title = threadFastTitle(f);
+          fb.innerHTML = iconSvg('zap')+'<span>Fast</span>';
+          bar.querySelector('.th-send').before(fb);
+        }
+      }
       return;
     }
     if(action==='th-sources-toggle'){
