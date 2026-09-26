@@ -2525,6 +2525,9 @@
     background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:6px;
     box-shadow:0 12px 32px rgba(15,23,42,.14); }
   .th-model.open .th-model-menu{ display:block; }
+  .th-model-group{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--text-faint); padding:8px 12px 2px; }
+  .th-model-group ~ .th-model-group{ border-top:1px solid var(--border); margin-top:4px; padding-top:10px; }
   .th-model-opt{ position:relative; display:flex; flex-direction:column; gap:2px; width:100%; text-align:left;
     border:0; background:transparent; border-radius:10px; padding:9px 34px 9px 12px; cursor:pointer; font:inherit; }
   .th-model-opt:hover{ background:var(--surface-2); }
@@ -16787,14 +16790,22 @@
    * account across devices without a column on threads.
    */
   var THREAD_MODELS = [
-    { key:'sonnet', label:'Sonnet', blurb:'Good at most things. The default.', cost:'$' },
-    { key:'opus',   label:'Opus',   blurb:'Best answers for big drafts. About 2.5\u00d7 the cost.', cost:'$$$' },
-    { key:'haiku',  label:'Haiku',  blurb:'Quickest and cheapest, for lists and small questions.', cost:'\u00a2' }
+    { key:'sonnet', group:'Claude', label:'Sonnet', blurb:'Good at most things. The default.', cost:'$' },
+    { key:'opus',   group:'Claude', label:'Opus',   blurb:'Best answers for big drafts. About 2.5\u00d7 the cost.', cost:'$$$' },
+    { key:'haiku',  group:'Claude', label:'Haiku',  blurb:'Quickest and cheapest, for lists and small questions.', cost:'\u00a2' },
+    // OpenAI's, offered only when the server has a key for them
+    { key:'gpt-sol',   group:'OpenAI', label:'GPT-6 Sol',   blurb:'OpenAI\u2019s everyday model. About the same cost as Sonnet.', cost:'$' },
+    { key:'gpt-astra', group:'OpenAI', label:'GPT-6 Astra', blurb:'OpenAI\u2019s best. About 5\u00d7 the cost of Sol.', cost:'$$$$$' },
+    { key:'gpt-luna',  group:'OpenAI', label:'GPT-6 Luna',  blurb:'Very cheap, for lists and small questions.', cost:'\u00a2' }
   ];
+  function threadModelsOffered(){
+    var openai = !!(hsSettings && hsSettings.openaiAvailable);
+    return THREAD_MODELS.filter(function(m){ return m.group !== 'OpenAI' || openai; });
+  }
   function threadModelKey(){
     var per = (PREFS && PREFS.threadModels) || {};
     var k = (TH && TH.id && per[TH.id]) || (PREFS && PREFS.threadModel) || 'sonnet';
-    return THREAD_MODELS.some(function(m){ return m.key === k; }) ? k : 'sonnet';
+    return threadModelsOffered().some(function(m){ return m.key === k; }) ? k : 'sonnet';
   }
   function threadModelPickerHtml(){
     var cur = threadModelKey();
@@ -16803,8 +16814,10 @@
       + '<button type="button" class="th-model-btn" data-action="th-model-menu" aria-haspopup="true" aria-expanded="false"'
       + ' title="Which model answers">'+escapeHtml(label)+iconSvg('chevron_down')+'</button>'
       + '<div class="th-model-menu" role="menu">'
-      + THREAD_MODELS.map(function(m){
-          return '<button type="button" class="th-model-opt'+(m.key===cur?' on':'')+'" role="menuitemradio"'
+      + threadModelsOffered().map(function(m, i, all){
+          var head = (i === 0 || all[i-1].group !== m.group) && all.some(function(x){ return x.group !== m.group; })
+            ? '<div class="th-model-group">'+escapeHtml(m.group)+'</div>' : '';
+          return head + '<button type="button" class="th-model-opt'+(m.key===cur?' on':'')+'" role="menuitemradio"'
             + ' aria-checked="'+(m.key===cur)+'" data-action="th-model-pick" data-model="'+m.key+'">'
             + '<span class="th-model-name">'+escapeHtml(m.label)+'<em>'+m.cost+'</em></span>'
             + '<span class="th-model-blurb">'+escapeHtml(m.blurb)+'</span>'

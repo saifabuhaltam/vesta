@@ -90,7 +90,7 @@ DEFAULTS = {
 }
 
 _CHOICES = {
-    "threadModel": ("sonnet", "opus", "haiku"),
+    "threadModel": ("sonnet", "opus", "haiku", "gpt-sol", "gpt-luna", "gpt-astra"),
     "theme": ("light", "dark"),
     "calendarDefaultView": ("month", "week", "list"),
     "calendarDetail": ("simple", "detailed"),

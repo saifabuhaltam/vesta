@@ -3,6 +3,8 @@ gunicorn==22.0.0
 pypdf==6.19.0
 python-docx==1.1.2
 anthropic
+# OpenAI's models in Headstart chats (openai_chat.py), when OPENAI_API_KEY is set.
+openai
 # Postgres, for the deployed app. db.py falls back to SQLite without DATABASE_URL,
 # so this is unused locally but the deploy crashes on import without it.
 psycopg[binary]==3.2.13

@@ -18,6 +18,8 @@ for the student to accept, edit or throw away.
 """
 import json
 import os
+
+import openai_chat
 import time
 import re
 import sqlite3
@@ -105,6 +107,10 @@ MODEL_PRICES = {
     "claude-sonnet-5": (2.0, 10.0),
     "claude-sonnet-4-6": (3.0, 15.0),
     "claude-haiku-4-5": (1.0, 5.0),
+    # OpenAI, for chats. From developers.openai.com/api/docs/pricing, September 2026.
+    "gpt-6-sol": (2.0, 10.0),
+    "gpt-6-luna": (0.10, 0.50),
+    "gpt-6-astra": (10.0, 50.0),
 }
 
 
@@ -114,6 +120,7 @@ CHAT_MODELS = {
     "sonnet": "claude-sonnet-5",
     "opus": "claude-opus-5",
     "haiku": "claude-haiku-4-5",
+    **openai_chat.MODELS,
 }
 
 
@@ -344,6 +351,8 @@ def chat_guard(conn, context, history, max_tokens, confirmed, model_key=None):
     answer before the stream opens, rather than halfway into one.
     """
     cfg = chat_cfg(settings(conn), model_key)
+    if openai_chat.is_openai(cfg["model"]) and not openai_chat.available():
+        raise AiRefused({"error": "OpenAI is not set up on this server. Pick a Claude model instead."}, 503)
     prompt_chars = (len(CHAT_SYSTEM) + len(context or "") + len(chat_voice(conn))
                     + sum(len(m["content"]) for m in history))
     in_tokens = estimate_tokens("x" * prompt_chars)
@@ -378,6 +387,19 @@ def call_claude_chat(conn, kind, context, history, max_tokens=4000, confirmed=Fa
     `history` is the full conversation including the new user turn, oldest first.
     """
     cfg, in_tokens = chat_guard(conn, context, history, max_tokens, confirmed, model_key)
+    if openai_chat.is_openai(cfg["model"]):
+        text, usage = [], None
+        for kind_, payload in stream_claude_chat(conn, cfg, kind, context, history, True, max_tokens):
+            if kind_ == "text":
+                text.append(payload)
+            elif kind_ == "error":
+                raise AiRefused({"error": payload["error"]}, payload.get("status", 502))
+            elif kind_ == "done":
+                usage = payload
+        text = "".join(text).strip()
+        if not text:
+            raise AiRefused({"error": "The model returned nothing. Try again, or add more detail."}, 502)
+        return dict(usage or {}, text=text)
     try:
         client = anthropic.Anthropic()
         response = client.messages.create(
@@ -424,6 +446,10 @@ def stream_claude_chat(conn, cfg, kind, context, history, fast=True, max_tokens=
     stream, which stops the generation; what was produced is still recorded, with the
     output estimated from what arrived, because it was still billed.
     """
+    if openai_chat.is_openai(cfg["model"]):
+        yield from openai_chat.stream_chat(conn, cfg, kind, chat_system(context, chat_voice(conn)),
+                                           history, fast, max_tokens)
+        return
     request = dict(model=cfg["model"], max_tokens=max_tokens,
                    system=chat_system(context, chat_voice(conn)),
                    messages=[{"role": m["role"], "content": m["content"]} for m in history])
@@ -922,6 +948,8 @@ def ai_settings():
         cfg = settings(conn)
     out = dict(cfg)
     out["usage"] = spent_today(conn, cfg)
+    # the page offers OpenAI's models only when the server holds a key for them
+    out["openaiAvailable"] = openai_chat.available()
     conn.close()
     return jsonify(out)
 
