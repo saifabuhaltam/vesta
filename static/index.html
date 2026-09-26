@@ -2335,7 +2335,7 @@
   .th-draft-note{ font-size:11.5px; color:var(--text-faint); }
   .th-body-wrap{ display:flex; gap:14px; flex:1; min-height:0; }
 
-  .th-rail{ width:196px; flex:none; display:flex; flex-direction:column; gap:4px;
+  .th-rail{ width:224px; flex:none; display:flex; flex-direction:column; gap:4px;
     background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
     padding:10px; overflow:auto; }
   .th-rail-head{ font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-faint);
@@ -2352,6 +2352,12 @@
     padding:9px; font:inherit; font-size:12.5px; font-weight:600; color:var(--text-muted); cursor:pointer; }
   .th-rail-new:hover{ color:var(--accent-ink); border-color:var(--accent); }
   .th-rail-new svg{ width:15px; height:15px; }
+  .th-rail-sources{ margin-top:14px; padding-top:10px; border-top:1px solid var(--border); }
+  .th-rail-sources .th-chips{ flex-direction:column; flex-wrap:nowrap; padding:0; }
+  .th-rail-sources .th-chip{ width:100%; align-items:flex-start; border-radius:var(--r-md); box-shadow:none; }
+  .th-rail-sources .th-chip svg{ margin-top:2px; }
+  .th-rail-sources .th-chip > span{ flex:1; white-space:normal; overflow-wrap:anywhere;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
 
   .th-main{ flex:1; min-width:0; display:flex; flex-direction:column;
     background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
@@ -2379,6 +2385,11 @@
     .th-body-wrap{ flex-direction:column; }
     .th-rail{ width:auto; flex-direction:row; flex-wrap:wrap; }
     .th-rail-new{ margin-top:0; }
+    .th-rail-sources{ width:100%; }
+    .th-rail-sources .th-chips{ flex-direction:row; flex-wrap:wrap; }
+    .th-rail-sources .th-chip{ width:auto; align-items:center; border-radius:var(--r-pill); }
+    .th-rail-sources .th-chip svg{ margin-top:0; }
+    .th-rail-sources .th-chip > span{ display:block; white-space:nowrap; }
   }
   /* Full screen: the thread over the whole window, the way Notes' editor goes full
      screen. The rail stays, so switching threads is still one click. */
@@ -16041,18 +16052,28 @@
     if(pinned.length){
       pinned.forEach(function(p){
         chips.push('<span class="th-chip'+(p.readable ? '' : ' th-chip-dim')+'"'
-          + (p.readable ? '' : ' title="No text could be read out of this one, so it is not sent."')+'>'
+          + ' title="'+escapeHtml(p.title||'Source')+(p.readable ? '' : '. No text could be read out of this one, so it is not sent.')+'"'+'>'
           + iconSvg(p.type === 'note' ? 'notes' : 'files')+'<span>'+escapeHtml(p.title||'Source')+'</span>'
           + '<button type="button" class="th-chip-x" data-action="th-unpin" data-kind="'+p.type+'" data-id="'+p.id+'"'
           + ' aria-label="Stop reading '+escapeHtml(p.title||'this')+'">\u00d7</button></span>');
       });
     } else {
       read.filter(function(s){ return s.type !== 'assignment'; }).forEach(function(s){
-        chips.push('<span class="th-chip th-chip-auto" title="Picked automatically: the assignment\u2019s files, then that week\u2019s, then the class\u2019s newest. Attach something to choose for yourself.">'
+        chips.push('<span class="th-chip th-chip-auto" title="'+escapeHtml(s.title||'Source')+'. Picked automatically: the assignment\u2019s files, then that week\u2019s, then the class\u2019s newest. Attach something to choose for yourself.">'
           + iconSvg(s.type === 'note' ? 'notes' : 'files')+'<span>'+escapeHtml(s.title||'Source')+'</span><em>auto</em></span>');
       });
     }
     return chips.length ? '<div class="th-chips">'+chips.join('')+'</div>' : '';
+  }
+
+  /**
+   * The same chips, in the chat page's rail under the chats. Above the message box a
+   * class's worth of auto-picked files took a third of the chat's height, while the
+   * rail beside it sat mostly empty. Every source is still listed in full.
+   */
+  function threadRailSourcesHtml(){
+    var chips = threadChipsHtml();
+    return chips ? '<div class="th-rail-sources"><div class="th-rail-head">Reading</div>'+chips+'</div>' : '';
   }
 
 
@@ -16405,6 +16426,7 @@
         }).join('')
       + '<button type="button" class="th-rail-new" data-action="hs-new-thread" data-class="'+d.classId+'">'
       + iconSvg('plus')+'New chat</button>'
+      + threadRailSourcesHtml()
       + '</aside>';
 
     var msgs = (d.messages||[]).map(threadBubbleHtml).join('');
@@ -16414,7 +16436,7 @@
       + threadLiveOrBusyHtml()
       + '</div>'
       + (TH.confirm ? threadConfirmHtml() : '')
-      + threadComposerHtml()
+      + threadComposerHtml(true)
       + '</div>';
 
     var full = threadFullOn();
@@ -16639,9 +16661,10 @@
               : 'Fast replies are off: it thinks before answering. Click for quicker replies.';
   }
 
-  function threadComposerHtml(){
+  /** noChips: the page view lists the sources in its rail instead. */
+  function threadComposerHtml(noChips){
     var fast = threadFastOn();
-    return '<div class="th-composer-wrap">' + threadChipsHtml() + '<div class="th-composer">'
+    return '<div class="th-composer-wrap">' + (noChips ? '' : threadChipsHtml()) + '<div class="th-composer">'
       + '<button type="button" class="th-attach" data-action="th-pick" title="Attach files or notes" aria-label="Attach files or notes">'+iconSvg('plus')+'</button>'
       // left usable while a reply streams, so the next question can be written meanwhile
       + '<textarea id="th-draft" data-action="th-draft" rows="2" placeholder="Ask for anything, or say what to change…">'
