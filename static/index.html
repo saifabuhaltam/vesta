@@ -6999,7 +6999,7 @@
     var mine = hsThreads.filter(function(t){ return t.classId===c.id; });
     var shown = mine.slice(0, 4).map(function(t){
       return '<button type="button" class="hs-saved" data-action="hs-open-thread" data-id="'+t.id+'">'
-        + '<b>'+escapeHtml(t.title||'Chat')+'</b>'
+        + '<b>'+escapeHtml(chatName(t))+'</b>'
         + '<span class="hs-saved-sub">'+t.messageCount+' message'+(t.messageCount===1?'':'s')
         + (t.lastMessageAt ? ' · '+relTimeAgo(t.lastMessageAt) : ' · not started')+'</span></button>';
     }).join('');
@@ -7152,7 +7152,7 @@
       + mine.slice(0, 6).map(function(t){
           return '<button type="button" class="hs-saved" data-action="hs-open-thread" data-id="'+t.id+'">'
             + '<span class="dot" style="--c:'+(classColor(t.classId)||'var(--none)')+'"></span>'
-            + '<b>'+escapeHtml(t.title||'Chat')+'</b>'
+            + '<b>'+escapeHtml(chatName(t))+'</b>'
             + '<span class="hs-saved-sub">'+t.messageCount+' message'+(t.messageCount===1?'':'s')
             + (t.lastMessageAt ? ' · '+relTimeAgo(t.lastMessageAt) : '')+'</span></button>';
         }).join('')
@@ -13943,6 +13943,32 @@
         + escapeHtml(o.label)+'</button>';
     }).join('') + '</div>';
   }
+  /**
+   * When Headstart stops to ask before sending. Stored with the other AI settings on
+   * the server, not in prefs, because the server is what refuses the message.
+   * 0 means never ask.
+   */
+  var AI_CONFIRM_CHOICES = [
+    {value:0.05, label:'Over 5\u00a2'}, {value:0.25, label:'Over 25\u00a2'},
+    {value:1, label:'Over $1'}, {value:0, label:'Never'}];
+  function aiConfirmSeg(){
+    // Only the Headstart page loads these, so Settings may open before they exist.
+    if(!hsSettings) loadAiSettingsInto().then(function(r){
+      if(r && settingsSection === 'prefs' && document.querySelector('#modal-root .set-pane')) openSettingsModal();
+    });
+    var cur = hsSettings ? Number(hsSettings.confirm_over_usd) || 0 : null;
+    return '<div class="seg" style="width:fit-content;">' + AI_CONFIRM_CHOICES.map(function(o){
+      return '<button type="button" class="seg-btn'+(cur===o.value?' active':'')+'"'
+        + ' data-action="set-ai-confirm" data-value="'+o.value+'">'+o.label+'</button>';
+    }).join('') + '</div>';
+  }
+  function setAiConfirm(v, then){
+    return apiPut('/api/ai/settings', { confirm_over_usd: v }).then(function(r){
+      hsSettings = r; hsUsage = r.usage || hsUsage;
+      if(then) then();
+    }).catch(reportError);
+  }
+
   function prefCheck(key, disabled){
     return '<input type="checkbox" class="set-switch" data-pref="'+key+'"'
       + (prefValue(key)?' checked':'')+(disabled?' disabled':'')+'>';
@@ -14167,6 +14193,9 @@
             prefSeg('editorFontSize', [
               {value:'small', label:'Small'}, {value:'medium', label:'Medium'}, {value:'large', label:'Large'}]))
           + setRow('Spell check', 'Underline misspelled words while writing.', prefCheck('editorSpellcheck')))
+      + setCard('Headstart spending', 'Your daily limit always applies, whichever you pick.',
+          setRow('Ask before sending', 'Check with me first when one message would cost more than this.',
+            aiConfirmSeg()))
       + setCard('Notifications', 'Browser notifications only. Vesta sends no email.',
           setRow('Browser permission', off ? 'Needed before the settings below can do anything.' : null, permRow)
           + setRow('Focus session ends', 'Tell me when a focus or break block finishes.', prefCheck('notifyFocusDone', off))
@@ -16136,7 +16165,9 @@
             + ' tokens and would cost roughly <b>$'+(c.estimateUsd||0).toFixed(3)+'</b>.</div>'
             + '<div class="hs-actions">'
             + '<button type="button" class="btn primary" data-action="th-send" data-confirmed="1">Send it anyway</button>'
+            + '<button type="button" class="btn" data-action="th-send-stop-asking">Send, and stop asking</button>'
             + '<button type="button" class="btn ghost" data-action="th-dismiss">Cancel</button></div>'
+            + '<div class="hint" style="margin-top:6px;">Your daily limit still applies. Change this in Settings, under Preferences.</div>'
           : '<div class="hs-actions">'
             + '<button type="button" class="btn" data-action="hs-open-settings">Change the limit</button>'
             + '<button type="button" class="btn ghost" data-action="th-dismiss">Not now</button></div>')
@@ -16420,7 +16451,7 @@
       + siblings.map(function(t){
           return '<button type="button" class="th-rail-item'+(t.id===d.id?' active':'')+'"'
             + ' data-action="hs-open-thread" data-id="'+t.id+'">'
-            + '<span class="th-rail-name">'+escapeHtml(t.title||'Chat')+'</span>'
+            + '<span class="th-rail-name" title="'+escapeHtml(t.title||'Chat')+'">'+escapeHtml(chatName(t))+'</span>'
             + '<span class="th-rail-sub">'+t.messageCount+' message'+(t.messageCount===1?'':'s')+'</span>'
             + '</button>';
         }).join('')
@@ -16517,6 +16548,30 @@
    * does, and Rename is there when the guess is wrong. Worked out here rather than by
    * the model: naming a sentence you typed yourself should not cost anything.
    */
+  /**
+   * What a chat is called in a list: short, the way Claude and ChatGPT name them.
+   *
+   * A chat opened from an assignment is titled with the assignment's full name, which
+   * wraps to three lines in the rail. Assignment names are nearly always "Discussion 03
+   * - Evolution by Natural Selection" or "Essay 2: ...", so the part before the dash or
+   * colon is the name. Only titles that are still the assignment's own name are
+   * shortened: one you have renamed is shown as you wrote it.
+   */
+  function chatName(t){
+    var title = (t && t.title) || 'Chat';
+    var it = t && t.itemId && items.find(function(i){ return i.id === t.itemId; });
+    if(!it || (it.title||'').trim() !== title.trim()) return title;
+    var cls = classById(t.classId) || {};
+    var squash = function(x){ return (x||'').toLowerCase().replace(/\s+/g, ''); };
+    // "REM 388 - Discussion 03 - ..." should not come out as "REM 388"
+    var parts = title.split(/\s+[-\u2013\u2014|]\s+|:\s+/).map(function(x){ return x.trim(); })
+      .filter(function(x){ return x && squash(x) !== squash(cls.code) && squash(x) !== squash(cls.name); });
+    var name = parts[0] || title;
+    if(name.length <= 32) return name;
+    var cut = name.slice(0, 32), sp = cut.lastIndexOf(' ');
+    return (sp > 12 ? cut.slice(0, sp) : cut) + '\u2026';
+  }
+
   function threadTitleFrom(toolKey, text){
     if(toolKey && HS_TOOLS[toolKey]) return HS_TOOLS[toolKey].label;
     var s = (text||'').replace(/\s+/g, ' ').trim();
@@ -16539,7 +16594,7 @@
           ? mine.map(function(t){
               return '<button type="button" class="hs-saved" style="width:100%;margin-bottom:6px;"'
                 + ' data-action="hs-open-thread" data-id="'+t.id+'">'
-                + '<b>'+escapeHtml(t.title||'Chat')+'</b>'
+                + '<b>'+escapeHtml(chatName(t))+'</b>'
                 + '<span class="hs-saved-sub">'+t.messageCount+' message'
                 + (t.messageCount===1?'':'s')
                 + (t.lastMessageAt ? ' · '+relTimeAgo(t.lastMessageAt) : ' · not started')
@@ -16833,8 +16888,7 @@
       + (u.calls||0)+' run'+((u.calls||0)===1?'':'s')+'. The count resets at midnight UTC.</div>'
       + '<label class="field">Stop me spending more than this in a day'
       + '<input type="number" id="ai-cap" step="0.25" min="0" value="'+(s.daily_cap_usd||0)+'"></label>'
-      + '<label class="field">Ask me first if a single run would cost more than'
-      + '<input type="number" id="ai-confirm" step="0.01" min="0" value="'+(s.confirm_over_usd||0)+'"></label>'
+      + '<div class="hint" style="margin:0;">When Vesta asks before sending a big message is in Settings, under Preferences.</div>'
       + '<label class="field">Model'
       + '<input type="text" id="ai-model" value="'+escapeHtml(s.model||'')+'"></label>'
       + '<div class="hint" style="margin:0;">Prices are per million tokens and only affect the '
@@ -16855,7 +16909,6 @@
     var num = function(id){ return parseFloat(document.getElementById(id).value) || 0; };
     apiPut('/api/ai/settings', {
       daily_cap_usd: num('ai-cap'),
-      confirm_over_usd: num('ai-confirm'),
       input_per_m: num('ai-in'),
       output_per_m: num('ai-out'),
       model: document.getElementById('ai-model').value.trim()
@@ -19125,6 +19178,14 @@
       t.innerHTML = iconSvg(show ? 'eye_off' : 'eye');
       t.title = show ? 'Hide password' : 'Show password';
       t.setAttribute('aria-label', t.title);
+      return;
+    }
+    if(action==='set-ai-confirm'){
+      setAiConfirm(Number(t.dataset.value), function(){ openSettingsModal(); });
+      return;
+    }
+    if(action==='th-send-stop-asking'){
+      setAiConfirm(0, function(){ threadSend(null, true); });
       return;
     }
     if(action==='ai-save'){

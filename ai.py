@@ -44,7 +44,9 @@ DEFAULT_SETTINGS = {
     "input_per_m": 2.0,
     "output_per_m": 10.0,
     "daily_cap_usd": 1.00,
-    "confirm_over_usd": 0.05,
+    # A chat turn that carries a class's readings estimates around $0.10, so anything
+    # lower asked on every message. The daily cap is the real limit; this is a nudge.
+    "confirm_over_usd": 0.25,
 }
 
 # Rough but stable: English prose runs about four characters per token.
