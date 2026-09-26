@@ -21,7 +21,6 @@ import openai
 MODELS = {
     "gpt-sol": "gpt-6-sol",
     "gpt-luna": "gpt-6-luna",
-    "gpt-astra": "gpt-6-astra",
 }
 
 # Reasoning counts against max_output_tokens, so leave room for it or a long think

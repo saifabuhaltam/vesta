@@ -110,7 +110,6 @@ MODEL_PRICES = {
     # OpenAI, for chats. From developers.openai.com/api/docs/pricing, September 2026.
     "gpt-6-sol": (2.0, 10.0),
     "gpt-6-luna": (0.10, 0.50),
-    "gpt-6-astra": (10.0, 50.0),
 }
 
 
