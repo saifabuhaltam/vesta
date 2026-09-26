@@ -2001,6 +2001,8 @@
   .files-section-h{ font-size:16px; font-weight:700; margin-bottom:12px; }
   .files-list-head{ display:flex; align-items:center; justify-content:space-between; margin:22px 0 12px; }
   .files-list-head .files-section-h{ margin-bottom:0; }
+  .files-list-head .flh-title{ display:flex; align-items:baseline; gap:12px; }
+  .files-list-head .see-all{ font-size:12px; font-weight:600; color:var(--accent); text-decoration:none; }
   .layout-toggle{ display:flex; gap:2px; background:var(--surface-2); border-radius:var(--r-md); padding:3px; }
   .lt-btn{ border:none; background:transparent; padding:6px 11px; border-radius:7px; cursor:pointer;
     font-size:13px; color:var(--text-muted); font-family:inherit; }
@@ -9287,6 +9289,7 @@
    * search box can repaint just this, and get the banner and the folder cards with
    * it rather than a bare list with no way back.
    */
+  var FILES_TOP_RECENT = 8;
   function filesBodyHtml(){
     var list = filesMatching();
     var layoutToggle = '<div class="layout-toggle">'
@@ -9307,10 +9310,19 @@
                 : filesFolder ? ((classById(filesFolder)||{}).code || 'Folder')
                 : 'Recent Files';
 
+    // The top of All Files is for browsing by class, so the list under the class
+    // cards is only the newest few. Everything is still one click away in Recent,
+    // in a class folder, or by searching or filtering, which lift the cap.
+    var shown = list, more = '';
+    if(browsing && !filesFolder && !filesFiltering() && list.length > FILES_TOP_RECENT){
+      shown = list.slice(0, FILES_TOP_RECENT);
+      more = '<a class="see-all" href="#" data-action="files-tab" data-tab="recent">More in Recent</a>';
+    }
+
     return filesResultBannerHtml(list.length)
       + cards
-      + '<div class="files-list-head"><h2 class="files-section-h">'+heading+'</h2>'+layoutToggle+'</div>'
-      + fileListHtml(list)
+      + '<div class="files-list-head"><div class="flh-title"><h2 class="files-section-h">'+heading+'</h2>'+more+'</div>'+layoutToggle+'</div>'
+      + fileListHtml(shown)
       + filesInsideSectionHtml(list);
   }
   // ---------------- Grades (global) ----------------
