@@ -255,23 +255,54 @@ def call_claude(conn, kind, prompt, max_tokens=4000, confirmed=False):
 
 # The standing instruction for a thread. It is the cached prefix's first block, so it
 # must not carry anything that changes per turn, or the cache misses every time.
+#
+# It used to call everything "scaffolding, not work to hand in" and ask for every
+# place the student had to add their own material. Replies came back as worksheets:
+# bracketed gaps, a "still need from you" list on every turn, headings and rules on a
+# one-line question. Saif set one beside ChatGPT's answer to the same discussion post,
+# which was shorter, complete and usable, though ChatGPT had less of his material.
 CHAT_SYSTEM = (
     "You are helping a university student with their coursework inside Vesta, their "
     "study app. You are given the course material they have attached to this "
     "conversation, and the conversation so far.\n\n"
-    "Work from the attached material. Where it does not cover something, say so rather "
-    "than inventing a source, a citation or a fact. Anything you produce is scaffolding "
-    "for the student to revise and build on, not work to hand in as it stands; where "
-    "they need to supply their own specifics, say so plainly.\n\n"
+    "Answer what was asked, at the length it needs, and stop. A request for a list gets "
+    "the list. No opener that praises the question or the choice, no recap of what you "
+    "just said, no closing offer of more help. Use headings, bold and dividers only for "
+    "a long piece that needs them; a short answer is plain prose or a plain list.\n\n"
+    "When asked to write something (a discussion post, an answer, a paragraph), write it "
+    "complete and ready to use: no bracketed gaps, no placeholders, no checklist of what "
+    "is left. Match the length the assignment asks for; a discussion post is a few short "
+    "paragraphs. If a part truly can only come from the student, such as something that "
+    "happened to them, write the most sensible version and add one short line after it "
+    "naming what to check.\n\n"
+    "Write the way a good undergraduate writes: plain words, sentences of normal length, "
+    "no em dashes, and none of the vocabulary that marks text as machine written "
+    "(delve, crucial, tapestry, underscores, it is worth noting). If a sample of the "
+    "student's own writing is given, sound like it.\n\n"
+    "Work from the attached material, and use the course's own definitions and terms. "
+    "Do not invent quotes, citations or facts; if the material does not cover something, "
+    "say so in one line. Examples should be ones a typical student would recognise, and "
+    "only describe details of an example you are sure of.\n\n"
+    "When the student says how they want answers (shorter, less formal, to the point), "
+    "keep doing that for the rest of the conversation, not just the next reply.\n\n"
     "Keep continuity with what has already been said in this conversation. If they ask "
     "for a second piece of work like an earlier one, do not repeat the earlier one's "
     "points unless they ask you to."
 )
 
 
-def chat_system(context):
-    """The standing instruction, then the pinned material behind a cache breakpoint."""
+def chat_voice(conn):
+    """The writing sample saved in Study > Humanizer, so drafts sound like the student."""
+    row = conn.execute("SELECT value FROM app_settings WHERE key='humanizer_voice'").fetchone()
+    return ((row["value"] if row else "") or "").strip()[:6000]
+
+
+def chat_system(context, voice=""):
+    """The standing instruction, the student's writing sample, then the pinned material
+    behind a cache breakpoint. The sample rarely changes, so it sits inside the cache."""
     system = [{"type": "text", "text": CHAT_SYSTEM}]
+    if voice:
+        system.append({"type": "text", "text": "A sample of the student's own writing:\n\n" + voice})
     if context:
         system.append({
             "type": "text",
@@ -288,7 +319,8 @@ def chat_guard(conn, context, history, max_tokens, confirmed):
     answer before the stream opens, rather than halfway into one.
     """
     cfg = settings(conn)
-    prompt_chars = len(CHAT_SYSTEM) + len(context or "") + sum(len(m["content"]) for m in history)
+    prompt_chars = (len(CHAT_SYSTEM) + len(context or "") + len(chat_voice(conn))
+                    + sum(len(m["content"]) for m in history))
     in_tokens = estimate_tokens("x" * prompt_chars)
     est = estimate_cost(cfg, in_tokens, max_tokens)
     used = spent_today(conn, cfg)
@@ -326,7 +358,7 @@ def call_claude_chat(conn, kind, context, history, max_tokens=4000, confirmed=Fa
         response = client.messages.create(
             model=cfg["model"],
             max_tokens=max_tokens,
-            system=chat_system(context),
+            system=chat_system(context, chat_voice(conn)),
             messages=[{"role": m["role"], "content": m["content"]} for m in history],
         )
     except anthropic.AuthenticationError:
@@ -367,7 +399,8 @@ def stream_claude_chat(conn, cfg, kind, context, history, fast=True, max_tokens=
     stream, which stops the generation; what was produced is still recorded, with the
     output estimated from what arrived, because it was still billed.
     """
-    request = dict(model=cfg["model"], max_tokens=max_tokens, system=chat_system(context),
+    request = dict(model=cfg["model"], max_tokens=max_tokens,
+                   system=chat_system(context, chat_voice(conn)),
                    messages=[{"role": m["role"], "content": m["content"]} for m in history])
     if fast:
         request["output_config"] = {"effort": "low"}
@@ -770,9 +803,9 @@ def assignment_state(conn, it):
 # Tools
 # ---------------------------------------------------------------------------
 SCAFFOLD_NOTE = (
-    "\n\nThis is study scaffolding for the student to work from and revise. It is not "
-    "something to hand in as-is. Where the student needs to supply their own specifics "
-    "(their data, their examples, their citations), say so plainly rather than inventing them."
+    "\n\nAnswer at the length this needs, in plain words, with no em dashes. Do not "
+    "invent data, quotes or citations; if something can only come from the student, "
+    "write the most sensible version and say in one line what to check."
 )
 
 TOOLS = {
@@ -825,9 +858,10 @@ TOOLS = {
     "draft": {
         "label": "Draft assistance",
         "max_tokens": 6000,
-        "prompt": "Write a first draft the student can build on. Use a natural voice appropriate "
-                  "for an undergraduate. Mark clearly, in a short closing list, every place where "
-                  "the student must add their own material.",
+        "prompt": "Write this assignment, complete and ready to use, at the length it asks for. "
+                  "Use the course's own definitions, and examples a typical student would "
+                  "recognise. Plain undergraduate voice, no headings unless the assignment has "
+                  "parts, no placeholders and no list of what is left to do.",
     },
     "revise": {
         "label": "Revision assistance",
