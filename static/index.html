@@ -2352,7 +2352,18 @@
     padding:9px; font:inherit; font-size:12.5px; font-weight:600; color:var(--text-muted); cursor:pointer; }
   .th-rail-new:hover{ color:var(--accent-ink); border-color:var(--accent); }
   .th-rail-new svg{ width:15px; height:15px; }
-  .th-rail-sources{ margin-top:14px; padding-top:10px; border-top:1px solid var(--border); }
+  .th-rail-sources{ margin-top:14px; padding-top:8px; border-top:1px solid var(--border); }
+  .th-src-toggle{ display:flex; align-items:center; gap:6px; width:100%; border:0; background:transparent;
+    border-radius:var(--r-md); padding:4px 8px 4px 0; cursor:pointer; font:inherit; text-align:left; }
+  .th-src-toggle:hover{ background:var(--surface-2); }
+  .th-src-toggle .th-rail-head{ padding:4px 0 4px 8px; }
+  .th-src-count{ font-size:11px; font-weight:700; color:var(--text-muted); background:var(--surface-2);
+    border-radius:var(--r-pill); padding:1px 7px; }
+  .th-src-chev{ margin-left:auto; display:grid; place-items:center; color:var(--text-faint); transition:transform .15s ease; }
+  .th-src-chev svg{ width:15px; height:15px; }
+  .th-rail-sources.open .th-src-chev{ transform:rotate(180deg); }
+  .th-src-list{ display:none; padding-top:6px; }
+  .th-rail-sources.open .th-src-list{ display:block; }
   .th-rail-sources .th-chips{ flex-direction:column; flex-wrap:nowrap; padding:0; }
   .th-rail-sources .th-chip{ width:100%; align-items:flex-start; border-radius:var(--r-md); box-shadow:none; }
   .th-rail-sources .th-chip svg{ margin-top:2px; }
@@ -2430,7 +2441,7 @@
   .th-main .th-msg{ align-self:auto; }
   .th-main .th-msg.th-user{ align-items:flex-end; }
   .th-main .th-msg.th-assistant{ align-items:flex-start; }
-  .th-main .th-msg .th-text{ max-width:88%; }
+  .th-main .th-msg.th-user .th-text{ max-width:78%; }
   .th-main .th-composer{ max-width:760px; width:100%; margin-left:auto; margin-right:auto; }
   .th-msg{ max-width:82%; display:flex; flex-direction:column; gap:5px; }
   .th-msg.th-user{ align-self:flex-end; align-items:flex-end; }
@@ -2438,13 +2449,24 @@
   .th-who{ font-size:11px; font-weight:700; color:var(--text-faint); text-transform:lowercase; }
   .th-text{ border-radius:var(--r-card); padding:11px 14px; font-size:13.5px; line-height:1.6;
     overflow-wrap:anywhere; }
-  .th-user .th-text{ background:var(--accent-soft); color:var(--accent-ink); }
-  .th-assistant .th-text{ background:var(--surface); border:1px solid var(--border); color:var(--text); }
+  .th-user .th-text{ background:var(--accent-soft); color:var(--accent-ink); border-radius:20px; padding:10px 16px;
+    white-space:pre-wrap; }
+  /* Vesta's reply is not in a bubble: it is the page, the way ChatGPT reads. */
+  .th-assistant{ max-width:100%; }
+  .th-assistant .th-text{ background:transparent; border:0; padding:0; color:var(--text); font-size:15px; line-height:1.7; }
+  .th-tag{ font-size:11px; font-weight:700; color:var(--text-faint); }
+  .th-assistant .th-md p, .th-assistant .th-md ul, .th-assistant .th-md ol{ margin-bottom:14px; }
+  .th-assistant .th-md > :last-child{ margin-bottom:0; }
   .th-md h1, .th-md h2, .th-md h3{ font-size:14px; margin:10px 0 4px; }
   .th-md p{ margin:0 0 8px; }
   .th-md ul, .th-md ol{ margin:0 0 8px 18px; }
-  .th-msg-acts{ display:flex; gap:6px; opacity:0; transition:opacity .12s ease; }
+  .th-msg-acts{ display:flex; gap:2px; margin-left:-6px; opacity:.55; transition:opacity .12s ease; }
   .th-msg:hover .th-msg-acts, .th-msg:focus-within .th-msg-acts{ opacity:1; }
+  .th-act{ display:flex; align-items:center; gap:6px; height:30px; min-width:30px; justify-content:center;
+    border:0; background:transparent; border-radius:8px; color:var(--text-muted); cursor:pointer; font:inherit;
+    font-size:12.5px; font-weight:600; padding:0 6px; }
+  .th-act:hover{ background:var(--surface-2); color:var(--text); }
+  .th-act svg{ width:16px; height:16px; }
   .th-empty{ color:var(--text-faint); font-size:13px; text-align:center; padding:18px 0 6px; }
   .th-starters{ display:flex; flex-wrap:wrap; gap:7px; padding-top:6px; }
   .th-starters .hs-group-label{ width:100%; }
@@ -2465,10 +2487,10 @@
   .th-chip-x{ border:0; background:transparent; color:var(--text-faint); cursor:pointer; font-size:15px; line-height:1;
     width:20px; height:20px; border-radius:50%; display:grid; place-items:center; flex:none; padding:0; }
   .th-chip-x:hover{ background:var(--surface-2); color:var(--text); }
-  .th-attach{ width:42px; height:42px; flex:none; border-radius:50%; border:1px solid var(--border); background:var(--surface);
-    color:var(--text-muted); cursor:pointer; display:grid; place-items:center; box-shadow:var(--shadow-card); padding:0; }
-  .th-attach:hover{ color:var(--accent); border-color:var(--accent); }
-  .th-attach svg{ width:18px; height:18px; }
+  .th-attach{ width:36px; height:36px; flex:none; border-radius:50%; border:0; background:transparent;
+    color:var(--text-muted); cursor:pointer; display:grid; place-items:center; padding:0; }
+  .th-attach:hover{ color:var(--text); background:var(--surface-2); }
+  .th-attach svg{ width:20px; height:20px; }
   .th-attach-overlay{ z-index:260; }
   .th-attach-win{ max-width:620px; }
   .th-attach-sub{ font-size:12.5px; color:var(--text-muted); margin-top:4px; line-height:1.5; }
@@ -2478,15 +2500,27 @@
   .th-upload-hint{ font-size:12px; color:var(--text-muted); }
   @media (max-width:520px){
     /* Four controls on one row left the box three words wide on a phone. */
-    .th-composer{ gap:6px; }
     .th-composer .th-fast span{ display:none; }
-    .th-attach{ width:38px; height:38px; }
   }
-  .th-composer{ display:flex; gap:8px; align-items:flex-end; padding:12px 0 16px;
-    border-top:1px solid var(--border); background:var(--surface); position:sticky; bottom:0; }
-  .th-composer textarea{ flex:1; resize:none; min-height:42px; max-height:150px; }
+  /* One rounded box, as in ChatGPT: what you are writing on top, the controls along
+     its bottom edge. It replaced a row of four separate controls under a rule. */
+  .th-composer-wrap{ padding-bottom:14px; }
+  .th-composer{ display:flex; flex-direction:column; gap:4px; padding:10px 10px 8px 14px;
+    border:1px solid var(--border); border-radius:26px; background:var(--surface);
+    box-shadow:0 2px 10px rgba(15,23,42,.06); position:sticky; bottom:0; transition:border-color .12s; }
+  .th-composer:focus-within{ border-color:var(--text-faint); }
+  .th-composer textarea, .th-composer textarea:focus, .th-composer textarea:focus-visible{
+    border:0; outline:none; box-shadow:none; background:transparent; resize:none;
+    min-height:26px; max-height:220px; padding:4px 2px; font-size:15px; line-height:1.5; }
+  .th-composer-bar{ display:flex; align-items:center; gap:6px; margin-left:-6px; }
+  .th-bar-gap{ flex:1; }
+  .th-send{ width:36px; height:36px; flex:none; border-radius:50%; border:0; cursor:pointer; padding:0;
+    display:grid; place-items:center; background:var(--text); color:var(--surface); transition:opacity .12s; }
+  .th-send svg{ width:18px; height:18px; stroke-width:2.2; }
+  .th-send.is-empty, .th-send:disabled{ opacity:.3; }
+  .th-send.th-stop svg{ width:14px; height:14px; fill:currentColor; }
   /* The lightning bolt: a pill that is plainly on or off, with its word beside the icon. */
-  .th-fast{ display:flex; align-items:center; gap:5px; height:38px; padding:0 12px; flex:none;
+  .th-fast{ display:flex; align-items:center; gap:5px; height:34px; padding:0 12px; flex:none;
     border:1px solid var(--border); background:var(--surface); border-radius:var(--r-pill);
     font:inherit; font-size:12.5px; font-weight:650; color:var(--text-faint); cursor:pointer;
     transition:background .12s, color .12s, border-color .12s; }
@@ -2494,8 +2528,6 @@
   .th-fast:hover{ color:var(--text); border-color:var(--text-faint); }
   .th-fast.on{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); }
   .th-fast.on svg{ fill:currentColor; }
-  .th-stop{ display:flex; align-items:center; gap:6px; }
-  .th-stop svg{ width:13px; height:13px; fill:currentColor; }
   .th-live-status{ display:flex; align-items:center; gap:8px; min-width:0; font-size:12.5px;
     color:var(--text-faint); }
   .th-live-status:empty{ display:none; }
@@ -3410,6 +3442,9 @@
     trash: '<path d="M4 6.5h16"/><path d="M9.5 6.5V4.6h5v1.9"/><path d="M6.2 6.5 7 20.1h10L17.8 6.5"/><path d="M10.3 10.4v5.6M13.7 10.4v5.6"/>',
     edit: '<path d="M4 20h4.2L19 9.2a2.1 2.1 0 0 0-3-3L5.2 17Z"/><path d="m14.8 7.4 2.8 2.8"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    arrow_up: '<path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/>',
+    copy: '<rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/>',
+    chevron_down: '<path d="m6 9 6 6 6-6"/>',
     link: '<path d="M10.4 13.6a3.9 3.9 0 0 0 5.5 0l2.7-2.7a3.9 3.9 0 0 0-5.5-5.5l-1.5 1.5"/>'
         + '<path d="M13.6 10.4a3.9 3.9 0 0 0-5.5 0l-2.7 2.7a3.9 3.9 0 0 0 5.5 5.5l1.5-1.5"/>',
     upload: '<path d="M12 16V4.6"/><path d="m7.6 9 4.4-4.4L16.4 9"/><path d="M4.5 15.5V19a1.5 1.5 0 0 0 1.5 1.5h12A1.5 1.5 0 0 0 19.5 19v-3.5"/>',
@@ -16029,24 +16064,25 @@
     }).catch(function(err){ closeModal(); reportError(err); });
   }
 
+  /**
+   * One turn, laid out the way ChatGPT does it: the student's words in a bubble on the
+   * right, Vesta's reply as plain text on the page with its actions underneath. Saif
+   * asked for this; two bubbles made a long reply read like a form.
+   */
   function threadBubbleHtml(m){
-    var who = m.role === 'user' ? 'you' : 'Vesta';
-    var body = m.role === 'user'
-      ? '<div class="th-text">'+escapeHtml(m.content||'')+'</div>'
-      : '<div class="th-text th-md">'+mdLite(m.content||'')+'</div>';
-    return '<div class="th-msg th-'+m.role+'">'
-      + '<div class="th-who">'+who
-      + (m.tool && HS_TOOLS[m.tool] ? ' · '+escapeHtml(HS_TOOLS[m.tool].label) : '')+'</div>'
-      + body
+    var tool = m.tool && HS_TOOLS[m.tool] ? '<div class="th-tag">'+escapeHtml(HS_TOOLS[m.tool].label)+'</div>' : '';
+    if(m.role === 'user'){
+      return '<div class="th-msg th-user">'+tool+'<div class="th-text">'+escapeHtml(m.content||'')+'</div></div>';
+    }
+    return '<div class="th-msg th-assistant">'
+      + '<div class="th-text th-md">'+mdLite(m.content||'')+'</div>'
       // the server marks a reply stopped part way with tool 'stopped'
-      + (m.role === 'assistant' && (m.stopped || m.tool === 'stopped') ? '<div class="th-stopped">Stopped</div>' : '')
-      + (m.role === 'assistant'
-          ? '<div class="th-msg-acts">'
-            + '<button type="button" class="btn ghost" data-action="th-copy" data-id="'+m.id+'">Copy</button>'
-            + '<button type="button" class="btn ghost" data-action="th-to-note" data-id="'+m.id+'">Save as a note</button>'
-            + '</div>'
-          : '')
-      + '</div>';
+      + (m.stopped || m.tool === 'stopped' ? '<div class="th-stopped">Stopped</div>' : '')
+      + '<div class="th-msg-acts">'
+      + '<button type="button" class="th-act" data-action="th-copy" data-id="'+m.id+'" title="Copy" aria-label="Copy">'+iconSvg('copy')+'</button>'
+      + '<button type="button" class="th-act th-act-lbl" data-action="th-to-note" data-id="'+m.id+'" title="Save as a note">'
+      + iconSvg('notes')+'<span>Save as a note</span></button>'
+      + '</div></div>';
   }
 
   /** The opening moves, shown only on an empty thread so they do not crowd a conversation. */
@@ -16102,7 +16138,20 @@
    */
   function threadRailSourcesHtml(){
     var chips = threadChipsHtml();
-    return chips ? '<div class="th-rail-sources"><div class="th-rail-head">Reading</div>'+chips+'</div>' : '';
+    if(!chips) return '';
+    var d = TH.data || {};
+    var n = (d.pinned && d.pinned.length ? d.pinned.length : (d.sources||[]).filter(function(x){ return x.type !== 'assignment'; }).length)
+      + ((d.sources||[]).some(function(x){ return x.type === 'assignment'; }) ? 1 : 0);
+    var open = threadSourcesOpen();
+    return '<div class="th-rail-sources'+(open?' open':'')+'">'
+      + '<button type="button" class="th-src-toggle" data-action="th-sources-toggle" aria-expanded="'+open+'">'
+      + '<span class="th-rail-head">Reading</span><span class="th-src-count">'+n+'</span>'
+      + '<span class="th-src-chev">'+iconSvg('chevron_down')+'</span></button>'
+      + '<div class="th-src-list">'+chips+'</div></div>';
+  }
+  /** Closed by default, per Saif; remembered on this device once opened. */
+  function threadSourcesOpen(){
+    try { return localStorage.getItem('vesta_th_sources_open') === '1'; } catch(e){ return false; }
   }
 
 
@@ -16117,6 +16166,7 @@
       if(sc0 && TH.scrollToEnd) sc0.scrollTop = sc0.scrollHeight;
       TH.scrollToEnd = false;
       var ta0 = document.getElementById('th-draft');
+      threadDraftFit(ta0);
       if(ta0 && !TH.busy){ ta0.focus(); ta0.setSelectionRange(ta0.value.length, ta0.value.length); }
       return;
     }
@@ -16154,6 +16204,7 @@
     var sc = document.getElementById('th-scroll');
     if(sc) sc.scrollTop = sc.scrollHeight;
     var ta = document.getElementById('th-draft');
+    threadDraftFit(ta);
     if(ta && !TH.busy){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
   }
 
@@ -16719,17 +16770,28 @@
   /** noChips: the page view lists the sources in its rail instead. */
   function threadComposerHtml(noChips){
     var fast = threadFastOn();
+    var empty = !(TH.draft||'').trim();
     return '<div class="th-composer-wrap">' + (noChips ? '' : threadChipsHtml()) + '<div class="th-composer">'
-      + '<button type="button" class="th-attach" data-action="th-pick" title="Attach files or notes" aria-label="Attach files or notes">'+iconSvg('plus')+'</button>'
       // left usable while a reply streams, so the next question can be written meanwhile
-      + '<textarea id="th-draft" data-action="th-draft" rows="2" placeholder="Ask for anything, or say what to change…">'
+      + '<textarea id="th-draft" data-action="th-draft" rows="1" placeholder="Ask for anything, or say what to change…">'
       + escapeHtml(TH.draft||'')+'</textarea>'
+      + '<div class="th-composer-bar">'
+      + '<button type="button" class="th-attach" data-action="th-pick" title="Attach files or notes" aria-label="Attach files or notes">'+iconSvg('plus')+'</button>'
+      + '<span class="th-bar-gap"></span>'
       + '<button type="button" class="th-fast'+(fast?' on':'')+'" data-action="th-fast" aria-pressed="'+fast+'"'
       + ' title="'+escapeHtml(threadFastTitle(fast))+'">'+iconSvg('zap')+'<span>Fast</span></button>'
       + (TH.stream
-          ? '<button type="button" class="btn th-stop" data-action="th-stop">'+iconSvg('stop')+'Stop</button>'
-          : '<button type="button" class="btn primary" data-action="th-send"'+(TH.busy?' disabled':'')+'>Send</button>')
-      + '</div></div>';
+          ? '<button type="button" class="th-send th-stop" data-action="th-stop" title="Stop" aria-label="Stop">'+iconSvg('stop')+'</button>'
+          : '<button type="button" class="th-send'+(empty?' is-empty':'')+'" data-action="th-send" title="Send (Enter)" aria-label="Send"'
+            + (TH.busy?' disabled':'')+'>'+iconSvg('arrow_up')+'</button>')
+      + '</div></div></div>';
+  }
+
+  /** The message box grows with its text, up to a limit, then scrolls. */
+  function threadDraftFit(ta){
+    if(!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 220) + 'px';
   }
 
   function threadLiveOrBusyHtml(){
@@ -16742,7 +16804,6 @@
     var st = TH.stream;
     return (st.user ? threadBubbleHtml(st.user) : '')
       + '<div class="th-msg th-assistant th-live" id="th-live">'
-      + '<div class="th-who">Vesta'+(st.fast ? ' · Fast' : '')+'</div>'
       + '<div class="th-live-status">'+threadLiveStatusHtml(st)+'</div>'
       + '<div class="th-text th-md th-live-text">'+threadLiveTextHtml(st)+'</div>'
       + '</div>';
@@ -17874,7 +17935,13 @@
     if(el) hzHot(el.dataset.hzI, false);
   });
   document.addEventListener('input', function(e){
-    if(TH && e.target && e.target.id === 'th-draft'){ TH.draft = e.target.value; return; }
+    if(TH && e.target && e.target.id === 'th-draft'){
+      TH.draft = e.target.value;
+      threadDraftFit(e.target);
+      var sendBtn = document.querySelector('.th-send[data-action="th-send"]');
+      if(sendBtn) sendBtn.classList.toggle('is-empty', !TH.draft.trim());
+      return;
+    }
     // Stored as it is typed, never on blur: a written answer that only registers when
     // the box loses focus is a written answer that gets thrown away on submit.
     if(FC && FC.test && e.target && e.target.matches('[data-action="test-write"]')){
@@ -19182,6 +19249,14 @@
     }
     if(action==='set-ai-confirm'){
       setAiConfirm(Number(t.dataset.value), function(){ openSettingsModal(); });
+      return;
+    }
+    if(action==='th-sources-toggle'){
+      var box = t.closest('.th-rail-sources');
+      var nowOpen = !box.classList.contains('open');
+      box.classList.toggle('open', nowOpen);
+      t.setAttribute('aria-expanded', String(nowOpen));
+      try { localStorage.setItem('vesta_th_sources_open', nowOpen ? '1' : '0'); } catch(e){}
       return;
     }
     if(action==='th-send-stop-asking'){
