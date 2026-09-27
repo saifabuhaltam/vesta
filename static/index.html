@@ -1357,7 +1357,6 @@
   .ne-swatch:hover{ transform:scale(1.12); }
   .ne-swatch.hl{ border-color:rgba(0,0,0,.08); border-radius:50%; }
   .ne-swatch.none{ background:linear-gradient(135deg, transparent 45%, var(--text-faint) 46%, var(--text-faint) 54%, transparent 55%), var(--surface); }
-  .ne-swatch.none:not(.hl){ background:var(--surface); }
   .ne-fonts{ display:flex; gap:4px; padding:0 2px 6px; }
   .ne-font{ flex:1; height:30px; border:1px solid var(--border); border-radius:9px; background:var(--surface);
     color:var(--text); font-size:13px; cursor:pointer; }
@@ -10150,7 +10149,12 @@
   try{ neBarHidden = localStorage.getItem('vesta.noteBarHidden') === '1'; }catch(e){}
 
   var NE_COLORS = [
-    { c:'',        t:'Default' }, { c:'#1D4ED8', t:'Blue' },   { c:'#0F766E', t:'Teal' },
+    // No colour removes the colour, which on a heading means the heading's own blue.
+    // It used to be a black A labelled Default, so it looked like black and did nothing
+    // to a heading. Black is the page's text colour rather than #000, so it stays
+    // readable in dark mode, and it is how a pasted heading matches the text around it.
+    { c:'',        t:'No colour' }, { c:'var(--text)', t:'Black' },
+    { c:'#1D4ED8', t:'Blue' },    { c:'#0F766E', t:'Teal' },
     { c:'#18794E', t:'Green' },   { c:'#B4560D', t:'Orange' }, { c:'#C0342E', t:'Red' },
     { c:'#6D3FC4', t:'Purple' },  { c:'#E0568F', t:'Pink' },   { c:'#6B7280', t:'Grey' }
   ];
@@ -10184,7 +10188,7 @@
     var colours = '<div class="ne-pop-label">Text colour</div><div class="ne-swatches">'
       + NE_COLORS.map(function(o){
           return '<button type="button" class="ne-swatch'+(o.c?'':' none')+'" data-action="ne" data-cmd="color" data-val="'+o.c+'"'
-            + ' title="'+o.t+'" style="'+(o.c?'color:'+o.c:'')+'">A</button>';
+            + ' title="'+o.t+'" style="'+(o.c?'color:'+o.c:'')+'">'+(o.c?'A':'')+'</button>';
         }).join('')
       + '</div><div class="ne-pop-label">Highlight</div><div class="ne-swatches">'
       + NE_HIGHLIGHTS.map(function(o){
