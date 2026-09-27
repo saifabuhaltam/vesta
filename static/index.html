@@ -18016,16 +18016,47 @@
     paintIcons(document.getElementById('search-root'));
     var input = document.getElementById('search-input');
     if(input) input.focus();
+    searchMini = null;          // built once per opening, from what is loaded now
     renderSearchResults('');
   }
-  function closeSearch(){ document.getElementById('search-root').innerHTML = ''; }
+  function closeSearch(){ document.getElementById('search-root').innerHTML = ''; searchMini = null; }
+
+  /**
+   * ⌘K's index, as MiniSearch (bundled in /libs.js). It replaced one substring test,
+   * which needed the words in the typed order and spelled exactly: "phil rubric" did
+   * not find "PHIL 110 Essay Rubric", a typo found nothing, and nothing was ranked.
+   * Now every word has to match somewhere, a word can be the start of one ("rub"),
+   * a longer word forgives a typo, and a match in the title counts most.
+   */
+  var searchMini = null;
+  function searchRanked(q){
+    if(!searchMini){
+      var docs = searchIndex();
+      if(!window.VestaLibs) return { docs: docs, hits: null };
+      var mini = new window.VestaLibs.MiniSearch({
+        idField: 'sid', fields: ['title', 'meta', 'text'],
+        searchOptions: {
+          boost: { title: 3, meta: 1.5 }, prefix: true, combineWith: 'AND',
+          fuzzy: function(term){ return term.length > 3 ? 0.2 : false; }
+        }
+      });
+      mini.addAll(docs.map(function(d, i){ return { sid: i, title: d.title || '', meta: d.meta || '', text: d.text || '' }; }));
+      searchMini = { docs: docs, mini: mini };
+    }
+    if(!searchMini.mini) return { docs: searchMini.docs, hits: null };
+    return { docs: searchMini.docs,
+             hits: searchMini.mini.search(q).map(function(h){ return searchMini.docs[h.id]; }) };
+  }
   function renderSearchResults(q){
     var root = document.getElementById('search-results');
     if(!root) return;
     var raw = (q||'').trim();
     q = raw.toLowerCase();
-    var idx = searchIndex();
-    var matches = q ? idx.filter(function(r){ return r.text.indexOf(q)>=0; }) : idx.slice(0,10);
+    var found = searchRanked(q);
+    var idx = found.docs;
+    // best match first; the groups then appear in the order of their best result
+    var matches = !q ? idx.slice(0,10)
+                : found.hits || idx.filter(function(r){ return r.text.indexOf(q)>=0; });
     var groups = {}, order = [];
     matches.forEach(function(r){ if(!groups[r.type]){ groups[r.type]=[]; order.push(r.type); } groups[r.type].push(r); });
     var html = '';
