@@ -5,6 +5,11 @@ python-docx==1.1.2
 anthropic
 # OpenAI's models in Headstart chats (openai_chat.py), when OPENAI_API_KEY is set.
 openai
+# The Humanizer's detector check (detector.py): a RoBERTa classifier run in plain numpy,
+# so no PyTorch. safetensors reads the weights, tokenizers splits the text.
+numpy
+safetensors
+tokenizers
 # Postgres, for the deployed app. db.py falls back to SQLite without DATABASE_URL,
 # so this is unused locally but the deploy crashes on import without it.
 psycopg[binary]==3.2.13

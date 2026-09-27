@@ -2232,6 +2232,27 @@
   .hz-text:disabled{ background:var(--surface-2); color:var(--text-muted); }
   .hz-foot{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
   .hz-meter{ display:flex; align-items:center; gap:10px; flex:1; min-width:0; font-size:12.5px; }
+  .hz-modes{ width:fit-content; margin:8px 0 10px; }
+  .hz-score{ display:inline-flex; align-items:center; font-size:11.5px; font-weight:700; padding:2px 9px;
+    border-radius:var(--r-pill); white-space:nowrap; }
+  .hz-score.ok{ background:var(--success-soft); color:var(--success); }
+  .hz-score.mid{ background:var(--warn-soft); color:var(--warn); }
+  .hz-score.ai{ background:var(--danger-soft); color:var(--danger); }
+  .hz-para{ margin-bottom:14px; }
+  .hz-para:last-child{ margin-bottom:0; }
+  .hz-para-score{ margin-top:6px; }
+  .hz-det{ margin-top:14px; }
+  .hz-det-row{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .hz-det-row .hz-score{ font-size:15px; padding:4px 12px; }
+  .hz-det-lbl{ font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-faint); margin-bottom:4px; }
+  .hz-det-arrow{ font-size:18px; color:var(--text-faint); padding-top:14px; }
+  .hz-det-note{ flex:1; min-width:240px; font-size:12.5px; color:var(--text-muted); line-height:1.5; }
+  .hz-checked{ margin-top:12px; border:1px solid var(--border); border-radius:var(--r-card); padding:12px 14px; background:var(--surface); }
+  .hz-checked-head{ display:flex; align-items:center; gap:10px; }
+  .hz-checked-head .btn{ margin-left:auto; }
+  .hz-checked-paras{ margin-top:10px; display:flex; flex-direction:column; gap:6px; }
+  .hz-checked-p{ display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--text-muted); }
+  .hz-checked-txt{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .hz-count{ color:var(--text-faint); font-weight:600; }
   .hz-count.over{ color:var(--danger); }
   .hz-over{ color:var(--danger); }
@@ -7554,10 +7575,34 @@
 
   function hzWords(text){ return (text||'').split(/\s+/).filter(Boolean).length; }
 
+  /**
+   * The Humanizer's two jobs. habits: strip the writing habits that read as AI and mark
+   * each one, which is how you learn to stop writing them. detectors: rewrite until an
+   * AI-text classifier scores it human, checked paragraph by paragraph (detector.py).
+   */
+  var HZ_MODES = [['habits', 'Clean up AI habits'], ['detectors', 'Pass AI detectors']];
+  function hzMode(){
+    if(HZ.mode) return HZ.mode;
+    try { HZ.mode = localStorage.getItem('vesta_hz_mode') === 'detectors' ? 'detectors' : 'habits'; }
+    catch(e){ HZ.mode = 'habits'; }
+    return HZ.mode;
+  }
+  function hzPct(p){ return Math.round((p || 0) * 100) + '%'; }
+  /** A score as a coloured chip: green reads human, amber in between, red reads AI. */
+  function hzScoreChip(p, prefix){
+    var tone = p <= 0.3 ? 'ok' : p <= 0.5 ? 'mid' : 'ai';
+    return '<span class="hz-score '+tone+'">'+(prefix||'')+hzPct(p)+' AI</span>';
+  }
+
   /** What a pass should cost, worked out the way humanizer.py works it out. */
   function hzEstimate(text){
     var tt = Math.max(1, Math.floor((text||'').length / 4));
-    var input = HZ.promptTokens + tt + Math.floor((HZ.useVoice ? HZ.voice.length : 0) / 4) + 50;
+    var vt = Math.floor((HZ.useVoice ? HZ.voice.length : 0) / 4);
+    if(hzMode() === 'detectors'){
+      // humanizer.estimate's detectors branch: the rewrite plus up to two partial retries
+      return ((2 * (900 + vt) + 3 * tt) * HZ.prices[0] + (2 * tt + 1500) * HZ.prices[1]) / 1e6;
+    }
+    var input = HZ.promptTokens + tt + vt + 50;
     var output = Math.floor(tt * 2.5) + 1500;
     return (input * HZ.prices[0] + output * HZ.prices[1]) / 1e6;
   }
@@ -7593,6 +7638,8 @@
     var b = document.getElementById('hz-run');
     var n = hzWords(HZ.text);
     if(b) b.disabled = HZ.busy || HZ.extracting || !n || n > HZ.maxWords;
+    var c = document.querySelector('[data-action="hz-check"]');
+    if(c) c.disabled = HZ.busy || HZ.checking || !n;
   }
 
   function hzHomeHtml(){
@@ -7602,9 +7649,18 @@
     return '<div class="hz-layout">'
       + '<section class="tile hz-main">'
       + '<div class="hz-intro"><h3>Humanizer</h3>'
-      + '<p>Finds the habits that make writing read as AI-generated, marks each one on your text '
-      + 'with the reason, and rewrites it without them. It keeps what the text says and never '
-      + 'invents facts; where a sentence needs a detail only you have, it asks.</p></div>'
+      + '<div class="seg hz-modes">' + HZ_MODES.map(function(m){
+          return '<button type="button" class="seg-btn'+(hzMode()===m[0]?' active':'')+'" data-action="hz-mode"'
+            + ' data-mode="'+m[0]+'"'+(HZ.busy?' disabled':'')+'>'+m[1]+'</button>';
+        }).join('') + '</div>'
+      + (hzMode() === 'detectors'
+          ? '<p>Rewrites it so AI detectors score it as human: uneven sentences, less predictable wording, '
+            + 'the way people actually write. Every paragraph is scored after the rewrite, and any still '
+            + 'flagged goes round again. It keeps every fact and adds none.</p>'
+          : '<p>Finds the habits that make writing read as AI-generated, marks each one on your text '
+            + 'with the reason, and rewrites it without them. It keeps what the text says and never '
+            + 'invents facts; where a sentence needs a detail only you have, it asks.</p>')
+      + '</div>'
       + '<div class="hz-sources">'
       + HZ_SOURCES.map(function(s){
           return '<button type="button" class="hz-src'+(kind===s[0]?' active':'')+'"'
@@ -7628,9 +7684,13 @@
       + (HZ.voice ? '' : ' title="Add a sample of your writing first, on the right."')+'>'
       + '<input type="checkbox" data-action="hz-use-voice"'+(HZ.voice && HZ.useVoice ? ' checked' : '')
       + (HZ.voice ? '' : ' disabled')+'> Match my voice</label>'
+      + '<button type="button" class="btn" data-action="hz-check"'+(HZ.busy || HZ.checking || !n ? ' disabled' : '')
+      + ' title="Score this text with the detector without changing it. Free.">'
+      + (HZ.checking ? 'Checking…' : 'Check score')+'</button>'
       + '<button type="button" class="btn primary" data-action="hz-run" id="hz-run"'+(blocked?' disabled':'')+'>'
-      + (HZ.busy ? 'Rewriting…' : 'Rewrite')+'</button>'
+      + (HZ.busy ? 'Rewriting…' : (hzMode() === 'detectors' ? 'Rewrite to pass' : 'Rewrite'))+'</button>'
       + '</div>'
+      + (HZ.checked ? hzCheckedHtml() : '')
       + (HZ.confirm ? hzConfirmHtml() : '')
       + (HZ.busy ? '<div class="hz-progress" id="hz-progress">'+hzProgressHtml()+'</div>' : '')
       + '</section>'
@@ -7682,7 +7742,10 @@
               return '<button type="button" class="hz-hist" data-action="hz-open-run" data-id="'+r.id+'">'
                 + '<span class="hz-hist-title">'+escapeHtml(r.title)+'</span>'
                 + '<span class="hz-hist-meta">'+escapeHtml(HZ_KIND_LABEL[r.sourceKind]||'Pasted')
-                + ' · '+r.words.toLocaleString()+' words · '+r.tellCount+' habit'+(r.tellCount===1?'':'s')
+                + ' · '+r.words.toLocaleString()+' words · '
+                + (r.mode === 'detectors'
+                    ? (r.detector && r.detector.after != null ? hzPct(r.detector.before)+' \u2192 '+hzPct(r.detector.after)+' AI' : 'Detector pass')
+                    : r.tellCount+' habit'+(r.tellCount===1?'':'s'))
                 + ' · '+escapeHtml(relTimeAgo(r.createdAt))+'</span></button>';
             }).join('') + '</div>'
           : '<p class="hz-muted">Nothing yet. Every rewrite is kept here so you can come back and copy it.</p>')
@@ -7729,6 +7792,7 @@
         + '<div class="hs-thinking"><i></i>Opening the rewrite…</div></div>';
     }
     var tells = hzOrderedTells(r);
+    var det = r.mode === 'detectors', d = r.detector || {};
     var note = r.sourceKind === 'note' && r.sourceId
       ? allNotes().filter(function(n){ return n.id === r.sourceId; })[0] : null;
     return '<div class="set-screen hz-run">'
@@ -7736,7 +7800,8 @@
       + '<button type="button" class="th-back" data-action="hz-home">‹ Humanizer</button>'
       + '<div class="th-screen-title"><h2>'+escapeHtml(r.title)+'</h2>'
       + '<span class="type-badge">'+escapeHtml(HZ_KIND_LABEL[r.sourceKind]||'Pasted')+'</span>'
-      + '<span class="type-badge">'+tells.length+' habit'+(tells.length===1?'':'s')+' marked</span>'
+      + (det ? (d.after != null ? '<span class="type-badge">AI score '+hzPct(d.before)+' \u2192 '+hzPct(d.after)+'</span>' : '')
+             : '<span class="type-badge">'+tells.length+' habit'+(tells.length===1?'':'s')+' marked</span>')
       + (r.usedVoice ? '<span class="type-badge">In your voice</span>' : '')
       + '</div>'
       + '<div class="th-screen-acts">'
@@ -7754,12 +7819,18 @@
       + '<div class="hz-compare">'
       + '<section class="tile hz-pane"><div class="hz-pane-head"><h4>Original</h4>'
       + '<span>'+hzWords(r.original).toLocaleString()+' words</span></div>'
-      + '<div class="hz-prose">'+hzMarkedHtml(r.original, tells)+'</div></section>'
+      + '<div class="hz-prose">'+(det ? escapeHtml(r.original) : hzMarkedHtml(r.original, tells))+'</div></section>'
       + '<section class="tile hz-pane"><div class="hz-pane-head"><h4>Rewrite</h4>'
       + '<span>'+hzWords(r.final).toLocaleString()+' words</span></div>'
-      + '<div class="hz-prose">'+escapeHtml(r.final)+'</div></section>'
+      + '<div class="hz-prose">'+(det && (d.paragraphs||[]).length
+          ? r.final.split(/\n\s*\n/).map(function(p, i){
+              return '<div class="hz-para">'+escapeHtml(p)
+                + (d.paragraphs[i] != null ? '<div class="hz-para-score">'+hzScoreChip(d.paragraphs[i])+'</div>' : '')+'</div>';
+            }).join('')
+          : escapeHtml(r.final))+'</div></section>'
       + '</div>'
-      + '<section class="hz-found"><div class="set-terms-head"><h3>What it found</h3>'
+      + (det ? hzDetectorSectionHtml(r) : '')
+      + (det ? '' : '<section class="hz-found"><div class="set-terms-head"><h3>What it found</h3>'
       + '<span class="hs-bucket-count">'+tells.length+'</span></div>'
       + (tells.length
           ? '<div class="hz-found-list">' + tells.map(function(t, i){
@@ -7771,14 +7842,61 @@
                 + '<p>'+escapeHtml(t.why)+'</p></div></div>';
             }).join('') + '</div>'
           : '<div class="empty">It found nothing that reads as AI-generated, so the text is unchanged.</div>')
-      + '</section>'
+      + '</section>')
       + ((r.stillOff||[]).length
           ? '<section class="tile hz-card hz-still"><h4>Left on purpose</h4><ul>'
             + r.stillOff.map(function(s){ return '<li>'+escapeHtml(s)+'</li>'; }).join('')+'</ul></section>'
           : '')
-      + '<p class="hz-by">The 25 patterns come from Wikipedia\'s "Signs of AI writing", by way of the open-source '
-      + 'humanizer skill (blader/humanizer, MIT).</p>'
+      + (det
+          ? '<p class="hz-by">Scores come from an open-source AI-text detector (Mozilla Fakespot\'s '
+            + 'roberta-base-ai-text-detection-v1, Apache-2.0), run on Vesta\'s own server.</p>'
+          : '<p class="hz-by">The 25 patterns come from Wikipedia\'s "Signs of AI writing", by way of the open-source '
+            + 'humanizer skill (blader/humanizer, MIT).</p>')
       + '</div>';
+  }
+
+  function hzDetectorSectionHtml(r){
+    var d = r.detector || {};
+    if(d.after == null){
+      return '<section class="tile hz-card hz-det"><h4>Detector check</h4>'
+        + '<p class="hz-muted">The detector could not run for this one, so the rewrite was not scored. '
+        + 'Use Check score on the Humanizer page to score it now.</p></section>';
+    }
+    return '<section class="tile hz-card hz-det"><div class="hz-det-row">'
+      + '<div><div class="hz-det-lbl">Before</div>'+hzScoreChip(d.before)+'</div>'
+      + '<div class="hz-det-arrow">\u2192</div>'
+      + '<div><div class="hz-det-lbl">After</div>'+hzScoreChip(d.after)+'</div>'
+      + '<div class="hz-det-note">'+(d.rounds > 1 ? d.rounds+' rounds: the paragraphs still flagged after the first pass went round again.'
+                                                 : 'Every paragraph passed on the first rewrite.')
+      + ' This is an estimate from an open-source detector; GPTZero and Turnitin run their own models, '
+      + 'so a pass here is likely there but not certain.</div>'
+      + '</div></section>';
+  }
+
+  /** The free check under the text box: a score, and each paragraph's when there are several. */
+  function hzCheckedHtml(){
+    var c = HZ.checked;
+    return '<div class="hz-checked"><div class="hz-checked-head"><b>Detector score</b>'+hzScoreChip(c.ai)
+      + '<span class="hz-muted">'+(c.ai <= 0.3 ? 'Reads as human.' : c.ai <= 0.5 ? 'Could go either way.' : 'Reads as AI-written.')+'</span>'
+      + '<button type="button" class="btn ghost" data-action="hz-check-close">Hide</button></div>'
+      + ((c.paragraphs||[]).length
+          ? '<div class="hz-checked-paras">'+c.paragraphs.map(function(p, i){
+              return '<div class="hz-checked-p"><span class="hz-num">'+(i+1)+'</span>'
+                + '<span class="hz-checked-txt">'+escapeHtml(p.text.length > 110 ? p.text.slice(0, 110).trim()+'\u2026' : p.text)+'</span>'
+                + hzScoreChip(p.ai)+'</div>';
+            }).join('')+'</div>'
+          : '')
+      + '</div>';
+  }
+
+  function hzCheck(){
+    var ta = document.getElementById('hz-text');
+    if(ta) HZ.text = ta.value;
+    if(!hzWords(HZ.text) || HZ.checking) return;
+    HZ.checking = true; HZ.checked = null;
+    renderView(); paintIcons();
+    apiPost('/api/humanizer/check', { text: HZ.text }).then(function(r){ HZ.checked = r; })
+      .catch(reportError).then(function(){ HZ.checking = false; renderView(); paintIcons(); });
   }
 
   /** A note's HTML as plain paragraphs, which is what the rewrite works on. */
@@ -7936,8 +8054,10 @@
   function hzProgressHtml(){
     var p = HZ.progress || { phase:'waiting', chars:0 };
     var pct = p.phase === 'writing' ? Math.min(96, Math.max(3, Math.round(100 * p.chars / (HZ.expectChars || 1)))) : 0;
-    var label = p.phase === 'writing' ? 'Writing the rewrite'
+    var label = p.phase === 'writing' ? (p.round ? 'Round '+p.round+': rewriting what is still flagged' : 'Writing the rewrite')
               : p.phase === 'thinking' ? 'Reading it and marking the AI habits'
+              : p.phase === 'checking' ? 'Scoring it with the detector'
+              : p.phase === 'retrying' ? 'Round '+p.round+': '+p.flagged+' paragraph'+(p.flagged===1?'':'s')+' still read as AI'
               : 'Sending it over';
     // A long paper is rewritten a section at a time. Saying which section it is on
     // is the difference between "it is working" and "it has hung".
@@ -7960,10 +8080,12 @@
     if(ta) HZ.text = ta.value;
     var words = hzWords(HZ.text);
     if(!words) return;
-    HZ.busy = true; HZ.confirm = null;
+    HZ.busy = true; HZ.confirm = null; HZ.round = 0;
     HZ.progress = { phase:'waiting', chars:0 };
     // the JSON that comes back: the rewrite, plus about one marked habit per 15 words
-    HZ.expectChars = HZ.text.length * 1.05 + (words / 15) * 220 + 300;
+    HZ.expectChars = hzMode() === 'detectors' ? HZ.text.length * 1.1 + 200
+                   : HZ.text.length * 1.05 + (words / 15) * 220 + 300;
+    HZ.checked = null;
     renderView(); paintIcons();
     var done = false;
     function finish(){
@@ -7972,7 +8094,8 @@
     }
     fetch('/api/humanizer/run', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ text: HZ.text, source: HZ.source || { kind:'paste' },
-                             useVoice: !!(HZ.voice && HZ.useVoice), confirmed: !!confirmed, stream: true }) })
+                             useVoice: !!(HZ.voice && HZ.useVoice), confirmed: !!confirmed, stream: true,
+                             mode: hzMode() }) })
       .then(function(r){
         if((r.headers.get('content-type') || '').indexOf('text/event-stream') !== 0){
           return r.json().catch(function(){ return {}; }).then(function(j){
@@ -7982,13 +8105,19 @@
           });
         }
         return readEventStream(r, function(name, data){
-          if(name === 'progress'){ HZ.progress = data; hzPaintProgress(); return; }
+          if(name === 'progress'){
+            // a retry round's writing keeps the round number, so the label says which pass it is
+            if(data.phase === 'retrying') HZ.round = data.round;
+            else if(data.phase === 'writing' && HZ.round) data.round = HZ.round;
+            HZ.progress = data; hzPaintProgress(); return;
+          }
           if(name === 'error'){ done = true; finish(); reportError(new Error(data.error || 'The rewrite failed.')); return; }
           if(name === 'done'){
             done = true;
             var run = data;
             HZ.runs.unshift({ id:run.id, title:run.title, sourceKind:run.sourceKind, sourceLabel:run.sourceLabel,
-                              words:run.words, tellCount:run.tellCount, createdAt:run.createdAt });
+                              words:run.words, tellCount:run.tellCount, createdAt:run.createdAt,
+                              mode:run.mode, detector:run.detector });
             HZ.run = run; HZ.copied = false; HZ.savedTo = null;
             HZ.text = ''; HZ.source = null;
             if(hsSideLoaded) hsLoadSide();       // the spend chip should reflect this pass
@@ -19768,6 +19897,14 @@
       return;
     }
     if(action==='hz-run'){ hzRun(t.dataset.confirmed === '1'); return; }
+    if(action==='hz-mode'){
+      var ta2 = document.getElementById('hz-text'); if(ta2) HZ.text = ta2.value;
+      HZ.mode = t.dataset.mode;
+      try { localStorage.setItem('vesta_hz_mode', HZ.mode); } catch(e){}
+      renderView(); paintIcons(); return;
+    }
+    if(action==='hz-check'){ hzCheck(); return; }
+    if(action==='hz-check-close'){ HZ.checked = null; renderView(); paintIcons(); return; }
     if(action==='hz-dismiss'){ HZ.confirm = null; renderView(); paintIcons(); return; }
     if(action==='hz-open-run'){ hzOpenRun(t.dataset.id); return; }
     if(action==='hz-home'){ HZ.run = null; HZ.runLoading = false; renderView(); paintIcons(); return; }

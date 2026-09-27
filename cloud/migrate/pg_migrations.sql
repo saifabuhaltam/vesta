@@ -459,3 +459,13 @@ select apply_owner_rls('week_plan_items');
 
 grant select, insert, update, delete on week_plan_items to authenticated;
 revoke all on week_plan_items from anon;
+
+
+-- migration: 013_humanizer_detector
+-- The Humanizer's second mode. "habits" is the original: strip AI writing habits and
+-- mark each one. "detectors" rewrites until a local AI-text classifier (detector.py)
+-- scores the text human, and keeps those scores with the run. Partner of the
+-- humanizer_runs columns in db.SCHEMA.
+
+alter table humanizer_runs add column if not exists "mode" text default 'habits';
+alter table humanizer_runs add column if not exists "detector" text;

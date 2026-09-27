@@ -365,7 +365,11 @@ CREATE TABLE IF NOT EXISTS humanizer_runs (
     model TEXT,
     input_tokens INTEGER DEFAULT 0,
     output_tokens INTEGER DEFAULT 0,
-    created_at TEXT
+    created_at TEXT,
+    -- habits: strip AI writing habits and mark them. detectors: rewrite until a local
+    -- AI-text classifier scores it human.
+    mode TEXT DEFAULT 'habits',
+    detector TEXT                   -- JSON: {before, after, rounds, paragraphs}
 );
 
 CREATE TABLE IF NOT EXISTS term_settings (
@@ -782,6 +786,14 @@ def init_db():
     for col in ("cache_read_tokens", "cache_write_tokens"):
         if col not in ucols:
             conn.execute(f"ALTER TABLE ai_usage ADD COLUMN {col} INTEGER DEFAULT 0")
+
+    # The Humanizer's second mode, and the detector scores it keeps with each run.
+    # Partner block: 013_humanizer_detector in cloud/migrate/pg_migrations.sql.
+    rcols = [r["name"] for r in conn.execute("PRAGMA table_info(humanizer_runs)").fetchall()]
+    if "mode" not in rcols:
+        conn.execute("ALTER TABLE humanizer_runs ADD COLUMN mode TEXT DEFAULT 'habits'")
+    if "detector" not in rcols:
+        conn.execute("ALTER TABLE humanizer_runs ADD COLUMN detector TEXT")
 
     # Which chat a saved Headstart became. Generated work now lives in one place, and
     # this is how an old saved result finds the conversation it turned into.
