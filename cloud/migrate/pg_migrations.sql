@@ -469,3 +469,13 @@ revoke all on week_plan_items from anon;
 
 alter table humanizer_runs add column if not exists "mode" text default 'habits';
 alter table humanizer_runs add column if not exists "detector" text;
+
+
+-- migration: 014_flashcards_fsrs
+-- Flashcards moved from SM-2 to FSRS (ts-fsrs, computed in the browser and stored
+-- here). NULL until a card's first review under FSRS, when its SM-2 ease and interval
+-- are converted. Partner of the flashcards columns in db.SCHEMA.
+
+alter table flashcards add column if not exists "stability" double precision;
+alter table flashcards add column if not exists "difficulty" double precision;
+alter table flashcards add column if not exists "fsrs_state" integer;

@@ -21,7 +21,8 @@
     "@tiptap/suggestion": "3.31.3",
     "dompurify": "3.4.16",
     "marked": "18.0.14",
-    "minisearch": "7.2.0"
+    "minisearch": "7.2.0",
+    "ts-fsrs": "5.4.2"
   },
   "devDependencies": {
     "esbuild": "0.28.2"

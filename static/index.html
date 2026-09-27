@@ -8466,7 +8466,8 @@
    */
   function sendReviews(grades){
     var reviews = Object.keys(grades || {}).map(function(id){
-      return { id:id, grade:grades[id] };
+      var card = fcFindCard(id);
+      return { id:id, grade:grades[id], fsrs: card ? fcNext(card, grades[id]) : null };
     });
     if(!reviews.length) return Promise.resolve();
     return apiPost('/api/cards/review-batch', { reviews:reviews }).then(function(r){
@@ -16019,7 +16020,70 @@
    * A mirror of `sm2_next` in ai.py, kept here so the buttons can say "Good · 4d"
    * without a round trip per card. If the scheduling changes there, change it here.
    */
+  /**
+   * Flashcards are scheduled by FSRS (ts-fsrs, bundled in /libs.js), which replaced
+   * SM-2: Anki's default since 2023, and about a fifth fewer reviews for the same
+   * recall. It runs here, so each button can say what it costs before it is pressed,
+   * and the state that is sent to the server is exactly the one that was shown.
+   * Whole days, 90% target recall, no fuzz. Grades: 1 Missed it, 4 Good, 5 Easy.
+   */
+  var FC_FSRS = null;
+  function fcScheduler(){
+    if(FC_FSRS || !window.VestaLibs || !window.VestaLibs.FSRS) return FC_FSRS;
+    var F = window.VestaLibs.FSRS;
+    FC_FSRS = F.fsrs(F.generatorParameters({
+      request_retention: 0.9, maximum_interval: 36500, enable_fuzz: false,
+      enable_short_term: false, learning_steps: [], relearning_steps: []
+    }));
+    return FC_FSRS;
+  }
+  function fcIsoDate(s){
+    if(!s) return null;
+    var d = new Date(/Z|[+-]\d\d:?\d\d$/.test(s) ? s : s + 'Z');   // the server writes UTC without a Z
+    return isNaN(d) ? null : d;
+  }
+  /**
+   * A card as ts-fsrs sees it. A card reviewed before FSRS carries SM-2's numbers
+   * instead, and is converted the first time it comes up: its interval becomes its
+   * stability (at 90% recall they are the same thing), and its ease maps onto
+   * difficulty, 2.5 to 5 on FSRS's 1 to 10 scale, a hard 1.3 to 9, an easy 3.7 to 1.
+   */
+  function fcAsFsrs(card, now){
+    var F = window.VestaLibs.FSRS;
+    var last = fcIsoDate(card.lastReviewed);
+    if(card.fsrsState != null && card.stability){
+      return { due: fcIsoDate(card.due) || now, stability: card.stability, difficulty: card.difficulty || 5,
+               elapsed_days: 0, scheduled_days: card.interval || 0, reps: card.repetitions || 0,
+               lapses: card.lapses || 0, learning_steps: 0, state: card.fsrsState, last_review: last || undefined };
+    }
+    if((card.repetitions || 0) > 0 || (card.lapses || 0) > 0){
+      var ivl = Math.max(1, card.interval || 1);
+      return { due: fcIsoDate(card.due) || now, stability: ivl,
+               difficulty: Math.min(10, Math.max(1, 5 - ((card.ease || 2.5) - 2.5) * (4 / 1.2))),
+               elapsed_days: 0, scheduled_days: ivl, reps: card.repetitions || 0, lapses: card.lapses || 0,
+               learning_steps: 0, state: F.State.Review,
+               last_review: last || new Date(now.getTime() - ivl * 86400000) };
+    }
+    return F.createEmptyCard(now);
+  }
+  /** What a grade does to a card: the FSRS state the server stores, or null without FSRS. */
+  function fcNext(card, grade, now){
+    var f = fcScheduler();
+    if(!f) return null;
+    var F = window.VestaLibs.FSRS;
+    now = now || new Date();
+    var rating = grade < 3 ? F.Rating.Again : grade >= 5 ? F.Rating.Easy : grade === 3 ? F.Rating.Hard : F.Rating.Good;
+    var c = f.next(fcAsFsrs(card, now), now, rating).card;
+    return { stability: c.stability, difficulty: c.difficulty, state: c.state, reps: c.reps,
+             lapses: c.lapses, scheduledDays: c.scheduled_days };
+  }
   function fcPredictDays(card, grade){
+    var n = fcNext(card, grade);
+    if(n) return n.scheduledDays;
+    return fcPredictDaysSm2(card, grade);
+  }
+  /** SM-2, kept only for the moment /libs.js fails to load; the server falls back too. */
+  function fcPredictDaysSm2(card, grade){
     var ease = card.ease || 2.5;
     var reps = card.repetitions || 0;
     var interval = card.interval || 0;
@@ -16051,6 +16115,17 @@
    * to do, left the second sighting holding the stale copy and predicting the wrong
    * intervals. Mutating in place keeps every reference honest.
    */
+  /** A card in the open set or the review queue, by id. */
+  function fcFindCard(id){
+    if(!FC) return null;
+    var lists = [FC.deck && FC.deck.cards, FC.queue];
+    for(var i = 0; i < lists.length; i++){
+      var hit = (lists[i] || []).filter(function(c){ return c.id === id; })[0];
+      if(hit) return hit;
+    }
+    return null;
+  }
+
   function fcAdoptCard(updated){
     if(!updated || !FC) return;
     var lists = [FC.deck && FC.deck.cards, FC.queue];
@@ -16184,7 +16259,7 @@
     renderDeck();
 
     // The schedule is the server's business and nothing on screen waits for it.
-    apiPost('/api/cards/'+card.id+'/review', { grade: g }).then(function(updated){
+    apiPost('/api/cards/'+card.id+'/review', { grade: g, fsrs: fcNext(card, g) }).then(function(updated){
       fcAdoptCard(updated);
       if(FC && FC.at >= FC.queue.length){ fcPaintDone(); hsLoadSide(); }
     }).catch(reportError);

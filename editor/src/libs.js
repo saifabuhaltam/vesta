@@ -1,8 +1,9 @@
-// Vesta's small third-party helpers, bundled into static/libs.js as window.VestaLibs.
+// Vesta's small third-party helpers (marked, DOMPurify, MiniSearch, ts-fsrs), bundled into static/libs.js as window.VestaLibs.
 // Kept apart from the TipTap bundle (index.js) so neither has to rebuild for the other.
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import MiniSearch from 'minisearch'
+import { fsrs, generatorParameters, createEmptyCard, Rating, State } from 'ts-fsrs'
 
 // GitHub-flavoured markdown (tables, strikethrough, autolinks), and a single line break
 // kept as a line break, which is how the old renderer and chat models both treat it.
@@ -30,4 +31,10 @@ function markdown(text) {
   })
 }
 
-window.VestaLibs = { markdown, MiniSearch }
+// FSRS, the scheduler Anki moved to in 2023, for flashcards. Whole days only: no
+// minute-long learning steps, because Vesta's due dates are dates and a missed card
+// comes back later in the same sitting anyway. No fuzz, so the interval a button shows
+// is the interval that is stored.
+const FSRS = { fsrs, generatorParameters, createEmptyCard, Rating, State }
+
+window.VestaLibs = { markdown, MiniSearch, FSRS }

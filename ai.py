@@ -1581,8 +1581,9 @@ def sm2_next(ease, reps, interval, lapses, grade):
     back to the bottom of the ladder; 3-5 is a hit and pushes the next sighting
     further out, scaled by how easy the card has proven to be.
 
-    `fcPredictDays` in static/index.html mirrors this so the buttons can say what
-    each grade costs before it is pressed. Change one and change the other.
+    Now only a fallback: cards are scheduled by FSRS in the browser (see
+    `clean_fsrs`). This runs when a review arrives without an FSRS state, from a tab
+    opened before FSRS shipped. `fcPredictDaysSm2` in static/index.html is its mirror.
     """
     ease = ease if ease else 2.5
     reps = reps or 0
@@ -1604,8 +1605,35 @@ def sm2_next(ease, reps, interval, lapses, grade):
             "lapses": lapses}
 
 
-def apply_review(conn, cid, grade, deck_id=None):
-    """Record one grade against one card. Returns the updated row, or None."""
+def clean_fsrs(state):
+    """The FSRS state the browser computed, bounded, or None if it is not usable.
+
+    ts-fsrs runs in the browser (static/libs.js), so the buttons can show what each
+    grade costs and the schedule that is stored is the one that was shown. The server
+    keeps it, but does not trust it blindly: every number is checked and clamped.
+    """
+    if not isinstance(state, dict):
+        return None
+    try:
+        out = {
+            "stability": min(36500.0, max(0.01, float(state["stability"]))),
+            "difficulty": min(10.0, max(1.0, float(state["difficulty"]))),
+            "state": min(3, max(0, int(state["state"]))),
+            "reps": max(0, int(state["reps"])),
+            "lapses": max(0, int(state["lapses"])),
+            "days": min(36500, max(0, int(state["scheduledDays"]))),
+        }
+    except (KeyError, TypeError, ValueError):
+        return None
+    return out
+
+
+def apply_review(conn, cid, grade, deck_id=None, fsrs=None):
+    """Record one grade against one card. Returns the updated row, or None.
+
+    With `fsrs`, the state ts-fsrs computed in the browser is stored. Without it (a
+    page loaded before FSRS shipped, still open in a tab), SM-2 runs as it used to.
+    """
     grade = max(0, min(5, int(grade)))
     if deck_id:
         c = conn.execute("SELECT * FROM flashcards WHERE id=? AND deck_id=?",
@@ -1614,8 +1642,17 @@ def apply_review(conn, cid, grade, deck_id=None):
         c = conn.execute("SELECT * FROM flashcards WHERE id=?", (cid,)).fetchone()
     if not c:
         return None
-    nxt = sm2_next(c["ease"], c["repetitions"], c["interval_days"], c["lapses"], grade)
     now = datetime.utcnow()
+    f = clean_fsrs(fsrs)
+    if f:
+        due = (now + timedelta(days=f["days"])).strftime("%Y-%m-%d")
+        conn.execute(
+            "UPDATE flashcards SET stability=?, difficulty=?, fsrs_state=?, repetitions=?, lapses=?,"
+            " interval_days=?, due_date=?, last_reviewed_at=? WHERE id=?",
+            (f["stability"], f["difficulty"], f["state"], f["reps"], f["lapses"], f["days"],
+             due, now.isoformat(), cid))
+        return conn.execute("SELECT * FROM flashcards WHERE id=?", (cid,)).fetchone()
+    nxt = sm2_next(c["ease"], c["repetitions"], c["interval_days"], c["lapses"], grade)
     due = (now + timedelta(days=nxt["interval"])).strftime("%Y-%m-%d")
     conn.execute(
         "UPDATE flashcards SET ease=?, interval_days=?, repetitions=?, lapses=?, due_date=?,"
@@ -1631,6 +1668,9 @@ def card_json(r):
             "repetitions": r["repetitions"], "lapses": r["lapses"], "due": r["due_date"],
             "lastReviewed": r["last_reviewed_at"], "suspended": bool(r["suspended"]),
             "learnLevel": (r["learn_level"] or 0) if "learn_level" in r.keys() else 0,
+            "stability": r["stability"] if "stability" in r.keys() else None,
+            "difficulty": r["difficulty"] if "difficulty" in r.keys() else None,
+            "fsrsState": r["fsrs_state"] if "fsrs_state" in r.keys() else None,
             "sortOrder": r["sort_order"]}
 
 
@@ -1824,13 +1864,14 @@ def one_card(cid):
 
 @bp.route("/api/cards/<cid>/review", methods=["POST"])
 def review_card(cid):
-    """Record how a card went and schedule the next sighting (SM-2)."""
+    """Record how a card went and schedule the next sighting (FSRS, from the browser)."""
     conn = get_db()
+    body = request.get_json(force=True) or {}
     try:
-        grade = int((request.get_json(force=True) or {}).get("grade", 3))
+        grade = int(body.get("grade", 3))
     except (TypeError, ValueError):
         grade = 3
-    row = apply_review(conn, cid, grade)
+    row = apply_review(conn, cid, grade, fsrs=body.get("fsrs"))
     if row is None:
         conn.close()
         abort(404)
@@ -1861,7 +1902,7 @@ def review_cards_batch():
             grade = int(r.get("grade", 3))
         except (TypeError, ValueError):
             continue
-        row = apply_review(conn, r["id"], grade)
+        row = apply_review(conn, r["id"], grade, fsrs=r.get("fsrs"))
         if row is not None:
             out.append(card_json(row))
     conn.commit()

@@ -237,6 +237,11 @@ CREATE TABLE IF NOT EXISTS flashcards (
     lapses INTEGER DEFAULT 0,
     due_date TEXT,
     last_reviewed_at TEXT,
+    -- FSRS memory state (ts-fsrs in the browser computes it). NULL until a card is
+    -- first reviewed under FSRS; its SM-2 history is converted then.
+    stability REAL,
+    difficulty REAL,
+    fsrs_state INTEGER,
     suspended INTEGER DEFAULT 0,
     sort_order INTEGER DEFAULT 0,
     created_at TEXT
@@ -786,6 +791,12 @@ def init_db():
     for col in ("cache_read_tokens", "cache_write_tokens"):
         if col not in ucols:
             conn.execute(f"ALTER TABLE ai_usage ADD COLUMN {col} INTEGER DEFAULT 0")
+
+    # Flashcards scheduled by FSRS. Partner block: 014_flashcards_fsrs.
+    fcols = [r["name"] for r in conn.execute("PRAGMA table_info(flashcards)").fetchall()]
+    for col, kind in (("stability", "REAL"), ("difficulty", "REAL"), ("fsrs_state", "INTEGER")):
+        if col not in fcols:
+            conn.execute(f"ALTER TABLE flashcards ADD COLUMN {col} {kind}")
 
     # The Humanizer's second mode, and the detector scores it keeps with each run.
     # Partner block: 013_humanizer_detector in cloud/migrate/pg_migrations.sql.
