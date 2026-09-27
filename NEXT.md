@@ -3,7 +3,7 @@
 A running list so nothing is lost between sessions. **needs Saif** means it cannot be
 done from a terminal: a dashboard login, an email click, or a decision that is his.
 
-_Last updated: 2026-09-25. Rewritten on 2026-09-21 from scratch: the old file had grown to 1,228
+_Last updated: 2026-09-27. Rewritten on 2026-09-21 from scratch: the old file had grown to 1,228
 lines, most of it a record of work already finished, and 72 open boxes of which about
 ten were stale. What follows is what is actually open, and the history worth keeping._
 
@@ -124,6 +124,16 @@ about 250 ms from here no matter what it does, which is mostly the hop to Railwa
       real test is on vesta.study: connect the calendar, sync once, then check
       `/health` reports `calendarPush.channels`, and change something in Google to see
       whether it lands without pressing Sync.
+
+### The Humanizer's detector mode (2026-09-27)
+
+Works on vesta.study since the move to Railway Hobby. The first live run failed
+because the trial plan's 0.5 GB volume could not hold the 499 MB model; the volume
+is now 5 GB. The model unloads after 15 idle minutes to keep the RAM bill down, and a
+failure now says why in the run result.
+
+- [ ] **needs Saif** — Saif likes it as it is but says it is not the greatest. Changes
+      wait until he names specific ones; do not tune it speculatively.
 
 ### Headstart and what it can read (found 2026-09-24)
 
