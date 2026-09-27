@@ -2480,7 +2480,22 @@
   .th-assistant .th-md > :last-child{ margin-bottom:0; }
   .th-md h1, .th-md h2, .th-md h3{ font-size:14px; margin:10px 0 4px; }
   .th-md p{ margin:0 0 8px; }
-  .th-md ul, .th-md ol{ margin:0 0 8px 18px; }
+  .th-md ul, .th-md ol, .hs-out ul, .hs-out ol{ margin:0 0 8px; padding-left:22px; }
+  /* What marked can produce that the old renderer never did: nested lists, tables,
+     code, quotes, links, rules. Shared by chat replies and Headstart's results. */
+  .th-md li > ul, .th-md li > ol, .hs-out li > ul, .hs-out li > ol{ margin:4px 0; }
+  .th-md li, .hs-out li{ margin-bottom:3px; }
+  .th-md table, .hs-out table{ border-collapse:collapse; margin:4px 0 14px; font-size:13.5px; display:block;
+    max-width:100%; overflow-x:auto; }
+  .th-md th, .th-md td, .hs-out th, .hs-out td{ border:1px solid var(--border); padding:6px 10px; text-align:left; vertical-align:top; }
+  .th-md th, .hs-out th{ background:var(--surface-2); font-weight:650; }
+  .th-md code, .hs-out code{ font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.9em;
+    background:var(--surface-2); border-radius:5px; padding:1px 5px; }
+  .th-md pre, .hs-out pre{ background:var(--surface-2); border-radius:10px; padding:12px 14px; overflow-x:auto; margin:4px 0 14px; }
+  .th-md pre code, .hs-out pre code{ background:none; padding:0; }
+  .th-md blockquote, .hs-out blockquote{ border-left:3px solid var(--border); margin:4px 0 14px; padding:2px 0 2px 12px; color:var(--text-muted); }
+  .th-md a, .hs-out a{ color:var(--accent); text-decoration:underline; }
+  .th-md hr, .hs-out hr{ border:0; border-top:1px solid var(--border); margin:14px 0; }
   .th-msg-acts{ display:flex; gap:2px; margin-left:-6px; opacity:.55; transition:opacity .12s ease; }
   .th-msg:hover .th-msg-acts, .th-msg:focus-within .th-msg-acts{ opacity:1; }
   .th-act{ display:flex; align-items:center; gap:6px; height:30px; min-width:30px; justify-content:center;
@@ -3403,6 +3418,7 @@
 <div id="focus-root"></div>
 
 <script src="/editor.js"></script>
+<script src="/libs.js"></script>
 <script>
 (function(){
   "use strict";
@@ -3611,7 +3627,17 @@
   function inlineMd(s){
     return s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*(?!\*)(.+?)\*(?!\*)/g,'$1<em>$2</em>');
   }
+  /**
+   * Markdown from a model as safe HTML: marked for the formatting (numbered lists,
+   * tables, code, quotes, links, nested lists) and DOMPurify so nothing in a reply can
+   * run. Both are bundled into /libs.js from editor/src/libs.js. The hand-written
+   * version below is kept only for the moment that bundle fails to load.
+   */
   function mdLite(text){
+    if(window.VestaLibs) return window.VestaLibs.markdown(text);
+    return mdLiteFallback(text);
+  }
+  function mdLiteFallback(text){
     var esc = escapeHtml(text||'');
     var lines = esc.split('\n');
     var html = '';

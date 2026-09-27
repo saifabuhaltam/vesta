@@ -1,9 +1,11 @@
 {
   "name": "vesta-editor",
   "private": true,
-  "description": "The notes editor: TipTap plus Vesta's own blocks, bundled into static/editor.js.",
+  "description": "The notes editor (TipTap plus Vesta's own blocks) and small helpers (marked, DOMPurify, MiniSearch), bundled into static/editor.js and static/libs.js.",
   "scripts": {
-    "build": "esbuild src/index.js --bundle --minify --format=iife --target=es2019 --outfile=../static/editor.js"
+    "build": "npm run build:editor && npm run build:libs",
+    "build:editor": "esbuild src/index.js --bundle --minify --format=iife --target=es2019 --outfile=../static/editor.js",
+    "build:libs": "esbuild src/libs.js --bundle --minify --format=iife --target=es2019 --outfile=../static/libs.js"
   },
   "dependencies": {
     "@tiptap/core": "3.31.3",
@@ -16,7 +18,10 @@
     "@tiptap/extensions": "3.31.3",
     "@tiptap/pm": "3.31.3",
     "@tiptap/starter-kit": "3.31.3",
-    "@tiptap/suggestion": "3.31.3"
+    "@tiptap/suggestion": "3.31.3",
+    "dompurify": "3.4.16",
+    "marked": "18.0.14",
+    "minisearch": "7.2.0"
   },
   "devDependencies": {
     "esbuild": "0.28.2"
