@@ -22,3 +22,8 @@ httpx>=0.27,<1
 # fire: a slim container has no /usr/share/zoneinfo and nothing would say so. Pure
 # data, no code.
 tzdata
+# Reading iCalendar feeds (ics.py): icalendar parses, recurring-ical-events expands
+# every repeat rule, extra dates and moved occurrences. Replaced a hand-written parser
+# that only expanded daily and weekly rules.
+icalendar
+recurring-ical-events
