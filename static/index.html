@@ -20490,6 +20490,40 @@
     });
   });
 
+  /**
+   * Enter in a one-line field presses its form's main button, as a real form would:
+   * the primary button in a dialog's footer, a Settings card or the assignment card.
+   * Only those footers, and only within the field's own dialog or card, so Enter in a
+   * filter box never sets off whatever primary button is nearby. Text areas, the notes editor,
+   * search boxes and fields that already handle Enter themselves are left alone.
+   */
+  function enterPressesSave(e){
+    var t = e.target;
+    if(e.defaultPrevented || e.isComposing || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false;
+    if(!t || t.tagName !== 'INPUT' || t.readOnly) return false;
+    if(/^(checkbox|radio|file|button|submit|range|color|search)$/.test(t.type)) return false;
+    if(/search/i.test(t.id || '')) return false;
+    var el = t.parentElement;
+    while(el && el !== document.body){
+      var btn = el.querySelector('.modal-foot .btn.primary, .ac-foot .btn.primary, .set-actions .btn.primary');
+      if(btn){
+        if(btn.disabled) return false;
+        var action = btn.dataset.action, id = btn.dataset.id;
+        e.preventDefault();
+        t.blur();   // fields that save on change save now, before the button reads them
+        // the blur can repaint the form, so find the button again rather than trust the old one
+        var again = document.querySelector('.btn.primary[data-action="'+action+'"]'
+          + (id ? '[data-id="'+id+'"]' : '')) || btn;
+        if(!again.disabled) again.click();
+        return true;
+      }
+      // a field's own dialog or Settings card is as far as it looks: never a neighbour's
+      if(el.matches('.modal, .st-card')) return false;
+      el = el.parentElement;
+    }
+    return false;
+  }
+
   document.addEventListener('keydown', function(e){
     // A dialog is modal over everything, so it takes Escape and Enter first.
     if(dialogOpen()){
@@ -20525,6 +20559,7 @@
       if(saveBtn) saveItemFromForm(saveBtn.dataset.id || null);
       return;
     }
+    if(e.key==='Enter' && enterPressesSave(e)) return;
     if(hsScreen && hsScreen.kind === 'thread' && TH && (e.metaKey||e.ctrlKey) && e.shiftKey
        && e.key.toLowerCase() === 'f'){
       e.preventDefault(); toggleThreadFull(); return;
