@@ -253,7 +253,9 @@ def detect_run(conn, cfg, text, voice, max_tokens, on_progress=None):
     after = detector.score(final) if ready else None
     still = []
     if not ready:
-        still.append("The detector check could not run this time, so the rewrite was not scored.")
+        why = detector.status()["error"]
+        still.append("The detector check could not run this time, so the rewrite was not scored."
+                     + (f" The server said: {why}" if why else ""))
     elif after and after["ai"] > DETECT_FLAG:
         still.append("It still scores as more likely AI than human. Running it again, or "
                      "adding a sentence or two of your own, usually tips it over.")
@@ -674,7 +676,9 @@ def check():
         return jsonify({"error": "There is no text to check."}), 400
     detector.prepare(background=False)
     if detector.status()["status"] != "ready":
-        return jsonify({"error": "The detector is not available right now. Try again in a minute."}), 503
+        why = detector.status()["error"]
+        return jsonify({"error": "The detector is not available right now. Try again in a minute."
+                                 + (f" The server said: {why}" if why else "")}), 503
     return jsonify(detector.score(text))
 
 

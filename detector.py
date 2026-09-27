@@ -12,13 +12,19 @@ weights are one 500 MB safetensors file, fetched from Hugging Face the first tim
 used and kept in DATA_DIR, which is the Railway volume in production. One forward pass
 over 512 tokens takes about a second on a CPU.
 
+Loaded, the weights hold about 500 MB of RAM, and Railway bills RAM by the hour. So the
+model is dropped from memory after IDLE_SECONDS without a score and read back from disk,
+a few seconds, the next time it is needed. The file itself stays on the volume.
+
 This is an estimate. GPTZero and Turnitin run their own models, so a pass here is
 likely but not guaranteed there.
 """
 import json
 import os
 import re
+import sys
 import threading
+import time
 from html import unescape
 
 import httpx
@@ -30,10 +36,12 @@ REPO = "fakespot-ai/roberta-base-ai-text-detection-v1"
 FILES = ("config.json", "tokenizer.json", "model.safetensors")
 MODEL_DIR = os.path.join(db.DATA_DIR, "models", "fakespot-roberta")
 MAX_TOKENS = 512
+IDLE_SECONDS = 15 * 60
 
 _lock = threading.Lock()
 _model = None
 _state = {"status": "absent", "error": None}   # absent, loading, ready, failed
+_last_used = 0.0
 
 
 def _download():
@@ -44,11 +52,16 @@ def _download():
             continue
         url = f"https://huggingface.co/{REPO}/resolve/main/{name}"
         part = dest + ".part"
-        with httpx.stream("GET", url, follow_redirects=True, timeout=120) as r:
-            r.raise_for_status()
-            with open(part, "wb") as f:
-                for chunk in r.iter_bytes(1 << 20):
-                    f.write(chunk)
+        try:
+            with httpx.stream("GET", url, follow_redirects=True, timeout=120) as r:
+                r.raise_for_status()
+                with open(part, "wb") as f:
+                    for chunk in r.iter_bytes(1 << 20):
+                        f.write(chunk)
+        except BaseException:
+            if os.path.exists(part):  # a failed fetch should not keep holding disk space
+                os.remove(part)
+            raise
         os.replace(part, dest)        # never leave a half file where a whole one is expected
 
 
@@ -63,8 +76,10 @@ def _load():
     tok.no_padding()
 
     def lin(prefix):
-        # stored as (out, in); transposed once here so every pass is a plain x @ W
-        return (np.ascontiguousarray(w[prefix + ".weight"].T), w[prefix + ".bias"])
+        # stored as (out, in). .T is a view, not a copy: the matrix multiply reads it
+        # transposed in place, which keeps peak memory near the 500 MB of weights
+        # instead of nearly doubling it on a small server.
+        return (w[prefix + ".weight"].T, w[prefix + ".bias"])
 
     layers = []
     for i in range(cfg["num_hidden_layers"]):
@@ -97,9 +112,12 @@ def prepare(background=True):
             try:
                 _download()
                 _model = _load()
+                _touch()
                 _state["status"] = "ready"
+                threading.Thread(target=_unload_when_idle, daemon=True).start()
             except Exception as e:
-                _state.update(status="failed", error=str(e))
+                _state.update(status="failed", error=f"{type(e).__name__}: {e}")
+                print(f"detector: could not load the model: {_state['error']}", file=sys.stderr)
     if _state["status"] == "ready":
         return
     if _state["status"] == "loading":
@@ -111,6 +129,26 @@ def prepare(background=True):
         threading.Thread(target=work, daemon=True).start()
     else:
         work()
+
+
+def _touch():
+    global _last_used
+    _last_used = time.monotonic()
+
+
+def _unload_when_idle():
+    """Drop the model once nothing has scored with it for IDLE_SECONDS. A score already
+    running keeps its own reference, so it finishes on the weights it started with."""
+    global _model
+    while True:
+        time.sleep(60)
+        with _lock:
+            if _model is None:
+                return
+            if time.monotonic() - _last_used >= IDLE_SECONDS:
+                _model = None
+                _state.update(status="absent", error=None)
+                return
 
 
 def status():
@@ -199,6 +237,7 @@ def score_each(paragraphs):
         prepare()
         return None
     m = _model
+    _touch()
     return [round(_ai_probability(m, np.array(m["tok"].encode(clean_text(p)).ids)), 3)
             for p in paragraphs]
 
@@ -211,6 +250,7 @@ def score(text):
         prepare()
         return None
     m = _model
+    _touch()
     paras = [p.strip() for p in re.split(r"\n\s*\n", text or "") if p.strip()]
 
     def one(t):
