@@ -21,6 +21,11 @@ channels are alive.
 - [ ] **needs Saif** — Write a real note on vesta.study with the new editor: a `/`
       menu block or two, a size change, undo after going full screen, Hide and
       cmd+shift+. to bring the bar back. All 42 checks ran against a local copy.
+- [ ] **needs Saif** — Try the numbered list styles (2026-09-28): Tab inside a
+      numbered list now steps 1. → a. → i.; typing "a. ", "A. ", "i. " or "I. " starts
+      that kind of list; /numbered, /lettered and /roman restyle the list the caret
+      is in. Checked in `reference/speed/test_notes_editor.py` (52 pass). Tab on the
+      very first item of a list still does nothing: there is no item above to nest under.
 - [ ] **Dragging blocks around, the way Notion's ⋮⋮ handle does, is not built.**
       TipTap's drag-handle extension requires its collaboration packages (Yjs), which
       Vesta does not use. A small handle of our own is the likely route if it is

@@ -15,11 +15,11 @@
  * Build: `npm install && npm run build` in this folder writes ../static/editor.js.
  * index.html loads it as a plain script and reads `window.VestaEditor`.
  */
-import { Editor, Extension, Node, mergeAttributes } from '@tiptap/core'
+import { Editor, Extension, Node, mergeAttributes, wrappingInputRule } from '@tiptap/core'
 import { StarterKit } from '@tiptap/starter-kit'
 import { TextStyle, Color, FontFamily, FontSize, BackgroundColor } from '@tiptap/extension-text-style'
 import { Highlight } from '@tiptap/extension-highlight'
-import { TaskList, TaskItem } from '@tiptap/extension-list'
+import { TaskList, TaskItem, OrderedList } from '@tiptap/extension-list'
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table'
 import { Image } from '@tiptap/extension-image'
 import { Placeholder } from '@tiptap/extensions'
@@ -278,6 +278,53 @@ const VTaskItem = TaskItem.extend({
   }
 })
 
+// Numbered lists step 1, a, i as Tab nests them, like Docs and Word; that is CSS in
+// index.html, keyed on depth. A list given a style on purpose (the / menu, or typing
+// "a. " or "i. ") keeps it as <ol type>, which beats the depth rule. TipTap drops
+// type="1" when it writes HTML, so a nested list switched back to numbers would read
+// as letters again after a reload; this keeps it.
+const VOrderedList = OrderedList.extend({
+  renderHTML({ HTMLAttributes }) {
+    const { start, type, ...rest } = HTMLAttributes
+    const attrs = mergeAttributes(this.options.HTMLAttributes, rest)
+    if (start !== 1) attrs.start = start
+    if (type) attrs.type = type
+    return ['ol', attrs, 0]
+  },
+  addCommands() {
+    return {
+      ...this.parent?.(),
+      // Restyles the list the caret is in, or starts a numbered one (turning a
+      // bulleted or to-do list into it) when it is not in one.
+      setListStyle: type => ({ tr, dispatch, commands }) => {
+        const innermost = () => {
+          const $from = tr.selection.$from
+          for (let d = $from.depth; d > 0; d--) {
+            const node = $from.node(d)
+            if (node.type.name === 'bulletList' || node.type.name === 'taskList') return null
+            if (node.type === this.type) return { pos: $from.before(d), node }
+          }
+          return null
+        }
+        let list = innermost()
+        if (!list) {
+          if (!commands.toggleOrderedList()) return false
+          list = innermost()
+          if (!list) return true
+        }
+        if (dispatch) tr.setNodeMarkup(list.pos, undefined, { ...list.node.attrs, type })
+        return true
+      }
+    }
+  },
+  addInputRules() {
+    return [
+      ...(this.parent?.() || []),
+      wrappingInputRule({ find: /^([aAiI])\.\s$/, type: this.type, getAttributes: m => ({ type: m[1] }) })
+    ]
+  }
+})
+
 /** Keys that are not any one block's business. */
 const Keys = Extension.create({
   name: 'vestaKeys',
@@ -319,7 +366,9 @@ const BLOCKS = [
   { id: 'h2', group: 'Basic', title: 'Heading 2', hint: 'Medium section title', icon: 'h2', keys: 'subtitle', run: c => c.setHeading({ level: 2 }) },
   { id: 'h3', group: 'Basic', title: 'Heading 3', hint: 'Small section title', icon: 'h3', keys: 'subheading', run: c => c.setHeading({ level: 3 }) },
   { id: 'bullet', group: 'Basic', title: 'Bulleted list', hint: 'A simple list', icon: 'bullet', keys: 'unordered ul dash', run: c => c.toggleBulletList() },
-  { id: 'ordered', group: 'Basic', title: 'Numbered list', hint: 'A list in order', icon: 'ordered', keys: 'ordered ol', run: c => c.toggleOrderedList() },
+  { id: 'ordered', group: 'Basic', title: 'Numbered list', hint: '1, 2, 3', icon: 'ordered', keys: 'ordered ol', run: c => c.setListStyle('1') },
+  { id: 'lettered', group: 'Basic', title: 'Lettered list', hint: 'a, b, c', icon: 'ordered', keys: 'ordered ol alpha letters abc', run: c => c.setListStyle('a') },
+  { id: 'roman', group: 'Basic', title: 'Roman numeral list', hint: 'i, ii, iii', icon: 'ordered', keys: 'ordered ol numerals', run: c => c.setListStyle('i') },
   { id: 'task', group: 'Basic', title: 'To-do list', hint: 'Tick things off', icon: 'task', keys: 'checklist checkbox todo', run: c => c.toggleTaskList() },
   { id: 'quote', group: 'Basic', title: 'Quote', hint: 'Set a passage apart', icon: 'quote', keys: 'blockquote cite', run: c => c.toggleBlockquote() },
   { id: 'callout', group: 'Basic', title: 'Callout', hint: 'Make something stand out', icon: 'callout', keys: 'note info box', run: c => c.toggleCallout('info') },
@@ -507,8 +556,10 @@ function create(opts) {
         defaultProtocol: 'https',
         HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' }
       },
-      undoRedo: { depth: 500 }
+      undoRedo: { depth: 500 },
+      orderedList: false
     }),
+    VOrderedList,
     TextStyle, Color, FontFamily, FontSize, BackgroundColor,
     Highlight.configure({ multicolor: true }),
     VTaskList.configure({ HTMLAttributes: { class: 'rte-check' } }),
